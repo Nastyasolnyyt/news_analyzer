@@ -1,0 +1,107 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      # ВАЖНО: advertised.host.name указывает на имя сервиса 'kafka' внутри сети
+      # Это ключевой момент для правильной работы внутри Docker Compose
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    
+
+  aggregator-parser:
+    build: ./services/aggregator-parser-service
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: raw_articles
+    depends_on:
+      - kafka
+
+  news-site-parser:
+    build: ./services/news-site-parser-service
+    ports:
+      - "8001:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: raw_articles
+    depends_on:
+      - kafka
+
+  telegram-parser:
+    build: ./services/telegram-parser-service
+    ports:
+      - "8002:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: raw_articles
+      TG_API_ID: 34045959
+      TG_API_HASH: b126e73a8a872a5d03704d8f4f777078
+      TG_PHONE: "+79196510789"
+    depends_on:
+      - kafka
+    # Новый сервис: Text Preprocessing
+  text-preprocessing:
+    build: ./services/text-preprocessing-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      INPUT_TOPIC: raw_articles
+      OUTPUT_TOPIC_NER: text_for_ner
+      OUTPUT_TOPIC_RISK: text_for_risk
+      OUTPUT_TOPIC_SENTIMENT: text_for_sentiment
+      # Можно настроить и group.id, если нужно
+      # KAFKA_CONSUMER_GROUP: my_preprocessing_group
+    depends_on:
+      - kafka
+    restart: on-failure
+    # Добавим небольшую задержку, чтобы Kafka точно была готова
+    command: >
+      sh -c "sleep 10 && python text_preprocessing_service_kafka.py"
+
+  risk-classifier:
+    build: ./services/risk-classifier
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: text_for_risk
+      OUTPUT_TOPIC: risk_classified  
+      DB_URL: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+    depends_on:
+      - kafka
+      - postgres
+    restart: on-failure
+    command: >
+      sh -c "sleep 10 && python -c 'from app.kafka_consumer import consume_from_kafka; consume_from_kafka()'"
+
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: risk_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
