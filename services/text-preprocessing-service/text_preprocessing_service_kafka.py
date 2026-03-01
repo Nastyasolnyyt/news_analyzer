@@ -14,7 +14,9 @@ INPUT_TOPIC = os.getenv('INPUT_TOPIC', 'raw_articles') # Можно настро
 OUTPUT_TOPICS = [
     os.getenv('OUTPUT_TOPIC_NER', 'text_for_ner'),
     os.getenv('OUTPUT_TOPIC_RISK', 'text_for_risk'),
-    os.getenv('OUTPUT_TOPIC_SENTIMENT', 'text_for_sentiment')
+    os.getenv('OUTPUT_TOPIC_SENTIMENT', 'text_for_sentiment'),
+    os.getenv('OUTPUT_TOPIC_ANOMALY', 'text_for_anomaly'),
+    os.getenv('OUTPUT_TOPIC_SYNC', 'text_for_kg_sync')
 ]
 
 # Конфигурация Kafka Consumer
@@ -50,6 +52,12 @@ def clean_text(text):
     soup = BeautifulSoup(text, "html.parser")
     clean_text = soup.get_text(separator=" ").lower()
     return " ".join(clean_text.split())
+
+def clean_special_symbol(text):
+    """Очищает текст: удаляет пунктуацию, спецсимволы."""
+
+def receive_tokens(text):
+    """Получение массива строк с токенами из оригинального текста нижнего регистра без пробелов, HTML-тегов, лишних пробелов, пунктуации, стоп-слов и спецсимволов"""
 
 def delivery_callback(err, msg):
     """Callback функция для проверки успешной доставки сообщения в Kafka."""
@@ -91,8 +99,12 @@ def main():
 
             original_text = article_data.get('text', '')
             cleaned_text = clean_text(original_text)
+            cleared_text = clean_special_symbol(cleaned_text)
+            extracted_tokens = receive_tokens(cleared_text)
             processed_article_data = article_data.copy()
             processed_article_data['text'] = cleaned_text
+            processed_article_data['clean_text'] = cleared_text
+            processed_article_data['tokens'] = extracted_tokens
 
             for out_topic in OUTPUT_TOPICS:
                 try:
