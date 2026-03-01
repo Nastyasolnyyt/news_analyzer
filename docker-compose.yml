@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -15,15 +17,17 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      # ВАЖНО: advertised.host.name указывает на имя сервиса 'kafka' внутри сети
-      # Это ключевой момент для правильной работы внутри Docker Compose
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-    
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   aggregator-parser:
     build: ./services/aggregator-parser-service
@@ -33,7 +37,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: raw_articles
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
 
   news-site-parser:
     build: ./services/news-site-parser-service
@@ -43,7 +48,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: raw_articles
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
 
   telegram-parser:
     build: ./services/telegram-parser-service
@@ -52,19 +58,12 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: raw_articles
-      TG_API_ID: 34045959
-      TG_API_HASH: b126e73a8a872a5d03704d8f4f777078
-      TG_PHONE: "+79196510789"
+    env_file:
+      - .env
     depends_on:
-      - kafka
-  elasticsearch:
-    build: ./service/elasticsearch
-    ports:
-      - "8003:8000"
-    enviroment:
-      
-      
-    # Новый сервис: Text Preprocessing
+      kafka:
+        condition: service_healthy
+
   text-preprocessing:
     build: ./services/text-preprocessing-service
     environment:
@@ -72,13 +71,10 @@ services:
       INPUT_TOPIC: raw_articles
       OUTPUT_TOPIC_NER: text_for_ner
       OUTPUT_TOPIC_RISK: text_for_risk
-      OUTPUT_TOPIC_SENTIMENT: text_for_sentiment
-      # Можно настроить и group.id, если нужно
-      # KAFKA_CONSUMER_GROUP: my_preprocessing_group
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     restart: on-failure
-    # Добавим небольшую задержку, чтобы Kafka точно была готова
     command: >
       sh -c "sleep 10 && python text_preprocessing_service_kafka.py"
 
@@ -89,26 +85,81 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: text_for_risk
-      OUTPUT_TOPIC: risk_classified  
-      DB_URL: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+      OUTPUT_TOPIC: risk_classified
+      # Убедитесь, что OPENROUTER_API_KEY в .env
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
     restart: on-failure
     command: >
       sh -c "sleep 10 && python -c 'from app.kafka_consumer import consume_from_kafka; consume_from_kafka()'"
 
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: risk_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+  redis:
+    image: redis:7-alpine
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "6379:6379"
+    command: [ "redis-server", "--requirepass", "password" ]
 
-volumes:
-  postgres_data:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  elasticsearch-sync:
+    build: ./services/elasticsearch-sync
+    env_file:
+      - .env
+    environment:
+      # Используем облачную БД
+      POSTGRES_DB_URL: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: on-failure
+    command: python app/main.py
+
+  output_module:
+    build:
+      context: ./services/output_module
+      dockerfile: Dockerfile
+    container_name: output_module
+    ports:
+      - "8003:8000"
+    env_file:
+      - .env
+    environment:
+      # Используем облачную БД
+      DATABASE_URL: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+      REDIS_URL: redis://:password@redis:6379/0
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8003
+    depends_on:
+      - output_module
+    profiles: ["with-frontend"]
+
+# Убрали локальную БД
+# volumes:
+#   postgres_data:
+#   redis_data:

@@ -2,34 +2,29 @@ from telethon import TelegramClient
 from .models import Article as ArticleModel
 import os
 
-# --- Настройки ---
-api_id = int(os.getenv("TG_API_ID"))  # ❌ Нет default!
-api_hash = os.getenv("TG_API_HASH")   # ❌ Нет default!
-phone = os.getenv("TG_PHONE")         # ❌ Нет default!
+api_id = int(os.getenv("TG_API_ID"))  
+api_hash = os.getenv("TG_API_HASH")   
+phone = os.getenv("TG_PHONE")        
 session = './app/mfin'
-# --- Общие настройки ---
+
 channels = ['rbc_news', 'mash']
 
 async def parse_telegram_channels() -> list[ArticleModel]:
     client = TelegramClient(session, api_id, api_hash)
 
-    # Подключаемся без повторной авторизации
     await client.connect()
 
-    # Проверяем, нужна ли авторизация
     if not await client.is_user_authorized():
         raise Exception("Session is invalid. Re-authentication required.")
 
-    print("✅ Connected to Telegram!")
+    print("Connected to Telegram!")
 
     articles = []
 
     for channel_username in channels:
         print(f"Downloading news from {channel_username}")
         try:
-            # Получаем объект канала
             channel_entity = await client.get_entity(channel_username)
-            # Используем асинхронный итератор
             async for post in client.iter_messages(channel_entity, limit=100):
                 if post.text:
                     # Формируем ссылку
@@ -39,7 +34,7 @@ async def parse_telegram_channels() -> list[ArticleModel]:
                         title=" ",
                         link=link,
                         text=post.text,
-                        pub_date=post.date,
+                        pub_date=post.date.isoformat(), 
                         source=f"Telegram: {channel_username}"
                     )
                     articles.append(article_model)

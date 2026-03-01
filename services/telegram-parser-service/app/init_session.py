@@ -34,7 +34,7 @@ async def main(client: telethon.TelegramClient):
         except:
             await qr_login.recreate()
 
-    print("✅ Successfully logged in via QR code!")
+    print("Successfully logged in via QR code!")
 
 TELEGRAM_API_ID = int(os.getenv("TG_API_ID"))
 TELEGRAM_API_HASH = os.getenv("TG_API_HASH")
