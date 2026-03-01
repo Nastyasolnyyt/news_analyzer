@@ -1,6 +1,6 @@
 import json
 from aiokafka import AIOKafkaProducer
-from .config import KAFKA_BOOTSTRAP_SERVERS
+from .config import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
 
 producer = None
 

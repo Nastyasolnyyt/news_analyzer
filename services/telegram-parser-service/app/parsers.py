@@ -3,19 +3,24 @@ from .models import Article as ArticleModel
 import os
 
 # --- Настройки ---
-api_id = int(os.getenv("TG_API_ID", "34045959"))
-api_hash = os.getenv("TG_API_HASH", "b126e73a8a872a5d03704d8f4f777078")
-phone = os.getenv("TG_PHONE", "+79196510789")
-session = 'mfin'
-
+api_id = int(os.getenv("TG_API_ID"))  # ❌ Нет default!
+api_hash = os.getenv("TG_API_HASH")   # ❌ Нет default!
+phone = os.getenv("TG_PHONE")         # ❌ Нет default!
+session = './app/mfin'
 # --- Общие настройки ---
 channels = ['rbc_news', 'mash']
 
 async def parse_telegram_channels() -> list[ArticleModel]:
     client = TelegramClient(session, api_id, api_hash)
-    await client.start()  # <-- await
 
-    print("Connected to Telegram!")
+    # Подключаемся без повторной авторизации
+    await client.connect()
+
+    # Проверяем, нужна ли авторизация
+    if not await client.is_user_authorized():
+        raise Exception("Session is invalid. Re-authentication required.")
+
+    print("✅ Connected to Telegram!")
 
     articles = []
 
@@ -23,15 +28,15 @@ async def parse_telegram_channels() -> list[ArticleModel]:
         print(f"Downloading news from {channel_username}")
         try:
             # Получаем объект канала
-            channel_entity = await client.get_entity(channel_username)  # <-- await
+            channel_entity = await client.get_entity(channel_username)
             # Используем асинхронный итератор
-            async for post in client.iter_messages(channel_entity, limit=100):  # <-- async for
+            async for post in client.iter_messages(channel_entity, limit=100):
                 if post.text:
-                    # Формируем ссылку (убраны лишние пробелы)
+                    # Формируем ссылку
                     link = f"https://t.me/{channel_username}/{post.id}"
                     # Создаем объект ArticleModel
                     article_model = ArticleModel(
-                        title="",
+                        title=" ",
                         link=link,
                         text=post.text,
                         pub_date=post.date,
@@ -43,5 +48,5 @@ async def parse_telegram_channels() -> list[ArticleModel]:
             print(f"Error reading channel {channel_username}: {e}")
             continue  # Переходим к следующему каналу
 
-    await client.disconnect()  # <-- await
+    await client.disconnect()
     return articles
