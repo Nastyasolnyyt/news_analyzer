@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 from confluent_kafka import Consumer, Producer
 import signal
 import sys
+from nltk import  word_tokenize, download
+import pymystem3
+from pymystem3 import Mystem
 
 # --- Настройки из переменных окружения ---
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
@@ -53,11 +56,30 @@ def clean_text(text):
     clean_text = soup.get_text(separator=" ").lower()
     return " ".join(clean_text.split())
 
-def clean_special_symbol(text):
+def clean_special_symbol(text:str):
     """Очищает текст: удаляет пунктуацию, спецсимволы."""
+    for i in range(len(text)):
+        if not(text[i].isalpha() or text[i].isdigit() or text[i] == ' '):
+            text = text[:i] + text[i + 1:]
+    return text.lower()
 
-def receive_tokens(text):
+def receive_tokens(text:str):
     """Получение массива строк с токенами из оригинального текста нижнего регистра без пробелов, HTML-тегов, лишних пробелов, пунктуации, стоп-слов и спецсимволов"""
+    with open('stopwords-ru (1).json', 'r', encoding='utf-8') as f:
+        stopwords = json.load(f)
+
+    mystem = Mystem()
+    download('punkt')
+    sentences = word_tokenize(text)
+    words = mystem.lemmatize(sentences)
+    try:
+        while 1:
+            words.remove(' ')
+    except:
+        for word in words:
+            if word in stopwords:
+                words.remove(word)
+        return words
 
 def delivery_callback(err, msg):
     """Callback функция для проверки успешной доставки сообщения в Kafka."""
