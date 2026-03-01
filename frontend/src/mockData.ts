@@ -1,0 +1,312 @@
+export type RiskLevel = 'high' | 'medium' | 'low';
+export type EntityType = 'Company' | 'Person' | 'Event';
+export type TrendDirection = 'up' | 'down' | 'flat';
+
+export interface Entity {
+  id: number;
+  type: EntityType;
+  name: string;
+  description: string;
+  jurisdiction?: string;
+  identifiers?: {
+    label: string;
+    value: string;
+  }[];
+  registryInfo?: {
+    address: string;
+    registry: string;
+    founded: string;
+  };
+  linkedEntityIds: number[];
+  mentions?: {
+    week: string;
+    count: number;
+    note?: string;
+  }[];
+  changePercent?: number;
+  direction?: TrendDirection;
+  category?: string;
+}
+
+export interface News {
+  id: number;
+  title: string;
+  date: string;
+  source: string;
+  riskLevel: RiskLevel;
+  relatedEntityIds: number[];
+  summary: string;
+  fullText: string[];
+  tags?: string[];
+}
+
+export interface Report {
+  id: number;
+  name: string;
+  criteria: {
+    period: string;
+    entities: string[];
+    topics: string[];
+  };
+  newsIds: number[];
+}
+
+export const entities: Entity[] = [
+  {
+    id: 1,
+    type: 'Company',
+    name: 'Northwind Energy',
+    description: 'Энергетический холдинг, специализирующийся на ветровой генерации и инфраструктуре устойчивой энергетики.',
+    jurisdiction: 'Соединённое Королевство',
+    identifiers: [
+      { label: 'ОГРН', value: '1187746439851' },
+      { label: 'ИНН', value: '7708456231' },
+      { label: 'LEI', value: '5493001KJTIIGC8YMM15' },
+    ],
+    registryInfo: {
+      address: '125 London Wall, London EC2Y 5AS, United Kingdom',
+      registry: 'Companies House, UK',
+      founded: '09.04.2018',
+    },
+    linkedEntityIds: [2, 3, 4],
+    mentions: [
+      { week: '07.10', count: 4 },
+      { week: '14.10', count: 5 },
+      { week: '21.10', count: 5 },
+      { week: '28.10', count: 11, note: 'Запрос регулятора' },
+      { week: '04.11', count: 9 },
+      { week: '11.11', count: 6 },
+      { week: '18.11', count: 12, note: 'Инцидент в цепочке поставок' },
+      { week: '24.11', count: 8 },
+    ],
+    changePercent: 28,
+    direction: 'up',
+    category: 'Компания',
+  },
+  {
+    id: 2,
+    type: 'Company',
+    name: 'Aurora Holdings',
+    description: 'Инвестиционный холдинг с фокусом на устойчивую энергетику и финтех.',
+    linkedEntityIds: [1, 3],
+    changePercent: 17,
+    direction: 'up',
+    category: 'Компания',
+  },
+  {
+    id: 3,
+    type: 'Person',
+    name: 'Лия Кац',
+    description: 'Генеральный директор Northwind Energy.',
+    linkedEntityIds: [1],
+    changePercent: -6,
+    direction: 'down',
+    category: 'Персона',
+  },
+  {
+    id: 4,
+    type: 'Event',
+    name: 'Закон о чистой энергии',
+    description: 'Новое законодательство о переходе на возобновляемые источники энергии.',
+    linkedEntityIds: [1, 5],
+    changePercent: 12,
+    direction: 'up',
+    category: 'Событие',
+  },
+  {
+    id: 5,
+    type: 'Company',
+    name: 'Vertex Robotics',
+    description: 'Компания по разработке автономных складских систем.',
+    linkedEntityIds: [1],
+    changePercent: -2,
+    direction: 'flat',
+    category: 'Компания',
+  },
+];
+
+export const news: News[] = [
+  {
+    id: 101,
+    title: 'Отчёт о нарушениях в цепочке поставок',
+    date: '24 ноября, 09:40',
+    source: 'Reuters',
+    riskLevel: 'high',
+    relatedEntityIds: [1],
+    summary: 'Регулятор запрашивает дополнительные проверки у двух подрядчиков Northwind Energy после жалоб профсоюзов.',
+    fullText: [
+      'Регулятор запрашивает дополнительные проверки у двух подрядчиков Northwind Energy после жалоб профсоюзов.',
+      'Проверка затрагивает поставщиков редкоземельных материалов и логистические компании, обслуживающие ветропарки в Северном море.',
+      'Аналитики отмечают, что ужесточение требований может повлиять на финансовую модель холдинга.',
+    ],
+    tags: ['санкции', 'финансы', 'высокий риск'],
+  },
+  {
+    id: 102,
+    title: 'Aurora Holdings завершает сделку M&A',
+    date: '24 ноября, 08:10',
+    source: 'WSJ',
+    riskLevel: 'medium',
+    relatedEntityIds: [2],
+    summary: 'Совет директоров одобрил покупку финтех-стартапа для расширения линейки рисковых продуктов.',
+    fullText: [
+      'Совет директоров одобрил покупку финтех-стартапа для расширения линейки рисковых продуктов.',
+      'Сделка оценивается в $450 млн и должна быть завершена в первом квартале следующего года.',
+      'Эксперты отмечают стратегическое значение сделки для диверсификации портфеля Aurora Holdings.',
+    ],
+  },
+  {
+    id: 103,
+    title: 'Vertex Robotics запускает пилот в Азии',
+    date: '23 ноября, 21:55',
+    source: 'Bloomberg',
+    riskLevel: 'low',
+    relatedEntityIds: [5],
+    summary: 'Компания объявила о запуске тестовой программы автономных складов в Сингапуре с локальными партнёрами.',
+    fullText: [
+      'Компания объявила о запуске тестовой программы автономных складов в Сингапуре с локальными партнёрами.',
+      'Пилотная зона автоматизации складов показала рост эффективности поставок на 14% в течение месяца.',
+      'Ожидается расширение программы на другие страны региона в следующем году.',
+    ],
+  },
+  {
+    id: 104,
+    title: 'Лия Кац дала комментарий о расследовании',
+    date: '23 ноября, 19:30',
+    source: 'Financial Times',
+    riskLevel: 'medium',
+    relatedEntityIds: [3, 1],
+    summary: 'Обозначены первые шаги по взаимодействию с регулятором. Ожидается новая пресс-конференция на этой неделе.',
+    fullText: [
+      'Обозначены первые шаги по взаимодействию с регулятором. Ожидается новая пресс-конференция на этой неделе.',
+      'Генеральный директор Northwind Energy подчеркнула готовность компании к полному сотрудничеству.',
+      'Эксперты ожидают, что это может положительно повлиять на репутацию компании.',
+    ],
+  },
+  {
+    id: 501,
+    title: '[Northwind Energy] Пересмотр рейтинга ESG',
+    date: '24.11.2025',
+    source: 'Bloomberg',
+    riskLevel: 'medium',
+    relatedEntityIds: [1],
+    summary: 'Рейтинговое агентство запросило дополнительную отчётность по вопросам выбросов и взаимодействия с регулятором.',
+    fullText: [
+      'Рейтинговое агентство запросило дополнительную отчётность по вопросам выбросов и взаимодействия с регулятором.',
+      'Это может повлиять на текущий рейтинг ESG компании и её привлекательность для инвесторов.',
+    ],
+  },
+  {
+    id: 502,
+    title: '[Aurora Holdings] Конфликт с регулятором в Азии',
+    date: '24.11.2025',
+    source: 'Nikkei Asia',
+    riskLevel: 'high',
+    relatedEntityIds: [2],
+    summary: 'Местный регулятор сообщил о плановой проверке после расширения инвестиционного портфеля компании.',
+    fullText: [
+      'Местный регулятор сообщил о плановой проверке после расширения инвестиционного портфеля компании.',
+      'Проверка может занять несколько месяцев и повлиять на планы компании по расширению в регионе.',
+    ],
+  },
+  {
+    id: 503,
+    title: '[Лия Кац] Выступление на комитете',
+    date: '23.11.2025',
+    source: 'Reuters',
+    riskLevel: 'medium',
+    relatedEntityIds: [3],
+    summary: 'Ключевые тезисы о предстоящем реформировании рынка и потенциальных рисках для сегмента промышленности.',
+    fullText: [
+      'Ключевые тезисы о предстоящем реформировании рынка и потенциальных рисках для сегмента промышленности.',
+      'Выступление получило широкий резонанс в профессиональном сообществе.',
+    ],
+  },
+  {
+    id: 504,
+    title: '[Vertex Robotics] Партнёрство с логистической сетью',
+    date: '23.11.2025',
+    source: 'TechCrunch',
+    riskLevel: 'low',
+    relatedEntityIds: [5],
+    summary: 'Соглашение позволит ускорить внедрение автономных складов и может снизить операционные издержки на 12%.',
+    fullText: [
+      'Соглашение позволит ускорить внедрение автономных складов и может снизить операционные издержки на 12%.',
+      'Партнёрство охватывает несколько ключевых рынков в Европе и Азии.',
+    ],
+  },
+  {
+    id: 801,
+    title: 'Регулятор инициировал внеплановую проверку Northwind Energy',
+    date: '24.11.2025',
+    source: 'Financial Times',
+    riskLevel: 'high',
+    relatedEntityIds: [1],
+    summary: 'Ведомство требует предоставить расширенный отчёт по ESG-показателям и взаимодействию с подрядчиками.',
+    fullText: [
+      'Ведомство требует предоставить расширенный отчёт по ESG-показателям и взаимодействию с подрядчиками.',
+      'Проверка может занять несколько месяцев и повлиять на текущие проекты компании.',
+    ],
+  },
+  {
+    id: 802,
+    title: 'Northwind Energy расширяет партнёрство с Aurora Capital',
+    date: '23.11.2025',
+    source: 'Bloomberg',
+    riskLevel: 'medium',
+    relatedEntityIds: [1, 2],
+    summary: 'Инвестфонд увеличил долю на 6%, что может повлиять на стратегию международной экспансии компании.',
+    fullText: [
+      'Инвестфонд увеличил долю на 6%, что может повлиять на стратегию международной экспансии компании.',
+      'Сделка оценивается экспертами как положительная для долгосрочного развития Northwind Energy.',
+    ],
+  },
+  {
+    id: 803,
+    title: 'Vertex Robotics протестировала совместные склады с Northwind',
+    date: '21.11.2025',
+    source: 'TechCrunch',
+    riskLevel: 'low',
+    relatedEntityIds: [5, 1],
+    summary: 'Пилотная зона автоматизации складов показала рост эффективности поставок на 14% в течение месяца.',
+    fullText: [
+      'Пилотная зона автоматизации складов показала рост эффективности поставок на 14% в течение месяца.',
+      'Успешные результаты пилота могут привести к расширению сотрудничества между компаниями.',
+    ],
+  },
+];
+
+export const reports: Report[] = [
+  {
+    id: 1,
+    name: 'Отчёт по рискам за октябрь',
+    criteria: {
+      period: '10.10.2025 — 19.10.2025',
+      entities: ['Газпром', 'Иванов А.Л.'],
+      topics: ['Санкции', 'Назначения'],
+    },
+    newsIds: [101, 102, 103, 104],
+  },
+];
+
+// Helper functions to get data by ID
+export function getEntityById(id: number): Entity | undefined {
+  return entities.find((e) => e.id === id);
+}
+
+export function getNewsById(id: number): News | undefined {
+  return news.find((n) => n.id === id);
+}
+
+export function getReportById(id: number): Report | undefined {
+  return reports.find((r) => r.id === id);
+}
+
+export function getEntitiesByIds(ids: number[]): Entity[] {
+  return entities.filter((e) => ids.includes(e.id));
+}
+
+export function getNewsByIds(ids: number[]): News[] {
+  return news.filter((n) => ids.includes(n.id));
+}
+

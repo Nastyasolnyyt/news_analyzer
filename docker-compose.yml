@@ -57,6 +57,13 @@ services:
       TG_PHONE: "+79196510789"
     depends_on:
       - kafka
+  elasticsearch:
+    build: ./service/elasticsearch
+    ports:
+      - "8003:8000"
+    enviroment:
+      
+      
     # Новый сервис: Text Preprocessing
   text-preprocessing:
     build: ./services/text-preprocessing-service
