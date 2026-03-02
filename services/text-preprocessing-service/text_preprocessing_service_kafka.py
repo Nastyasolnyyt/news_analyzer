@@ -63,11 +63,11 @@ def clean_special_symbol(text:str):
             text = text[:i] + text[i + 1:]
     return text.lower()
 
-def receive_tokens(text:str):
-    """Получение массива строк с токенами из оригинального текста нижнего регистра без пробелов, HTML-тегов, лишних пробелов, пунктуации, стоп-слов и спецсимволов"""
-    with open('stopwords-ru (1).json', 'r', encoding='utf-8') as f:
+with open('stopwords-ru (1).json', 'r', encoding='utf-8') as f:
         stopwords = json.load(f)
 
+def receive_tokens(text:str, stopwords):
+    """Получение массива строк с токенами из оригинального текста нижнего регистра без пробелов, HTML-тегов, лишних пробелов, пунктуации, стоп-слов и спецсимволов"""
     mystem = Mystem()
     download('punkt')
     sentences = word_tokenize(text)
@@ -122,7 +122,7 @@ def main():
             original_text = article_data.get('text', '')
             cleaned_text = clean_text(original_text)
             cleared_text = clean_special_symbol(cleaned_text)
-            extracted_tokens = receive_tokens(cleared_text)
+            extracted_tokens = receive_tokens(cleared_text, stopwords)
             processed_article_data = article_data.copy()
             processed_article_data['text'] = cleaned_text
             processed_article_data['clean_text'] = cleared_text
