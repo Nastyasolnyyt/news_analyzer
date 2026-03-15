@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 class Article(BaseModel):
-    id: Optional[int] = None # <-- Добавлено для сохранения в базу
+    id: Optional[int] = None 
     title: str
     description: Optional[str] = None
     link: str

@@ -5,7 +5,7 @@ services:
     env: python
     region: oregon  
     plan: free
-    buildCommand: pip install --only-binary=all -r requirements.txt  # ✅ Убрано cd services/...
+    buildCommand: pip install --only-binary=all -r requirements.txt  
     startCommand: python app.py
     rootDir: services/aggregator-parser-service
     autoDeploy: true
@@ -20,7 +20,7 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install --only-binary=all -r requirements.txt  # ✅ Убрано cd services/...
+    buildCommand: pip install --only-binary=all -r requirements.txt  
     startCommand: python main.py
     rootDir: services/telegram-parser-service
     autoDeploy: true
@@ -37,7 +37,7 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install --only-binary=all -r requirements.txt  # ✅ Убрано cd services/...
+    buildCommand: pip install --only-binary=all -r requirements.txt  
     startCommand: python kafka_consumer.py
     rootDir: services/text-preprocessing-service
     autoDeploy: true
@@ -45,7 +45,7 @@ services:
       - key: KAFKA_BOOTSTRAP_SERVERS
         value: your-kafka-url:9092
       - key: POSTGRES_URL
-        value: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+        value: DATABASE_UR
 
   #AHAЛИТИЧЕСКИЕ СЕРВИСЫ (Background Workers)
   - type: web
@@ -53,7 +53,7 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install --only-binary=all -r requirements.txt  # ✅ Убрано cd services/...
+    buildCommand: pip install --only-binary=all -r requirements.txt 
     startCommand: python classifier_service.py
     rootDir: services/risk-classifier
     autoDeploy: true
@@ -61,7 +61,7 @@ services:
       - key: KAFKA_BOOTSTRAP_SERVERS
         value: your-kafka-url:9092
       - key: POSTGRES_URL
-        value: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+        value: DATABASE_UR
       - key: OPENROUTER_API_KEY   
         value: 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
 
@@ -70,10 +70,10 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install --only-binary=all -r requirements.txt  # ✅ Убрано cd services/...
+    buildCommand: pip install --only-binary=all -r requirements.txt  
     startCommand: python event_clustering.py
     rootDir: services/event
     autoDeploy: true
     envVars:
       - key: POSTGRES_URL
-        value: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
+        value: DATABASE_UR

@@ -30,7 +30,7 @@ async def send_article_to_kafka(article: Article):
     json_str = article.model_dump_json(exclude_none=True) 
     
     try:
-        # УБЕДИТЕСЬ, ЧТО ЗДЕСЬ НЕТ timeout=...
+        
         await prod.send_and_wait(KAFKA_TOPIC, json_str.encode("utf-8")) 
     except Exception as e:
         print(f"Failed to send article to Kafka: {e}")

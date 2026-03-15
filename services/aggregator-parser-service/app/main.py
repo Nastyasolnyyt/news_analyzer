@@ -16,12 +16,11 @@ async def parse_aggregator(urls: List[str]):
             clean_url = url.strip()
             articles = parse_rss(clean_url)
             for article in articles:
-                # ВАЖНО: передаём объект Article, а не article.model_dump()
+                
                 await send_article_to_kafka(article)
             all_articles.extend(articles)
         except Exception as e:
-            # Убедитесь, что эта строка правильно ловит все ошибки
+           
             raise HTTPException(status_code=500, detail=f"Error parsing {url}: {str(e)}")
     return all_articles
 
-# ...
