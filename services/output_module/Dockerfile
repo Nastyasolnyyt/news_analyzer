@@ -19,4 +19,5 @@ COPY . .
 
 EXPOSE 8000
 
-CMD sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"
+# Убрали alembic upgrade head, чтобы не было конфликта с существующими таблицами
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

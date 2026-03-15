@@ -1,40 +1,52 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { news, type News } from '../mockData';
+import api from '../api'; // Подключаем твой API
 
 const router = useRouter();
 
-interface Criteria {
-  period: string;
-  entities: string[];
-  topics: string[];
-}
+// Критерии пока оставим статичными или можно будет потом передавать их через query-параметры
+const criteria = ref({
+  period: 'Последние 7 дней',
+  entities: ['Тестовая Организация'],
+  topics: ['Общий анализ'],
+});
 
-const criteria: Criteria = {
-  period: '10.10.2025 — 19.10.2025',
-  entities: ['Газпром', 'Иванов А.Л.'],
-  topics: ['Санкции', 'Назначения'],
-};
+const allArticles = ref<any[]>([]);
+const reportItems = ref<any[]>([]);
+const isLoading = ref(true);
 
-const availableNews: News[] = news.slice(0, 5).map((n) => ({
-  id: n.id,
-  title: n.title,
-  date: n.date,
-  source: n.source,
-  risk: n.riskLevel,
-}));
+onMounted(async () => {
+  try {
+    // Загружаем новости из базы для формирования отчета
+    const data = await api.getPosts();
+    const items = data.items || data;
+    
+    allArticles.value = items;
+    // По умолчанию добавим в отчет первые 5 новостей из базы
+    reportItems.value = items.slice(0, 5);
+  } catch (error) {
+    console.error("Ошибка при получении данных для отчета:", error);
+  } finally {
+    isLoading.value = false;
+  }
+});
 
-const reportItems = ref<News[]>(availableNews.slice(0, 4));
-
-const totalFound = availableNews.length;
+const totalFound = computed(() => allArticles.value.length);
 
 const removeFromReport = (id: number) => {
-  reportItems.value = reportItems.value.filter((item) => item.id !== id);
+  reportItems.value = reportItems.value.filter((item) => {
+    const postId = item.post?.id || item.id;
+    return postId !== id;
+  });
 };
 
 const stats = computed(() => {
-  const highRisk = reportItems.value.filter((item) => item.risk === 'high').length;
+  const highRisk = reportItems.value.filter((item) => {
+    const tonality = item.analysis?.tonality || 0;
+    return tonality < -0.3;
+  }).length;
+
   return {
     count: reportItems.value.length,
     highRisk,
@@ -44,6 +56,11 @@ const stats = computed(() => {
 const handleNewsClick = (newsId: number) => {
   router.push(`/news/${newsId}`);
 };
+
+// Функция для имитации экспорта
+const exportReport = (format: string) => {
+  alert(`Отчет из ${reportItems.value.length} элементов экспортирован в ${format}`);
+};
 </script>
 
 <template>
@@ -51,109 +68,101 @@ const handleNewsClick = (newsId: number) => {
     <header class="page-header">
       <button class="logo" @click="router.push('/')">
         <span class="dot" />
-        Report Studio
+        Atlas Report
       </button>
       <div class="header-actions">
-        <button class="icon-btn" aria-label="search" @click="router.push('/search')">
-          <svg viewBox="0 0 24 24"><path d="M11 4a7 7 0 0 1 5.6 11.2l3.6 3.6-1.4 1.4-3.6-3.6A7 7 0 1 1 11 4Z" /></svg>
-        </button>
-        <button class="icon-btn" aria-label="notifications" @click="router.push('/notifications')">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M12 2a6 6 0 0 0-6 6v3.4l-.9 2.2a1 1 0 0 0 1 1.4h11.8a1 1 0 0 0 1-.6 1 1 0 0 0 0-.8L18 11.4V8a6 6 0 0 0-6-6Z"
-            />
-            <path d="M9 18a3 3 0 0 0 6 0" />
-          </svg>
-        </button>
-        <button class="icon-btn profile" aria-label="profile">
-          <span>AK</span>
-        </button>
+        <button class="icon-btn" @click="router.push('/search')">Поиск</button>
+        <button class="icon-btn profile">AK</button>
       </div>
     </header>
 
     <section class="hero card">
       <div>
         <p class="overline">Формирование отчёта</p>
-        <h1>Подборка по заданным критериям</h1>
+        <h1>Результаты анализа базы</h1>
         <p>
-          Соберите данные, отфильтруйте нужные новости и экспортируйте в формат PDF или Excel для
-          отправки заинтересованным сторонам.
+          Данные сформированы на основе последних записей в вашей базе данных. 
+          Вы можете удалить лишние элементы перед экспортом.
         </p>
       </div>
-      <button class="primary" @click="router.push('/search')">Найти новости</button>
+      <button class="primary" @click="router.push('/')">Добавить данные</button>
     </section>
 
-    <section class="criteria card">
-      <div class="criteria-line">
-        <span class="label">Период:</span>
-        <span>{{ criteria.period }}</span>
-      </div>
-      <div class="criteria-line">
-        <span class="label">Сущности:</span>
-        <span>
-          <button v-for="entity in criteria.entities" :key="entity" class="pill">
-            {{ entity }}
-          </button>
-        </span>
-      </div>
-      <div class="criteria-line">
-        <span class="label">Темы:</span>
-        <span>
-          <button v-for="topic in criteria.topics" :key="topic" class="pill neutral">
-            {{ topic }}
-          </button>
-        </span>
-      </div>
-    </section>
+    <div v-if="isLoading" class="loading-container">Загрузка данных из БД...</div>
 
-    <section class="news card">
-      <header>
-        <div>
-          <p class="overline">Новости в отчёте</p>
-          <h2>{{ stats.count }} элементов</h2>
+    <template v-else>
+      <section class="criteria card">
+        <div class="criteria-line">
+          <span class="label">Период:</span>
+          <span>{{ criteria.period }}</span>
         </div>
-        <span class="count">Всего найдено {{ totalFound }}</span>
-      </header>
-      <div class="news-list">
-        <article
-          v-for="item in reportItems"
-          :key="item.id"
-          class="news-card"
-          @click="handleNewsClick(item.id)"
-        >
+        <div class="criteria-line">
+          <span class="label">Сущности в поиске:</span>
+          <span>
+            <button v-for="entity in criteria.entities" :key="entity" class="pill">
+              {{ entity }}
+            </button>
+          </span>
+        </div>
+      </section>
+
+      <section class="news card">
+        <header>
           <div>
-            <p class="title">[{{ item.title }}]</p>
-            <p class="meta">{{ item.date }} — Источник: {{ item.source }}</p>
+            <p class="overline">Выбранные новости</p>
+            <h2>{{ stats.count }} элементов в списке</h2>
           </div>
-          <button class="remove" aria-label="Удалить" @click.stop="removeFromReport(item.id)">×</button>
-        </article>
-        <p v-if="!reportItems.length" class="placeholder">
-          Нет выбранных новостей — добавьте их из подборки.
-        </p>
-      </div>
-    </section>
+          <span class="count">Всего в базе: {{ totalFound }}</span>
+        </header>
+        
+        <div class="news-list">
+          <article
+            v-for="item in reportItems"
+            :key="item.post?.id || item.id"
+            class="news-card"
+            @click="handleNewsClick(item.post?.id || item.id)"
+          >
+            <div>
+              <p class="title">[{{ item.post?.title || item.title }}]</p>
+              <p class="meta">
+                {{ item.post?.source || item.source }} — 
+                {{ item.post?.created_at ? new Date(item.post.created_at).toLocaleDateString('ru-RU') : 'Дата не указана' }}
+              </p>
+            </div>
+            <button class="remove" @click.stop="removeFromReport(item.post?.id || item.id)">×</button>
+          </article>
 
-    <section class="stats card">
-      <h3>Статистика</h3>
-      <ul>
-        <li>Всего найдено: {{ totalFound }}</li>
-        <li>В отчёте: {{ stats.count }}</li>
-        <li>Высокий риск: {{ stats.highRisk }}</li>
-      </ul>
-    </section>
+          <p v-if="!reportItems.length" class="placeholder">
+            Отчет пуст. Вернитесь на главную, чтобы выбрать новости.
+          </p>
+        </div>
+      </section>
 
-    <section class="actions card">
-      <div>
-        <h3>Экспортировать</h3>
-        <p>Проверьте состав и выгрузите отчёт в нужном формате.</p>
-      </div>
-      <div class="cta-buttons">
-        <button class="secondary">Экспорт в PDF</button>
-        <button class="secondary">Экспорт в Excel</button>
-      </div>
-    </section>
+      <section class="stats card">
+        <h3>Итоговая статистика</h3>
+        <ul>
+          <li>Объектов анализа: {{ stats.count }}</li>
+          <li>Из них критических (высокий риск): {{ stats.highRisk }}</li>
+          <li>Средняя тональность выборки: 
+             {{ (reportItems.reduce((acc, curr) => acc + (curr.analysis?.tonality || 0), 0) / (reportItems.length || 1)).toFixed(2) }}
+          </li>
+        </ul>
+      </section>
+
+      <section class="actions card">
+        <div>
+          <h3>Экспортировать документ</h3>
+          <p>Сформируйте готовый файл для отправки.</p>
+        </div>
+        <div class="cta-buttons">
+          <button class="secondary" @click="exportReport('PDF')">Скачать PDF</button>
+          <button class="secondary" @click="exportReport('Excel')">Скачать Excel</button>
+        </div>
+      </section>
+    </template>
   </section>
 </template>
+
 
 <style scoped>
 .report-page {
@@ -183,6 +192,7 @@ const handleNewsClick = (newsId: number) => {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+  border: none;
 }
 
 .logo:hover {
@@ -220,9 +230,6 @@ const handleNewsClick = (newsId: number) => {
 .icon-btn svg {
   width: 20px;
   height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
 }
 
 .icon-btn.profile {
@@ -295,6 +302,7 @@ const handleNewsClick = (newsId: number) => {
   color: #fff;
   padding: 6px 12px;
   margin-right: 6px;
+  cursor: pointer;
 }
 
 .pill.neutral {
@@ -411,14 +419,11 @@ const handleNewsClick = (newsId: number) => {
     flex-direction: column;
     align-items: flex-start;
   }
-
   .cta-buttons {
     width: 100%;
   }
-
   .cta-buttons button {
     flex: 1;
   }
 }
 </style>
-

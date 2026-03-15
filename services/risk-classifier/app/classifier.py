@@ -21,8 +21,8 @@ class MistralNeuralClassifier:
             timeout=30.0
         )
         
-        # ✅ Ваша модель
-        self.model = "qwen/qwen3-vl-30b-a3b-thinking"
+     
+        self.model = "qwen/qwen3-next-80b-a3b-instruct:free"
         
         logger.info(f"Classifier initialized with model: {self.model}")
     

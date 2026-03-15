@@ -1,14 +1,26 @@
-from sqlalchemy import Column, DateTime, Integer, String, func
-from src.application.enums import UserRole
-from src.infrastructure.postgres.connection import Base
+from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy.orm import declarative_base
+import enum
 
+Base = declarative_base()
+
+class UserRole(str, enum.Enum):
+    USER = "user"
+    ADMIN = "admin"
+    SUPERADMIN = "superadmin"
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    login = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
-    name = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False, default=UserRole.USER.value)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    login = Column(String, unique=True, nullable=False)
+    username = Column(String, unique=True, nullable=False)  
+    password_hash = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    role = Column(String, default=UserRole.USER.value)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    def __repr__(self):
+        return f"<User(id={self.id}, login='{self.login}', username='{self.username}')>"
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

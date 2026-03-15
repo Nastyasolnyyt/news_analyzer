@@ -1,175 +1,100 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { getEntityById, getEntitiesByIds, news } from '../mockData';
+import api from '../api'; 
 
 const router = useRouter();
 const route = useRoute();
-const entityId = Number(route.params.id);
 
-const entity = computed(() => getEntityById(entityId));
-const linkedEntities = computed(() => {
-  if (!entity.value) return [];
-  return getEntitiesByIds(entity.value.linkedEntityIds);
-});
-const relatedNews = computed(() => {
-  if (!entity.value) return [];
-  return news.filter((n) => n.relatedEntityIds.includes(entityId));
-});
+const entity = ref<any>(null);
+const relatedNews = ref<any[]>([]);
+const isLoading = ref(true);
 
-const handleLinkedEntityClick = (linkedId: number) => {
-  router.push(`/entity/${linkedId}`);
+const entityId = computed(() => Number(route.params.id));
+
+const fetchData = async (id: number) => {
+  isLoading.value = true;
+  try {
+    // Получаем сущность (в базе это колонки id, text, type, details)
+    const data = await api.getEntityById(id);
+    entity.value = data;
+
+    // Загружаем новости, связанные с этой сущностью (через article_id или поиск)
+    const newsData = await api.getPosts({ entity_id: id });
+    relatedNews.value = newsData.items || [];
+  } catch (error) {
+    console.error("Ошибка загрузки профиля:", error);
+  } finally {
+    isLoading.value = false;
+  }
 };
 
-const handleNewsClick = (newsId: number) => {
-  router.push(`/news/${newsId}`);
-};
+onMounted(() => fetchData(entityId.value));
+watch(entityId, (newId) => fetchData(newId));
 
-if (!entity.value) {
-  router.push('/');
-}
+// Безопасное получение данных из JSON-поля details
+const details = computed(() => entity.value?.details || {});
 </script>
-
 <template>
-  <section v-if="entity" class="profile">
+  <div v-if="isLoading" class="loading">
+    Загрузка профиля...
+  </div>
+
+  <section v-else-if="entity" class="profile">
     <header class="profile-header">
       <button class="logo" @click="router.push('/')">
-        <span class="dot" />
-        Atlas Risk
+        <span class="dot" /> Atlas Risk
       </button>
-      <div class="header-icons">
-        <button aria-label="search" class="icon-btn" @click="router.push('/search')">
-          <svg viewBox="0 0 24 24"><path d="M11 4a7 7 0 0 1 5.6 11.2l3.6 3.6-1.4 1.4-3.6-3.6A7 7 0 1 1 11 4Z" /></svg>
-        </button>
-        <button aria-label="notifications" class="icon-btn" @click="router.push('/notifications')">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M12 2a6 6 0 0 0-6 6v3.4l-.9 2.2a1 1 0 0 0 1 1.4h11.8a1 1 0 0 0 1-.6 1 1 0 0 0 0-.8L18 11.4V8a6 6 0 0 0-6-6Z"
-            />
-            <path d="M9 18a3 3 0 0 0 6 0" />
-          </svg>
-        </button>
-        <button aria-label="profile" class="icon-btn profile">
-          <span>AK</span>
-        </button>
-      </div>
-    </header>
+      </header>
 
     <section class="hero">
       <div>
-        <p class="entity-type">{{ entity.type === 'Company' ? 'Организация' : entity.type === 'Person' ? 'Персона' : 'Событие' }}</p>
-        <h1>{{ entity.name }}</h1>
-        <p v-if="entity.jurisdiction" class="jurisdiction">{{ entity.jurisdiction }}</p>
+        <p class="entity-type">
+          {{ entity.type === 'Company' ? 'Организация' : 'Персона' }}
+        </p>
+        <h1>{{ entity.text }}</h1>
+        <p v-if="details.jurisdiction" class="jurisdiction">
+          {{ details.jurisdiction }}
+        </p>
       </div>
       <p class="description">
-        {{ entity.description }}
+        {{ details.description || 'Описание отсутствует' }}
       </p>
     </section>
 
     <section class="grid">
-      <article v-if="entity.identifiers || entity.registryInfo" class="card identifiers">
+      <article class="card identifiers">
         <h2>Основные данные</h2>
-        <dl v-if="entity.identifiers">
-          <div v-for="item in entity.identifiers" :key="item.label">
-            <dt>{{ item.label }}</dt>
-            <dd>{{ item.value }}</dd>
-          </div>
-        </dl>
-        <div v-if="entity.registryInfo" class="registry">
-          <p><strong>Юр. адрес:</strong> {{ entity.registryInfo.address }}</p>
-          <p><strong>Реестр:</strong> {{ entity.registryInfo.registry }}</p>
-          <p><strong>Основана:</strong> {{ entity.registryInfo.founded }}</p>
+        <div class="registry">
+          <p v-if="details.address"><strong>Адрес:</strong> {{ details.address }}</p>
+          <p v-if="details.founded"><strong>Основана:</strong> {{ details.founded }}</p>
+          <p><strong>Тип в системе:</strong> {{ entity.type }}</p>
         </div>
-        <p v-if="linkedEntities.length > 0" class="links">
-          Связан с:
-          <a
-            v-for="linked in linkedEntities.slice(0, 3)"
-            :key="linked.id"
-            href="#"
-            @click.prevent="handleLinkedEntityClick(linked.id)"
-            >{{ linked.name }}</a
-          >
-        </p>
       </article>
 
-      <article v-if="linkedEntities.length > 0" class="card related">
-        <header>
-          <div>
-            <p class="overline">Связанные сущности</p>
-            <h2>Ключевые связи</h2>
+      <article v-if="relatedNews.length > 0" class="card news">
+        <h2>Последние события</h2>
+        <div class="news-list">
+          <div v-for="item in relatedNews.slice(0, 3)" :key="item.id" class="news-card">
+            <strong>{{ item.title || 'Новость без заголовка' }}</strong>
+            <p>{{ item.content?.slice(0, 80) }}...</p>
           </div>
-          <button class="outline">Все связи</button>
-        </header>
-        <ul>
-          <li v-for="item in linkedEntities" :key="item.id">
-            <div>
-              <strong>{{ item.name }}</strong>
-              <span>{{ item.type === 'Company' ? 'Компания' : item.type === 'Person' ? 'Персона' : 'Событие' }}</span>
-            </div>
-            <button @click="handleLinkedEntityClick(item.id)">Перейти</button>
-          </li>
-        </ul>
+        </div>
       </article>
     </section>
 
-    <section v-if="entity.mentions" class="mentions card">
-      <header>
-        <div>
-          <p class="overline">Упоминания</p>
-          <h2>Динамика за 8 недель</h2>
-        </div>
-        <button class="outline">Подробнее</button>
-      </header>
-      <div class="chart">
-        <div v-for="point in entity.mentions" :key="point.week" class="bar">
-          <div class="bar-fill" :style="{ height: `${point.count * 5}px` }">
-            <span v-if="point.note" class="note">{{ point.note }}</span>
-          </div>
-          <span class="count">{{ point.count }}</span>
-          <span class="week">{{ point.week }}</span>
-        </div>
-      </div>
-      <p class="chart-summary">Среднее 6 упоминаний / неделя, резкий рост 18.11 из-за инцидента.</p>
-    </section>
+    <div class="actions">
+      <button class="primary" @click="router.push('/')">Вернуться к списку</button>
+    </div>
+  </section>
 
-    <section v-if="relatedNews.length > 0" class="news card">
-      <header>
-        <div>
-          <p class="overline">Новости</p>
-          <h2>Связанные события</h2>
-        </div>
-        <button class="outline">Все новости</button>
-      </header>
-      <div class="news-list">
-        <article
-          v-for="newsItem in relatedNews.slice(0, 3)"
-          :key="newsItem.id"
-          class="news-card"
-          @click="handleNewsClick(newsItem.id)"
-        >
-          <div class="news-meta">
-            <span class="date">{{ newsItem.date }}</span>
-            <span class="source">{{ newsItem.source }}</span>
-          </div>
-          <h3>{{ newsItem.title }}</h3>
-          <p>{{ newsItem.summary }}</p>
-          <button class="inline-link" @click.stop="handleNewsClick(newsItem.id)">Перейти к новости</button>
-        </article>
-      </div>
-    </section>
-
-    <section class="actions card">
-      <div>
-        <h3>Что дальше?</h3>
-        <p>Просматривайте график в деталях, анализируйте связи и создавайте отчет по рискам.</p>
-      </div>
-      <div class="cta">
-        <button class="primary">Открыть график</button>
-        <button class="secondary" @click="router.push('/reports')">Создать отчёт</button>
-      </div>
-    </section>
+  <section v-else class="error">
+    <h2>Сущность с ID {{ entityId }} не найдена</h2>
+    <p>Проверьте правильность ссылки или наличие записи в базе данных.</p>
+    <button @click="router.push('/')">На главную</button>
   </section>
 </template>
+
 
 <style scoped>
 .profile {

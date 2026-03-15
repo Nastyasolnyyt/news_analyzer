@@ -117,7 +117,7 @@ def lemmatize_ru(text: str) -> str:
 _word_re = re.compile(r"[A-Za-zА-Яа-яёЁ]+", flags=re.U)
 
 # %%
-# --- Clustering component ---
+#Clustering component 
 class EventClustering:
     def __init__(
         self,

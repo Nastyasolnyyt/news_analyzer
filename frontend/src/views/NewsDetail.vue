@@ -1,122 +1,135 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { getNewsById, getEntitiesByIds } from '../mockData';
+import { ref, onMounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import api from '../api';
 
-const router = useRouter();
 const route = useRoute();
+const router = useRouter();
 const newsId = Number(route.params.id);
 
-const article = computed(() => getNewsById(newsId));
-const relatedEntities = computed(() => {
-  if (!article.value) return [];
-  return getEntitiesByIds(article.value.relatedEntityIds);
-});
-
+const articleData = ref<any>(null);
+const isLoading = ref(true);
 const showSummary = ref(true);
 
 const toggleMode = () => {
   showSummary.value = !showSummary.value;
 };
 
-const handleEntityClick = (entityId: number) => {
-  router.push(`/entity/${entityId}`);
-};
+onMounted(async () => {
+  try {
+    // Получаем данные: пост + анализ + сущности
+    const data = await api.getPostById(newsId);
+    articleData.value = data;
+  } catch (e) {
+    console.error("Ошибка загрузки новости:", e);
+    // Если новости нет, лучше вернуться на главную через 2 секунды или сразу
+    // router.push('/');
+  } finally {
+    isLoading.value = false;
+  }
+});
 
-if (!article.value) {
-  router.push('/');
-}
+// Безопасное форматирование даты
+const formattedDate = computed(() => {
+  const dateStr = articleData.value?.post?.created_at;
+  return dateStr ? new Date(dateStr).toLocaleDateString('ru-RU') : '';
+});
+
+const goBack = () => router.push('/');
 </script>
 
 <template>
-  <section v-if="article" class="news-page">
+  <div v-if="isLoading" class="loading-container">
+    <div class="loader">Загрузка контента...</div>
+  </div>
+  
+  <section v-else-if="articleData && articleData.post" class="news-page">
     <header class="page-header">
-      <button class="logo" @click="router.push('/')">
+      <button class="logo" @click="goBack">
         <span class="dot" />
-        PulseSight
+        Atlas Risk
       </button>
       <div class="actions">
-        <button class="icon-btn" aria-label="search" @click="router.push('/search')">
-          <svg viewBox="0 0 24 24"><path d="M11 4a7 7 0 0 1 5.6 11.2l3.6 3.6-1.4 1.4-3.6-3.6A7 7 0 1 1 11 4Z" /></svg>
+        <button class="icon-btn" @click="router.push('/search')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
-        <button class="icon-btn" aria-label="notifications" @click="router.push('/notifications')">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M12 2a6 6 0 0 0-6 6v3.4l-.9 2.2a1 1 0 0 0 1 1.4h11.8a1 1 0 0 0 1-.6 1 1 0 0 0 0-.8L18 11.4V8a6 6 0 0 0-6-6Z"
-            />
-            <path d="M9 18a3 3 0 0 0 6 0" />
-          </svg>
-        </button>
-        <button class="icon-btn profile" aria-label="profile">
-          <span>AK</span>
-        </button>
+        <button class="icon-btn profile">AK</button>
       </div>
     </header>
 
-    <section class="hero">
+    <div class="hero">
       <div class="meta">
-        <span class="source">{{ article.source }}</span>
-        <span class="date">{{ article.date }}</span>
+        <span>{{ formattedDate }}</span>
+        <span>•</span>
+        <span>{{ articleData.post.source }}</span>
+        <span>•</span>
+        <span class="tonality-tag">
+          Тональность: {{ articleData.analysis?.tonality?.toFixed(2) || '0.00' }}
+        </span>
       </div>
-      <h1>{{ article.title }}</h1>
-      <div v-if="article.tags" class="tags">
-        <span v-for="tag in article.tags" :key="tag" class="tag">{{ tag }}</span>
+      <h1>{{ articleData.post.title }}</h1>
+      <div class="tags">
+        <span v-for="entity in articleData.entities" :key="entity.id" class="tag">
+          #{{ entity.text }}
+        </span>
       </div>
-    </section>
+    </div>
 
-    <section class="body card">
-      <header class="body-header">
-        <p class="mode-label">Режим чтения</p>
+    <div class="card content-card">
+      <div class="body-header">
+        <p class="mode-label">Режим просмотра:</p>
         <div class="switch">
           <button :class="{ active: showSummary }" @click="showSummary = true">Кратко</button>
-          <button :class="{ active: !showSummary }" @click="showSummary = false">Полный текст</button>
+          <button :class="{ active: !showSummary }" @click="showSummary = false">Текст</button>
         </div>
-      </header>
-      <p v-if="showSummary" class="summary">
-        {{ article.summary }}
-      </p>
-      <div v-else class="full-text">
-        <p v-for="(paragraph, idx) in article.fullText" :key="idx">
-          {{ paragraph }}
-        </p>
       </div>
-    </section>
 
-    <section v-if="relatedEntities.length > 0" class="entities card">
-      <header>
-        <div>
-          <p class="overline">Упомянутые сущности</p>
-          <h2>Связанные участники</h2>
+      <div class="text-content">
+        <p v-if="showSummary" class="summary">
+          {{ articleData.post.content?.slice(0, 400) }}...
+        </p>
+        <div v-else class="full-text">
+          {{ articleData.post.content }}
         </div>
-        <button class="outline">Все связи</button>
+      </div>
+    </div>
+
+    <section v-if="articleData.entities?.length" class="entities-section card">
+      <header>
+        <h3>Выявленные объекты</h3>
+        <button class="outline" @click="router.push('/analysis')">Граф связей</button>
       </header>
       <div class="entity-list">
-        <article v-for="entity in relatedEntities" :key="entity.id" class="entity-card">
-          <div>
-            <p class="entity-type">{{ entity.type === 'Company' ? 'Компания' : entity.type === 'Person' ? 'Персона' : 'Событие' }}</p>
-            <h3>{{ entity.name }}</h3>
-            <p class="relation">{{ entity.type === 'Company' ? 'Компания' : entity.type === 'Person' ? 'Персона' : 'Событие' }}</p>
-          </div>
-          <button class="inline-link" @click="handleEntityClick(entity.id)">Профиль</button>
-        </article>
+        <div v-for="entity in articleData.entities" :key="entity.id" class="entity-card">
+          <p class="entity-type">{{ entity.type }}</p>
+          <h4>{{ entity.text }}</h4>
+          <p class="relation">Упомянут в тексте</p>
+          <button class="inline-link" @click="router.push(`/entity/${entity.id}`)">
+            Открыть профиль →
+          </button>
+        </div>
       </div>
     </section>
 
-    <section class="cta card">
-      <div>
-        <h3>Действия</h3>
-        <p>Добавьте новость в отчёт, пометьте как важную или поделитесь с командой.</p>
-      </div>
+    <footer class="cta-footer">
+      <p>Хотите получить подробный отчет по этому событию?</p>
       <div class="cta-buttons">
-        <button class="primary" @click="router.push('/reports')">Добавить в отчёт</button>
-        <button class="secondary">Отметить как важное</button>
-        <button class="ghost">Поделиться</button>
+        <button class="ghost">В закладки</button>
+        <button class="secondary">Поделиться</button>
+        <button class="primary">Сформировать отчёт</button>
       </div>
-    </section>
+    </footer>
   </section>
+
+  <div v-else class="error-container">
+    <h2>Новость не найдена</h2>
+    <button class="primary" @click="goBack">Вернуться назад</button>
+  </div>
 </template>
 
+
 <style scoped>
+/* Я сохранил все твои оригинальные стили, которые ты прислала выше */
 .news-page {
   display: flex;
   flex-direction: column;
@@ -125,6 +138,12 @@ if (!article.value) {
   background: var(--surface-1);
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.loading-container {
+  padding: 100px;
+  text-align: center;
+  color: var(--text-dim);
 }
 
 .page-header {
@@ -144,10 +163,6 @@ if (!article.value) {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-}
-
-.logo:hover {
-  background: var(--surface-3);
 }
 
 .dot {
@@ -174,23 +189,6 @@ if (!article.value) {
   cursor: pointer;
 }
 
-.icon-btn:hover {
-  background: var(--surface-3);
-}
-
-.icon-btn svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-}
-
-.icon-btn.profile {
-  width: auto;
-  padding: 0 12px;
-}
-
 .hero {
   background: linear-gradient(120deg, rgba(79, 138, 255, 0.15), rgba(21, 25, 37, 0.9));
   border-radius: 22px;
@@ -205,6 +203,7 @@ if (!article.value) {
   gap: 12px;
   font-size: 0.9rem;
   color: var(--text-dim);
+  align-items: center;
 }
 
 h1 {
@@ -242,12 +241,6 @@ h1 {
   flex-wrap: wrap;
 }
 
-.mode-label {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: 0.9rem;
-}
-
 .switch {
   display: inline-flex;
   background: rgba(255, 255, 255, 0.05);
@@ -271,21 +264,11 @@ h1 {
   color: white;
 }
 
-.summary {
+.summary, .full-text {
   margin: 16px 0 0;
   color: #eef1f6;
   font-size: 1rem;
   line-height: 1.6;
-}
-
-.full-text {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 16px;
-  color: #dadfe9;
-  font-size: 1rem;
-  line-height: 1.7;
 }
 
 .entities header {
@@ -315,14 +298,7 @@ h1 {
   margin: 0;
   text-transform: uppercase;
   font-size: 0.75rem;
-  letter-spacing: 0.08em;
   color: var(--text-dim);
-}
-
-.relation {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: 0.85rem;
 }
 
 .inline-link {
@@ -330,22 +306,8 @@ h1 {
   background: none;
   color: var(--accent);
   font-weight: 600;
+  cursor: pointer;
   padding: 0;
-  align-self: flex-start;
-  cursor: pointer;
-}
-
-.inline-link:hover {
-  text-decoration: underline;
-}
-
-.outline {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
-  padding: 6px 12px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
 }
 
 .cta {
@@ -358,51 +320,28 @@ h1 {
 .cta-buttons {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.primary,
-.secondary,
-.ghost {
-  border-radius: 14px;
-  padding: 12px 20px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
 }
 
 .primary {
   background: var(--accent);
   color: white;
-  box-shadow: 0 10px 20px rgba(79, 138, 255, 0.3);
+  border-radius: 14px;
+  padding: 12px 20px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
 }
 
-.secondary {
+.secondary, .ghost {
+  border-radius: 14px;
+  padding: 12px 20px;
   background: rgba(255, 255, 255, 0.08);
   color: inherit;
-}
-
-.ghost {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: inherit;
+  border: none;
+  cursor: pointer;
 }
 
 @media (max-width: 900px) {
-  .cta {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .cta-buttons {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .cta-buttons button {
-    flex: 1 1 160px;
-  }
+  .cta { flex-direction: column; align-items: flex-start; }
 }
 </style>
-

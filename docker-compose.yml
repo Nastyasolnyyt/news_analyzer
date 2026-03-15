@@ -86,7 +86,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: text_for_risk
       OUTPUT_TOPIC: risk_classified
-      # Убедитесь, что OPENROUTER_API_KEY в .env
+     
     depends_on:
       kafka:
         condition: service_healthy
@@ -118,7 +118,6 @@ services:
     env_file:
       - .env
     environment:
-      # Используем облачную БД
       POSTGRES_DB_URL: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
       ELASTICSEARCH_URL: http://elasticsearch:9200
     depends_on:
@@ -128,24 +127,13 @@ services:
     command: python app/main.py
 
   output_module:
-    build:
-      context: ./services/output_module
-      dockerfile: Dockerfile
-    container_name: output_module
+    build: ./services/output_module
     ports:
       - "8003:8000"
     env_file:
-      - .env
-    environment:
-      # Используем облачную БД
-      DATABASE_URL: postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386
-      REDIS_URL: redis://:password@redis:6379/0
-      ELASTICSEARCH_URL: http://elasticsearch:9200
+      - .env 
     depends_on:
-      elasticsearch:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - elasticsearch
 
   frontend:
     build:
@@ -158,8 +146,3 @@ services:
     depends_on:
       - output_module
     profiles: ["with-frontend"]
-
-# Убрали локальную БД
-# volumes:
-#   postgres_data:
-#   redis_data:

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import HeaderBar from '../components/HeaderBar.vue';
 import StatsWidget from '../components/StatsWidget.vue';
@@ -7,16 +7,39 @@ import TopEntities from '../components/TopEntities.vue';
 import EventFeed from '../components/EventFeed.vue';
 import RiskLegend from '../components/RiskLegend.vue';
 import ActionPanel from '../components/ActionPanel.vue';
-import { entities, news, type RiskLevel } from '../mockData';
+import api from '../api'; 
+// Оставляем сущности из моков, если бэкенд их пока не отдает
+import { entities as mockEntities } from '../mockData';
 
 const router = useRouter();
 
-const stats = {
-  relevantNews: news.length,
-};
+const articles = ref<any[]>([]);
+const isLoading = ref(true);
 
+onMounted(async () => {
+  try {
+    // ВАЖНО: Если бэкенд требует авторизацию, проверь, что в api.ts 
+    // добавляется заголовок Authorization: Bearer <твой_токен>
+    const data = await api.getPosts();
+    
+    // Проверяем структуру: на FastAPI обычно возвращается объект, 
+    // в котором список лежит в ключе 'items'
+    articles.value = data.items || data; 
+  } catch (error) {
+    console.error("Ошибка загрузки реальных данных:", error);
+    // Если бэкенд пустой, можно временно оставить articles.value = []
+  } finally {
+    isLoading.value = false;
+  }
+});
+
+const stats = computed(() => ({
+  relevantNews: articles.value.length,
+}));
+
+// Сущности (пока моки, как ты просила)
 const topEntities = computed(() => {
-  return entities
+  return mockEntities
     .filter((e) => e.changePercent !== undefined)
     .map((e) => ({
       id: e.id,
@@ -27,30 +50,34 @@ const topEntities = computed(() => {
     }));
 });
 
+// ПРАВИЛЬНЫЙ МАППИНГ: Берем данные из твоей БД (PostWithExternalModelsDTO)
 const events = computed(() => {
-  return news.slice(0, 4).map((n) => ({
-    id: n.id,
-    title: n.title,
-    date: n.date,
-    source: n.source,
-    summary: n.summary,
-    risk: n.riskLevel,
-  }));
+  return articles.value.map((item: any) => {
+    // В зависимости от того, как бэкенд отдает пост: 
+    // либо item.post.title, либо просто item.title
+    const post = item.post || item;
+    const analysis = item.analysis || { tonality: 0 };
+
+    return {
+      id: post.id,
+      title: post.title,
+      date: post.created_at ? new Date(post.created_at).toLocaleDateString('ru-RU') : 'Сегодня',
+      source: post.source || 'Источник',
+      summary: post.content ? post.content.slice(0, 150) + '...' : 'Нет описания',
+      // Тональность из БД переводим в уровень риска для EventFeed
+      risk: analysis.tonality < -0.3 ? 'high' : (analysis.tonality < 0 ? 'medium' : 'low'),
+    };
+  });
 });
 
-const riskLegend: Array<{ level: RiskLevel; label: string; description: string }> = [
-  { level: 'high', label: 'Высокий риск', description: 'Требует немедленной реакции' },
-  { level: 'medium', label: 'Средний риск', description: 'Нужен мониторинг' },
-  { level: 'low', label: 'Низкий риск', description: 'Информация к сведению' },
+const riskLegend = [
+  { level: 'high', label: 'Высокий риск', description: 'Отрицательная тональность' },
+  { level: 'medium', label: 'Средний риск', description: 'Нейтрально-негативно' },
+  { level: 'low', label: 'Низкий риск', description: 'Положительно' },
 ];
 
-const handleEntityClick = (entityId: number) => {
-  router.push(`/entity/${entityId}`);
-};
-
-const handleNewsClick = (newsId: number) => {
-  router.push(`/news/${newsId}`);
-};
+const handleEntityClick = (entityId: number) => router.push(`/entity/${entityId}`);
+const handleNewsClick = (newsId: number) => router.push(`/news/${newsId}`);
 </script>
 
 <template>
@@ -60,7 +87,8 @@ const handleNewsClick = (newsId: number) => {
       <section class="primary">
         <StatsWidget :count="stats.relevantNews" />
         <TopEntities :entities="topEntities" @entity-click="handleEntityClick" />
-        <EventFeed :events="events" @news-click="handleNewsClick" />
+        <div v-if="isLoading" style="color: var(--text-dim); padding: 20px;">Загрузка новостей...</div>
+        <EventFeed v-else :events="events" @news-click="handleNewsClick" />
       </section>
       <aside class="secondary">
         <RiskLegend :levels="riskLegend" />
@@ -110,4 +138,3 @@ const handleNewsClick = (newsId: number) => {
   }
 }
 </style>
-

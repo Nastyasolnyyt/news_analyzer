@@ -1,19 +1,32 @@
 import os
-
 from dotenv import load_dotenv
+from urllib.parse import urlparse
 
 
 class Settings:
     def __init__(self) -> None:
         load_dotenv()
-        # Postgres Settings
-        self.PG_HOST = self._get_required_env("PG_HOST")
-        self.PG_PORT = int(self._get_required_env("PG_PORT"))
-        self.PG_DATABASE = self._get_required_env("PG_DATABASE")
-        self.PG_USERNAME = self._get_required_env("PG_USERNAME")
-        self.PG_PASSWORD = self._get_required_env("PG_PASSWORD")
 
-        # Redis Settings
+        # Проверяем, задан ли DATABASE_URL
+        database_url = os.getenv("DATABASE_URL")
+
+        if database_url:
+            # Разбираем DATABASE_URL
+            parsed = urlparse(database_url)
+            self.PG_HOST = parsed.hostname
+            self.PG_PORT = parsed.port or 5432  # стандартный порт
+            self.PG_DATABASE = parsed.path.lstrip('/')  # /dbname -> dbname
+            self.PG_USERNAME = parsed.username
+            self.PG_PASSWORD = parsed.password
+        else:
+            # Используем отдельные переменные (старое поведение)
+            self.PG_HOST = self._get_required_env("PG_HOST")
+            self.PG_PORT = int(self._get_required_env("PG_PORT"))
+            self.PG_DATABASE = self._get_required_env("PG_DATABASE")
+            self.PG_USERNAME = self._get_required_env("PG_USERNAME")
+            self.PG_PASSWORD = self._get_required_env("PG_PASSWORD")
+
+        # Redis Settings (оставляем как есть)
         self.REDIS_HOST = self._get_required_env("REDIS_HOST")
         self.REDIS_PORT = int(self._get_required_env("REDIS_PORT"))
         self.REDIS_DB_INDEX = int(self._get_required_env("REDIS_DB_INDEX"))

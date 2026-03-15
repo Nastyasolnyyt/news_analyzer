@@ -1,50 +1,66 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { news } from '../mockData';
+import api from '../api'; // Твой API клиент
 
 const router = useRouter();
-const query = ref('финансовые риски');
-const showFilters = ref(true);
+const query = ref(''); // Начинаем с пустой строки
+const showFilters = ref(false);
+const isLoading = ref(false);
+const results = ref<any[]>([]);
 
-interface FilterOption {
-  id: string;
-  label: string;
-}
-
-const sourceOptions: FilterOption[] = [
+// Опции фильтров (пока для визуала, но можно прокидывать в API)
+const sourceOptions = [
   { id: 'media', label: 'СМИ' },
   { id: 'telegram', label: 'Telegram' },
   { id: 'registry', label: 'Реестры' },
 ];
 
-const topicOptions: FilterOption[] = [
-  { id: 'economics', label: 'Экономика' },
-  { id: 'politics', label: 'Политика' },
-];
-
-const riskOptions: FilterOption[] = [
+const riskOptions = [
   { id: 'high', label: 'Высокий' },
   { id: 'medium', label: 'Средний' },
   { id: 'low', label: 'Низкий' },
 ];
 
 const infoChecklist = [
-  'Вводите ключевые слова, названия компаний или персон',
-  'Комбинируйте фильтры по источникам, темам и рискам',
-  'Просматривайте карточки найденных событий',
-  'Переходите в полную карточку для деталей и отчётов',
+  'Вводите ключевые слова или названия компаний',
+  'Система ищет по заголовкам и содержанию статей',
+  'Результаты подтягиваются напрямую из вашей БД',
 ];
 
-const results = ref(
-  news.filter((n) => n.id >= 501 && n.id <= 504).map((n) => ({
-    id: n.id,
-    title: n.title,
-    date: n.date,
-    source: n.source,
-    summary: n.summary,
-  }))
-);
+// ГЛАВНАЯ ФУНКЦИЯ ПОИСКА
+const handleSearch = async () => {
+  if (!query.value.trim()) return;
+  
+  isLoading.value = true;
+  try {
+    // Делаем запрос к бэкенду. 
+    // Предполагаем, что бэкенд умеет принимать параметр search или q
+    const data = await api.getPosts({ search: query.value });
+    
+    // Мапим данные из структуры { post, analysis, entities }
+    const items = data.items || data;
+    results.value = items.map((item: any) => ({
+      id: item.post?.id || item.id,
+      title: item.post?.title || item.title,
+      date: item.post?.created_at 
+        ? new Date(item.post.created_at).toLocaleDateString('ru-RU') 
+        : 'Неизвестно',
+      source: item.post?.source || item.source,
+      summary: item.post?.content || item.content,
+    }));
+  } catch (error) {
+    console.error("Ошибка при поиске:", error);
+    results.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Загружаем что-нибудь при входе, если нужно
+onMounted(() => {
+  if (query.value) handleSearch();
+});
 
 const toggleFilters = () => {
   showFilters.value = !showFilters.value;
@@ -60,31 +76,29 @@ const handleNewsClick = (newsId: number) => {
     <header class="search-header">
       <button class="home-btn" @click="router.push('/')">
         <span class="dot" />
-        Insight Monitor
+        Atlas Insight
       </button>
       <div class="header-actions">
-        <button class="icon-btn" aria-label="notifications">
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M12 2a6 6 0 0 0-6 6v3.4l-.9 2.2a1 1 0 0 0 1 1.4h11.8a1 1 0 0 0 1-.6 1 1 0 0 0 0-.8L18 11.4V8a6 6 0 0 0-6-6Z"
-            />
-            <path d="M9 18a3 3 0 0 0 6 0" />
-          </svg>
-        </button>
-        <button class="icon-btn profile" aria-label="profile">
-          <span class="initials">AK</span>
-        </button>
+        <button class="icon-btn profile">AK</button>
       </div>
     </header>
 
     <section class="search-panel">
-      <label class="search-input" aria-label="Поисковый запрос">
-        <input v-model="query" type="text" placeholder="Например: санкции, дизельный рынок" />
-        <button type="button">Искать</button>
-      </label>
+      <form class="search-input" @submit.prevent="handleSearch">
+        <input 
+          v-model="query" 
+          type="text" 
+          placeholder="Введите запрос (например: Газпром, санкции)..." 
+        />
+        <button type="submit" :disabled="isLoading">
+          {{ isLoading ? '...' : 'Искать' }}
+        </button>
+      </form>
+      
       <button class="filter-toggle" type="button" @click="toggleFilters">
         {{ showFilters ? 'Скрыть фильтры' : 'Показать фильтры' }}
       </button>
+
       <div v-if="showFilters" class="filters">
         <div class="filter-group">
           <p>Источники</p>
@@ -94,62 +108,72 @@ const handleNewsClick = (newsId: number) => {
           </label>
         </div>
         <div class="filter-group">
-          <p>Темы</p>
-          <label v-for="option in topicOptions" :key="option.id">
-            <input type="checkbox" />
-            <span>{{ option.label }}</span>
-          </label>
-        </div>
-        <div class="filter-group">
-          <p>Уровень риска</p>
+          <p>Уровень риска (AI)</p>
           <label v-for="option in riskOptions" :key="option.id">
-            <input type="checkbox" :checked="option.id !== 'low'" />
+            <input type="checkbox" checked />
             <span>{{ option.label }}</span>
           </label>
         </div>
       </div>
     </section>
 
-    <section class="info-block">
-      <h2>Что можно делать</h2>
-      <ul>
-        <li v-for="item in infoChecklist" :key="item">
-          <span class="bullet" />
-          <span>{{ item }}</span>
-        </li>
-      </ul>
-    </section>
+    <div v-if="isLoading" class="loading-status">
+      Поиск в базе данных...
+    </div>
 
-    <section class="results">
-      <header>
-        <div>
-          <p class="overline">Найденные события</p>
-          <h3>Актуальные новости по запросу</h3>
-        </div>
-        <span class="count">{{ results.length }} результатов</span>
-      </header>
-      <div class="card-list">
-        <article v-for="item in results" :key="item.id" class="result-card" tabindex="0">
-          <div class="card-top">
-            <h4>{{ item.title }}</h4>
-            <span class="date">{{ item.date }}</span>
+    <template v-else>
+      <section v-if="results.length > 0" class="results">
+        <header>
+          <div>
+            <p class="overline">Результаты</p>
+            <h3>Найдено в вашей системе</h3>
           </div>
-          <p class="source">{{ item.source }}</p>
-          <p class="summary">{{ item.summary }}</p>
-          <button class="inline-link" @click="handleNewsClick(item.id)">Перейти к карточке</button>
-        </article>
-      </div>
-    </section>
+          <span class="count">{{ results.length }} новостей</span>
+        </header>
+        <div class="card-list">
+          <article 
+            v-for="item in results" 
+            :key="item.id" 
+            class="result-card"
+            @click="handleNewsClick(item.id)"
+          >
+            <div class="card-top">
+              <h4>{{ item.title }}</h4>
+              <span class="date">{{ item.date }}</span>
+            </div>
+            <p class="source">{{ item.source }}</p>
+            <p class="summary">{{ item.summary.slice(0, 160) }}...</p>
+            <button class="inline-link">Подробнее →</button>
+          </article>
+        </div>
+      </section>
+
+      <section v-else-if="query" class="info-block">
+        <h2>Ничего не найдено</h2>
+        <p>Попробуйте изменить запрос или проверить подключение к бэкенду.</p>
+      </section>
+
+      <section v-else class="info-block">
+        <h2>Начните поиск</h2>
+        <ul>
+          <li v-for="item in infoChecklist" :key="item">
+            <span class="bullet" />
+            <span>{{ item }}</span>
+          </li>
+        </ul>
+      </section>
+    </template>
 
     <section class="action-footer">
       <div>
-        <h4>Готовы зафиксировать выводы?</h4>
-        <p>Соберите подборку новостей в единый отчёт и отправьте заинтересованным сторонам.</p>
+        <h4>Нужен официальный отчёт?</h4>
+        <p>Вы можете отобрать найденные новости и сформировать PDF-документ.</p>
       </div>
-      <button class="primary" @click="router.push('/reports')">Создать отчёт</button>
+      <button class="primary" @click="router.push('/reports')">В студию отчётов</button>
     </section>
   </section>
 </template>
+
 
 <style scoped>
 .search-page {
