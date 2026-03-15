@@ -2,9 +2,9 @@ import asyncio
 from parsers import parse_telegram_channels
 
 async def test():
-    print("🔍 Parsing started...")
+    print("Parsing started...")
     articles = await parse_telegram_channels()
-    print(f"✅ Found {len(articles)} articles")
+    print(f"Found {len(articles)} articles")
     for i, article in enumerate(articles[:5], 1):  # Показываем первые 5
         print(f"\n[{i}] {article.title}")
         print(f"Link: {article.link}")
