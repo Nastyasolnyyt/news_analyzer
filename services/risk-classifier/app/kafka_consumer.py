@@ -164,6 +164,7 @@ def consume_from_kafka():
                     result_message['published_at'] = article.published_at
                 
                 producer.produce(
+                    
                     topic=output_topic,
                     value=json.dumps(result_message, ensure_ascii=False).encode('utf-8'),
                     callback=delivery_callback,
@@ -174,6 +175,7 @@ def consume_from_kafka():
                 
                 logger.info(f"Sent to {output_topic}: {result.risk_type} (conf: {result.confidence:.2f})")
                 
+                time.sleep(8)
                 if message_count % 10 == 0:
                     producer.flush()
                 

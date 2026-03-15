@@ -6,16 +6,17 @@ def parse_rss(url: str) -> list[Article]:
     feed = feedparser.parse(url)
     articles = []
     for entry in feed.entries:
-        pub_date = entry.get("published_parsed")
-        # Преобразуем struct_time в datetime, если возможно
-        pub_date = datetime(*pub_date[:6]) if pub_date else None
+        # Извлекаем данные аккуратно
+        title_val = entry.get("title", "")
+        desc_val = entry.get("summary", "")
+        
         article = Article(
-            title=entry.get("title", ""),
-            description=entry.get("summary", ""),
+            title=title_val,
+            description=desc_val,
+            text=desc_val,  # Записываем описание в text, чтобы колонка не была пустой
             link=entry.get("link", ""),
-            pub_date=pub_date,  
+            pub_date=datetime(*entry.published_parsed[:6]) if entry.get("published_parsed") else None,
             source=url
         )
         articles.append(article)
     return articles
-    

@@ -117,7 +117,7 @@ def lemmatize_ru(text: str) -> str:
 _word_re = re.compile(r"[A-Za-zА-Яа-яёЁ]+", flags=re.U)
 
 # %%
-#Clustering component 
+# --- Clustering component ---
 class EventClustering:
     def __init__(
         self,
@@ -420,4 +420,25 @@ class EventClustering:
             logger.info("Inserted sample %d articles", len(sample_texts))
         finally:
             session.close()
-
+            
+if __name__ == "__main__":
+    # Загружаем настройки
+    db_url = os.getenv("DATABASE_URL")
+    
+    clustering = EventClustering(db_url=db_url)
+    
+    # Создаем таблицы, если их нет
+    create_tables(clustering.engine)
+    
+    logger.info("Starting Event Clustering service...")
+    
+    # Запускаем бесконечный цикл (например, раз в 10 минут)
+    import time
+    while True:
+        try:
+            clustering.run_once(limit=100)
+            logger.info("Clustering cycle finished. Sleeping...")
+            time.sleep(600) 
+        except Exception as e:
+            logger.error(f"Error in clustering loop: {e}")
+            time.sleep(60)

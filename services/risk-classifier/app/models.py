@@ -6,6 +6,7 @@ from datetime import datetime
 class Article(BaseModel):
     id: Optional[int] = None
     title: str
+    text: Optional[str] = None
     description: Optional[str] = None  
     link: str
     pub_date: Optional[datetime] = None 

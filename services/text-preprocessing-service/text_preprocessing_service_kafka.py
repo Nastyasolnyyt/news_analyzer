@@ -1,19 +1,22 @@
-# text_preprocessing_service_kafka.py
 import json
 import os
 import logging
+import re
 from bs4 import BeautifulSoup
 from confluent_kafka import Consumer, Producer
 import signal
 import sys
-from nltk import  word_tokenize, download
-import pymystem3
+import nltk
+from nltk import word_tokenize
 from pymystem3 import Mystem
+
+# --- Инициализация тяжелых ресурсов (ОДИН РАЗ при запуске) ---
+nltk.download('punkt', quiet=True)
+mystem = Mystem()
 
 # --- Настройки из переменных окружения ---
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
-
-INPUT_TOPIC = os.getenv('INPUT_TOPIC', 'raw_articles') # Можно настроить гибко
+INPUT_TOPIC = os.getenv('INPUT_TOPIC', 'raw_articles')
 OUTPUT_TOPICS = [
     os.getenv('OUTPUT_TOPIC_NER', 'text_for_ner'),
     os.getenv('OUTPUT_TOPIC_RISK', 'text_for_risk'),
@@ -22,135 +25,117 @@ OUTPUT_TOPICS = [
     os.getenv('OUTPUT_TOPIC_SYNC', 'text_for_kg_sync')
 ]
 
-# Конфигурация Kafka Consumer
 CONSUMER_CONFIG = {
     'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
-    'group.id': os.getenv('KAFKA_CONSUMER_GROUP', 'text-preprocessing-group'), # Также можно настроить
+    'group.id': os.getenv('KAFKA_CONSUMER_GROUP', 'text-preprocessing-group'),
     'auto.offset.reset': 'latest',
     'enable.auto.commit': False,
 }
 
-# Конфигурация Kafka Producer
-PRODUCER_CONFIG = {
-    'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
-}
+PRODUCER_CONFIG = {'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS}
 
-# --- Логирование ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Глобальные переменные для корректного завершения ---
 running = True
 producer = None
 
 def signal_handler(sig, frame):
     global running
-    logger.info("Получен сигнал SIGINT. Завершение работы...")
+    logger.info("Получен сигнал завершения. Останавливаемся...")
     running = False
 
 def clean_text(text):
-    """Очищает текст: удаляет HTML-теги, приводит к нижнему регистру, убирает лишние пробелы."""
-    if not text:
-        return ""
+    if not text: return ""
     soup = BeautifulSoup(text, "html.parser")
-    clean_text = soup.get_text(separator=" ").lower()
-    return " ".join(clean_text.split())
+    text = soup.get_text(separator=" ").lower()
+    return " ".join(text.split())
 
-def clean_special_symbol(text:str):
-    """Очищает текст: удаляет пунктуацию, спецсимволы."""
-    for i in range(len(text)):
-        if not(text[i].isalpha() or text[i].isdigit() or text[i] == ' '):
-            text = text[:i] + text[i + 1:]
-    return text.lower()
+def clean_special_symbol(text: str):
+    """Очистка через регулярные выражения — это быстрее и не ломает индексы."""
+    if not text: return ""
+    # Оставляем только буквы, цифры и пробелы
+    return re.sub(r'[^a-zа-яё0-9\s]', '', text.lower())
 
-with open('stopwords-ru (1).json', 'r', encoding='utf-8') as f:
-        stopwords = json.load(f)
+# Загружаем стоп-слова один раз
+try:
+    with open('stopwords-ru.json', 'r', encoding='utf-8') as f:
+        stopwords = set(json.load(f)) # set работает в разы быстрее для поиска
+except Exception as e:
+    logger.error(f"Не удалось загрузить стоп-слова: {e}")
+    stopwords = set()
 
-def receive_tokens(text:str, stopwords):
-    """Получение массива строк с токенами из оригинального текста нижнего регистра без пробелов, HTML-тегов, лишних пробелов, пунктуации, стоп-слов и спецсимволов"""
-    mystem = Mystem()
-    download('punkt')
-    sentences = word_tokenize(text)
-    words = mystem.lemmatize(sentences)
-    try:
-        while 1:
-            words.remove(' ')
-    except:
-        for word in words:
-            if word in stopwords:
-                words.remove(word)
-        return words
+def receive_tokens(text: str, stopwords):
+    """Лемматизация и фильтрация."""
+    if not text: return []
+    
+    # Mystem лучше всего работает с целой строкой, а не со списком токенов
+    lemmas = mystem.lemmatize(text)
+    
+    # Оставляем только значимые слова (не пробелы и не стоп-слова)
+    tokens = [
+        word for word in lemmas 
+        if word.strip() and word not in stopwords and len(word) > 1
+    ]
+    return tokens
 
 def delivery_callback(err, msg):
-    """Callback функция для проверки успешной доставки сообщения в Kafka."""
     if err is not None:
-        logger.error(f'Ошибка доставки сообщения в {msg.topic()}: {err}')
-    else:
-        logger.debug(f'Сообщение доставлено в {msg.topic()} [{msg.partition()}] на оффсет {msg.offset()}')
+        logger.error(f'Ошибка доставки: {err}')
 
 def main():
     global producer, running
     signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     consumer = Consumer(CONSUMER_CONFIG)
     consumer.subscribe([INPUT_TOPIC])
-    logger.info(f"Подписка на топик '{INPUT_TOPIC}' с Kafka: {KAFKA_BOOTSTRAP_SERVERS}...")
-
     producer = Producer(PRODUCER_CONFIG)
 
-    logger.info(f"Запуск Text Preprocessing Service...")
+    logger.info(f"Сервис препроцессинга запущен. Слушаем {INPUT_TOPIC}...")
 
     try:
         while running:
             msg = consumer.poll(timeout=1.0)
-
-            if msg is None:
-                continue
+            if msg is None: continue
             if msg.error():
                 logger.error(f'Ошибка Kafka: {msg.error()}')
                 continue
 
-            raw_message = msg.value().decode('utf-8')
-
             try:
+                raw_message = msg.value().decode('utf-8')
                 article_data = json.loads(raw_message)
-            except json.JSONDecodeError:
-                logger.error(f"Ошибка декодирования JSON: {raw_message[:100]}...")
+                
+                original_text = article_data.get('text', '')
+                
+                # Обработка
+                cleaned = clean_text(original_text)
+                cleared = clean_special_symbol(cleaned)
+                tokens = receive_tokens(cleared, stopwords)
+
+                # Собираем результат
+                processed_data = article_data.copy()
+                processed_data['text'] = cleaned
+                processed_data['clean_text'] = cleared
+                processed_data['tokens'] = tokens
+
+                # Отправка
+                message_bytes = json.dumps(processed_data, ensure_ascii=False).encode('utf-8')
+                for out_topic in OUTPUT_TOPICS:
+                    producer.produce(topic=out_topic, value=message_bytes, callback=delivery_callback)
+                
+                producer.poll(0)
                 consumer.commit(msg)
-                continue
 
-            original_text = article_data.get('text', '')
-            cleaned_text = clean_text(original_text)
-            cleared_text = clean_special_symbol(cleaned_text)
-            extracted_tokens = receive_tokens(cleared_text, stopwords)
-            processed_article_data = article_data.copy()
-            processed_article_data['text'] = cleaned_text
-            processed_article_data['clean_text'] = cleared_text
-            processed_article_data['tokens'] = extracted_tokens
-
-            for out_topic in OUTPUT_TOPICS:
-                try:
-                    message_to_send = json.dumps(processed_article_data, ensure_ascii=False).encode('utf-8')
-                    producer.produce(topic=out_topic, value=message_to_send, callback=delivery_callback)
-                    logger.debug(f"Сообщение помещено в очередь {out_topic}.")
-
-                except BufferError:
-                    logger.error(f'Буфер продюсера переполнен при отправке в {out_topic}. Ожидание...')
-                    producer.flush()
-
-            consumer.commit(msg)
-            logger.debug(f"Обработано и подтверждено сообщение из {INPUT_TOPIC}")
-            producer.poll(0)
-
-    except Exception as e:
-        logger.error(f"Неожиданная ошибка: {e}")
+            except Exception as e:
+                logger.error(f"Ошибка при обработке конкретного сообщения: {e}")
+                # Коммитим, чтобы не застрять на «битом» сообщении навсегда
+                consumer.commit(msg) 
 
     finally:
-        logger.info("Очистка ресурсов...")
+        logger.info("Закрытие соединений...")
         producer.flush()
         consumer.close()
-        logger.info("Сервис завершен.")
-
 
 if __name__ == "__main__":
     main()

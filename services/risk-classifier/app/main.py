@@ -1,21 +1,32 @@
 from fastapi import FastAPI
-from .classifier import HFRiskClassifier
 from .models import Article, RiskResult
 from pydantic_settings import BaseSettings
+from .classifier import MistralNeuralClassifier
+import os
 
+# 1. Сначала определяем настройки
 class Settings(BaseSettings):
-     openrouter_api_key: str
+    openrouter_api_key: str
 
-class Config:
+    class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
 
+# 2. Создаем экземпляр настроек
 settings = Settings()
+
+# 3. Создаем приложение FastAPI
 app = FastAPI(title="Risk Classifier Service")
-classifier = HFRiskClassifier( openrouter_api_key=settings.openrouter_api_key)
+
+# 4. Инициализируем классификатор (используем правильное имя класса)
+classifier = MistralNeuralClassifier(api_key=settings.openrouter_api_key)
 
 @app.post("/classify", response_model=RiskResult)
 async def classify_risk(article: Article):
-    result = classifier.classify(article.text)
+    # Используем article.text или article.title как запасной вариант
+    # Убедись, что в models.py ты добавила поле text!
+    text_to_classify = getattr(article, 'text', None) or article.title
+    result = classifier.classify(text_to_classify)
     return result
 
 @app.get("/")
