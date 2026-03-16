@@ -52,9 +52,11 @@ const handleClick = (newsId: number) => {
           {{ item.summary }}
         </p>
         <div class="footer">
-          <span class="risk" :data-risk="item.risk">{{ riskLabel[item.risk] }}</span>
-          <button class="inline-link" @click.stop="handleClick(item.id)">Открыть источник</button>
-        </div>
+            <span class="risk" :data-risk="item.risk">
+              {{ riskLabel[item.risk] }}
+            </span>
+            <button class="details-btn">Анализ</button>
+          </div>
       </article>
     </div>
   </section>

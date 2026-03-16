@@ -4,6 +4,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
+from sqlalchemy.dialects.postgresql import insert
 
 load_dotenv()
 
@@ -35,16 +36,30 @@ class Risk(Base):
 engine = create_engine(settings.db_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
+
 def save_risk_result(article_id: int, result):
     db = SessionLocal()
     try:
-        risk = Risk(
-            article_id=article_id, 
-            risk_type=result.risk_type, 
+        # Создаем инструкцию INSERT ... ON CONFLICT
+        stmt = insert(Risk).values(
+            article_id=article_id,
+            risk_type=result.risk_type,
             confidence=result.confidence
         )
-        db.add(risk)
+        
+        # Если article_id уже есть, обновляем существующую запись
+        stmt = stmt.on_conflict_do_update(
+            constraint="unique_article_risk", # Тот самый CONSTRAINT, что мы создали в psql
+            set_={
+                "risk_type": result.risk_type,
+                "confidence": result.confidence
+            }
+        )
+        
+        db.execute(stmt)
         db.commit()
+        print(f"Успешно сохранено/обновлено для ID {article_id}: {result.risk_type}")
     except Exception as e:
         print(f"Ошибка при сохранении: {e}")
         db.rollback()

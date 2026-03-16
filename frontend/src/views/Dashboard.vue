@@ -9,7 +9,6 @@ import RiskLegend from '../components/RiskLegend.vue';
 import api from '../api'; 
 
 const router = useRouter();
-
 const articles = ref<any[]>([]);
 const totalNews = ref(0);
 const isLoading = ref(true);
@@ -17,20 +16,45 @@ const isLoading = ref(true);
 onMounted(async () => {
   try {
     const data = await api.getPosts();
-    // На FastAPI обычно структура { items: [...], total: 10 }
+    // Сохраняем сырые данные как они есть (с вложенными post и analysis)
     articles.value = data.items || [];
     totalNews.value = data.total || articles.value.length;
   } catch (error) {
-    console.error("Бэкенд недоступен:", error);
+    console.error("Ошибка загрузки:", error);
   } finally {
     isLoading.value = false;
   }
 });
 
-// Вытягиваем сущности динамически из новостей
+// ГЛАВНОЕ: Формируем список для ленты
+const events = computed(() => {
+  return articles.value.map((item: any) => {
+    // Безопасно достаем данные. Если структуры разные, проверяем оба варианта.
+    const post = item.post || item; 
+    const analysis = item.analysis || {};
+    
+    // Пытаемся найти риск в разных местах (зависит от твоего JOIN в БД)
+    const dbRisk = analysis.risk_level || 
+                   item.risk_type || 
+                   (item.risks && item.risks[0]?.risk_type) || 
+                   'low';
+
+    return {
+      id: post.id,
+      title: post.title,
+      date: new Date(post.created_at).toLocaleString('ru-RU'),
+      source: post.source,
+      // Берем content или text (смотря что заполнено в БД)
+      summary: (post.content || post.text || '').substring(0, 160) + '...',
+      risk: dbRisk as 'high' | 'medium' | 'low'
+    };
+  });
+});
+
+// Вытягиваем сущности динамически
 const topEntities = computed(() => {
-  const allEntities = articles.value.flatMap(item => item.entities || []);
-  // Убираем дубликаты по тексту
+  // Ищем сущности либо в корне, либо внутри post
+  const allEntities = articles.value.flatMap(item => (item.post?.entities || item.entities || []));
   const unique = Array.from(new Map(allEntities.map(e => [e.text, e])).values());
   
   return unique.slice(0, 5).map((e: any) => ({
@@ -42,22 +66,13 @@ const topEntities = computed(() => {
   }));
 });
 
-const events = computed(() => {
-  return articles.value.map((item: any) => ({
-    id: item.post.id,
-    title: item.post.title,
-    date: new Date(item.post.created_at).toLocaleString('ru-RU'),
-    source: item.post.source,
-    summary: item.post.content?.substring(0, 160) + '...',
-    risk: (item.analysis?.risk_level || 'low') as 'high' | 'medium' | 'low',
-  }));
-});
-
-const riskLegend = [
-  { level: 'high' as const, label: 'Высокий риск', description: 'Критическое событие' },
-  { level: 'medium' as const, label: 'Средний риск', description: 'Внимание' },
-  { level: 'low' as const, label: 'Низкий риск', description: 'Инфо' },
+type RiskLevel = 'high' | 'medium' | 'low';
+const riskLegend: { level: RiskLevel; label: string; description: string }[] = [
+  { level: 'high', label: 'Высокий', description: 'Критическая угроза' },
+  { level: 'medium', label: 'Средний', description: 'Требует внимания' },
+  { level: 'low', label: 'Низкий', description: 'Информационный фон' }
 ];
+    
 const handleNewsClick = (id: number) => router.push(`/news/${id}`);
 const handleEntityClick = (id: number) => router.push(`/entity/${id}`);
 </script>

@@ -4,7 +4,7 @@ uvicorn==0.24.0
 
 # Data & DB
 sqlalchemy==2.0.23
-pydantic==2.8.2  # ✅ Обновите до 2.8.2 (подходит для mistralai)
+pydantic==2.8.2  
 pydantic-settings==2.4.0
 psycopg2-binary==2.9.9
 
@@ -19,3 +19,4 @@ mistralai==1.0.0
 # Utils
 requests==2.31.0
 python-dotenv==1.0.0
+asyncpg

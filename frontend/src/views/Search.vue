@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import api from '../api'; // Твой API клиент
+import api from '../api'; 
 
 const router = useRouter();
-const query = ref(''); // Начинаем с пустой строки
+const query = ref(''); 
 const showFilters = ref(false);
 const isLoading = ref(false);
 const results = ref<any[]>([]);
 
-// Опции фильтров (пока для визуала, но можно прокидывать в API)
+// Возвращаем переменные, которые требует шаблон
 const sourceOptions = [
   { id: 'media', label: 'СМИ' },
   { id: 'telegram', label: 'Telegram' },
@@ -28,27 +28,32 @@ const infoChecklist = [
   'Результаты подтягиваются напрямую из вашей БД',
 ];
 
-// ГЛАВНАЯ ФУНКЦИЯ ПОИСКА
 const handleSearch = async () => {
   if (!query.value.trim()) return;
   
   isLoading.value = true;
   try {
-    // Делаем запрос к бэкенду. 
-    // Предполагаем, что бэкенд умеет принимать параметр search или q
-    const data = await api.getPosts({ search: query.value });
+    // Вызываем API. Передаем query третьим аргументом (для поиска)
+    const data = await api.getPosts(1, 50, query.value);
     
-    // Мапим данные из структуры { post, analysis, entities }
-    const items = data.items || data;
-    results.value = items.map((item: any) => ({
-      id: item.post?.id || item.id,
-      title: item.post?.title || item.title,
-      date: item.post?.created_at 
-        ? new Date(item.post.created_at).toLocaleDateString('ru-RU') 
-        : 'Неизвестно',
-      source: item.post?.source || item.source,
-      summary: item.post?.content || item.content,
-    }));
+    const items = data.items || data || [];
+    
+    results.value = items.map((item: any) => {
+      // Поддерживаем структуру { post, analysis } как в Dashboard
+      const post = item.post || item;
+      const analysis = item.analysis || {};
+      
+      return {
+        id: post.id,
+        title: post.title,
+        date: post.created_at 
+          ? new Date(post.created_at).toLocaleDateString('ru-RU') 
+          : 'Неизвестно',
+        source: post.source,
+        summary: post.content || post.text || 'Нет описания',
+        risk: analysis.risk_level || 'low'
+      };
+    });
   } catch (error) {
     console.error("Ошибка при поиске:", error);
     results.value = [];
@@ -57,7 +62,6 @@ const handleSearch = async () => {
   }
 };
 
-// Загружаем что-нибудь при входе, если нужно
 onMounted(() => {
   if (query.value) handleSearch();
 });
@@ -141,7 +145,10 @@ const handleNewsClick = (newsId: number) => {
               <h4>{{ item.title }}</h4>
               <span class="date">{{ item.date }}</span>
             </div>
-            <p class="source">{{ item.source }}</p>
+            <p class="source">
+              {{ item.source }} • 
+              <span :class="['risk-tag', item.risk]">{{ item.risk }}</span>
+            </p>
             <p class="summary">{{ item.summary.slice(0, 160) }}...</p>
             <button class="inline-link">Подробнее →</button>
           </article>
@@ -150,7 +157,7 @@ const handleNewsClick = (newsId: number) => {
 
       <section v-else-if="query" class="info-block">
         <h2>Ничего не найдено</h2>
-        <p>Попробуйте изменить запрос или проверить подключение к бэкенду.</p>
+        <p>Попробуйте изменить запрос или проверить наличие данных в PostgreSQL.</p>
       </section>
 
       <section v-else class="info-block">
@@ -173,7 +180,6 @@ const handleNewsClick = (newsId: number) => {
     </section>
   </section>
 </template>
-
 
 <style scoped>
 .search-page {

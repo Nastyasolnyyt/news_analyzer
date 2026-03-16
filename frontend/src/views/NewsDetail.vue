@@ -63,7 +63,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Я сохранил все твои оригинальные стили, которые ты прислала выше */
+
 .news-page {
   display: flex;
   flex-direction: column;

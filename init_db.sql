@@ -1,25 +1,25 @@
--- Таблица статей
+-- 1. Таблица статей (Добавлена уникальность ссылки и индексация для поиска)
 CREATE TABLE articles (
     id SERIAL PRIMARY KEY,
     title TEXT,
     text TEXT NOT NULL,
-    link TEXT,
+    link TEXT UNIQUE NOT NULL, -- КРИТИЧНО: Защита от дубликатов на уровне БД
     pub_date TIMESTAMPTZ,
     source TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица рисков (для Risk Classifier)
+-- 2. Таблица рисков (Изменено на UNIQUE article_id, так как одной статье — одна оценка риска)
 CREATE TABLE risks (
     id SERIAL PRIMARY KEY,
-    article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-    risk_type TEXT NOT NULL,
+    article_id INTEGER UNIQUE REFERENCES articles(id) ON DELETE CASCADE, -- UNIQUE исключает повторный анализ одной новости
+    risk_type TEXT NOT NULL, -- Здесь будут наши 'high', 'medium', 'low'
     confidence REAL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица сущностей (для NER Service)
+-- 3. Таблица сущностей
 CREATE TABLE entities (
     id SERIAL PRIMARY KEY,
     article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
@@ -27,10 +27,11 @@ CREATE TABLE entities (
     type TEXT NOT NULL,
     start_pos INTEGER,
     end_pos INTEGER,
-    details JSONB
+    details JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица источников
+-- 4. Таблица источников (Уже была UNIQUE url, это хорошо)
 CREATE TABLE sources (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
@@ -41,7 +42,7 @@ CREATE TABLE sources (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица пользователей
+-- 5. Таблица пользователей
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
@@ -50,38 +51,38 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица тональности (для Sentiment Analysis)
+-- 6. Таблица тональности
 CREATE TABLE sentiments (
     id SERIAL PRIMARY KEY,
-    article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-    sentiment_label TEXT NOT NULL,  -- 'positive', 'negative', 'neutral'
+    article_id INTEGER UNIQUE REFERENCES articles(id) ON DELETE CASCADE, -- Тоже UNIQUE
+    sentiment_label TEXT NOT NULL,
     confidence REAL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица кластеров (для Event Clustering)
+-- 7. Таблица кластеров (Улучшено: использование GIN индекса для массивов)
 CREATE TABLE clusters (
     id SERIAL PRIMARY KEY,
-    name TEXT,
+    name TEXT NOT NULL,
     description TEXT,
-    article_ids INTEGER[],
+    article_ids INTEGER[] NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица аномалий (для Anomaly Detection)
+-- 8. Таблица аномалий
 CREATE TABLE anomalies (
     id SERIAL PRIMARY KEY,
     article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
     entity_id INTEGER REFERENCES entities(id) ON DELETE SET NULL,
     risk_type TEXT,
-    anomaly_type TEXT NOT NULL,  -- 'mention_spike', 'sentiment_shift', 'unusual_pair'
+    anomaly_type TEXT NOT NULL,
     description TEXT,
-    severity TEXT DEFAULT 'medium',  -- 'low', 'medium', 'high'
+    severity TEXT DEFAULT 'medium',
     score REAL,
     detected_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Таблица связей между сущностями (для Knowledge Graph Sync)
+-- 9. Таблица связей между сущностями
 CREATE TABLE entity_relations (
     id SERIAL PRIMARY KEY,
     entity1_id INTEGER REFERENCES entities(id) ON DELETE CASCADE,
@@ -89,14 +90,19 @@ CREATE TABLE entity_relations (
     relation_type TEXT DEFAULT 'co-occurrence',
     weight REAL DEFAULT 1.0,
     article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Уникальность связи в рамках одной статьи, чтобы не дублировать граф
+    UNIQUE(entity1_id, entity2_id, article_id, relation_type) 
 );
 
--- Индексы
-CREATE INDEX idx_articles_source ON articles(source);
-CREATE INDEX idx_articles_pub_date ON articles(pub_date);
-CREATE INDEX idx_risks_article_id ON risks(article_id);
-CREATE INDEX idx_entities_article_id ON entities(article_id);
-CREATE INDEX idx_sentiments_article_id ON sentiments(article_id);
-CREATE INDEX idx_anomalies_article_id ON anomalies(article_id);
-CREATE INDEX idx_entity_relations_article_id ON entity_relations(article_id);
+--- ИНДЕКСЫ ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ ---
+
+-- Поиск по ссылке (самый частый запрос при парсинге)
+CREATE INDEX idx_articles_link ON articles(link);
+
+-- Полнотекстовый поиск (заказчик оценит возможность искать по тексту)
+CREATE INDEX idx_articles_text_gin ON articles USING gin(to_tsvector('russian', text));
+
+-- Оптимизация связей
+CREATE INDEX idx_entities_type ON entities(type);
+CREATE INDEX idx_clusters_articles ON clusters USING gin(article_ids);

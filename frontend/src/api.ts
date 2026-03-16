@@ -20,26 +20,35 @@ export default {
     return response.data;
   },
 
-  // Исправленный метод для получения списка постов
-  async getPosts(page = 1, pageSize = 20) {
-    // Путь теперь совпадает с тем, что мы видели в логах бэкенда
+  async getPosts(page = 1, pageSize = 20, search = '') {
     const response = await instance.get('/posts', {
       params: {
         page: page,
         page_size: pageSize,
+        search: search, // Передаем строку поиска на бэкенд
         order: 'desc',
         sort: 'created_at'
       }
     });
-    // Важно: возвращаем всё response.data, так как там лежат { items, total, page, page_size }
+    // Возвращаем объект { items, total, page, page_size }
     return response.data;
   },
 
-  // Конкретный пост
-  async getPostById(id: number) {
-    // Убираем /core/, так как роутинг в FastAPI, судя по логам, плоский
+  // Конкретный пост по ID
+  async getPostById(id: number | string) {
     const response = await instance.get(`/posts/${id}`);
     return response.data;
+  },
+
+  async searchPosts(query: string) {
+    const response = await instance.get('/posts', {
+      params: {
+        search: query,
+        page: 1,
+        page_size: 50,
+        order: 'desc'
+      }
+    });
+    return response.data;
   }
-  
 };

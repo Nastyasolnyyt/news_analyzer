@@ -8,7 +8,7 @@ interface LegendItem {
 }
 
 defineProps<{
-  levels: LegendItem[];
+  levels: readonly LegendItem[];
 }>();
 </script>
 
