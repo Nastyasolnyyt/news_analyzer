@@ -1,5 +1,17 @@
-confluent-kafka==2.3.0
-beautifulsoup4==4.12.3
-lxml==5.3.0
-nltk==3.9.3
-pymystem3==0.2.0
+# Работа с Kafka
+confluent-kafka
+
+# Анализ текста и HTML
+beautifulsoup4
+nltk
+pymystem3
+
+# Сетевые запросы (для скрейпинга полных статей)
+httpx
+
+# Работа с базой данных PostgreSQL
+sqlalchemy
+psycopg2-binary
+
+# Дополнительно (обычно уже есть, но лучше зафиксировать)
+lxml

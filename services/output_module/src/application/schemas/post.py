@@ -1,42 +1,58 @@
 from datetime import datetime
 from typing import List, Optional
-
-from pydantic import BaseModel, Field
-from src.application.schemas.named_entity import NamedEntityDTO
-from src.application.schemas.post_analysis import PostAnalysisWithExternalModelsDTO
-
-
-class PostDTO(BaseModel):
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional, Union
+# 1. Схема самой новости
+class PostBaseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True) # Добавлено
+    
     id: int
-    author: str
-    title: str
+    title: Optional[str]
     content: str
     source: str
     created_at: datetime
+    author: Optional[str] = None
 
+# 2. Схема аналитики
+class PostAnalysisDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    tonality: float
+    risk_level: Optional[str] = None
+    # Теперь поле примет и "outlier" (str), и False (bool)
+    is_anomaly: Optional[Union[str, bool]] = False
 
-class PostWithExternalModelsDTO(BaseModel):
-    post: PostDTO
-    analysis: PostAnalysisWithExternalModelsDTO
-    entities: List[NamedEntityDTO]
+# 3. Схема сущности
+class EntityDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True) # Добавлено
+    
+    id: int
+    text: str
+    type: Optional[str] = None
+    details: Optional[dict] = None
 
+# 4. Итоговый объект
+class PostResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True) # Современный стиль Pydantic V2
+    
+    post: PostBaseDTO
+    analysis: PostAnalysisDTO
+    entities: List[EntityDTO] = []
 
-class PostFilterDTO(BaseModel):
-    topic_id: Optional[int] = None
-    emotion: Optional[float] = None
-    tonality: Optional[float] = None
-    relevance: Optional[float] = None
-    entity_id: Optional[int] = None
-    sort: Optional[str] = Field(
-        None, description="Поле для сортировки (id, created_at, emotion, tonality, relevance)"
-    )
-    order: Optional[str] = Field("asc", description="Порядок сортировки: asc или desc")
-    page: int = Field(1, ge=1)
-    page_size: int = Field(20, ge=1, le=100)
-
-
+# 5. Схема для списка
 class PostListResponseDTO(BaseModel):
-    items: List[PostWithExternalModelsDTO]
+    model_config = ConfigDict(from_attributes=True)
+    
+    items: List[PostResponseDTO]
     total: int
     page: int
     page_size: int
+
+# 6. Фильтры
+class PostFilterDTO(BaseModel):
+    search: Optional[str] = None
+    entity_id: Optional[int] = None
+    page: int = 1
+    page_size: int = 20
+    order: Optional[str] = "desc"
+    sort: Optional[str] = "created_at"

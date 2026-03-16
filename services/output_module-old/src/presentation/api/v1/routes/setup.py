@@ -8,6 +8,7 @@ from .users.api import ROUTER as USERS_ROUTER
 
 def setup_core_routes() -> APIRouter:
     router = APIRouter()
+    router = APIRouter(prefix="/core")
     router.include_router(AUTH_ROUTER)
     router.include_router(USERS_ROUTER)
     router.include_router(POST_ROUTER, tags=["Post"])

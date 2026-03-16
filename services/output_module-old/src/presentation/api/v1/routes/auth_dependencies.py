@@ -27,9 +27,8 @@ async def get_current_user(
 
     try:
         # Получаем контейнер Dishka из request state
-        from dishka.integrations.fastapi import get_container
+        container = request.state.dishka_container
 
-        container = get_container(request)
         auth_service = await container.get(AuthService)
         user_service = await container.get(UserService)
 

@@ -2,21 +2,24 @@ import json
 import os
 import logging
 import re
-from bs4 import BeautifulSoup
-from confluent_kafka import Consumer, Producer
 import signal
 import sys
+import httpx  # Для скачивания страниц
+from bs4 import BeautifulSoup
+from confluent_kafka import Consumer, Producer
+from sqlalchemy import create_engine, text as sql_text # Для UPDATE запроса
 import nltk
-from nltk import word_tokenize
 from pymystem3 import Mystem
 
-# --- Инициализация тяжелых ресурсов (ОДИН РАЗ при запуске) ---
+# --- Инициализация тяжелых ресурсов ---
 nltk.download('punkt', quiet=True)
 mystem = Mystem()
 
 # --- Настройки из переменных окружения ---
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
 INPUT_TOPIC = os.getenv('INPUT_TOPIC', 'raw_articles')
+DATABASE_URL = os.getenv('DATABASE_URL') # Обязательно добавь в docker-compose
+
 OUTPUT_TOPICS = [
     os.getenv('OUTPUT_TOPIC_NER', 'text_for_ner'),
     os.getenv('OUTPUT_TOPIC_RISK', 'text_for_risk'),
@@ -24,6 +27,13 @@ OUTPUT_TOPICS = [
     os.getenv('OUTPUT_TOPIC_ANOMALY', 'text_for_anomaly'),
     os.getenv('OUTPUT_TOPIC_SYNC', 'text_for_kg_sync')
 ]
+
+# Настройка БД (как в твоем агрегаторе)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"sslmode": "require"},
+    pool_pre_ping=True
+)
 
 CONSUMER_CONFIG = {
     'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
@@ -40,10 +50,7 @@ logger = logging.getLogger(__name__)
 running = True
 producer = None
 
-def signal_handler(sig, frame):
-    global running
-    logger.info("Получен сигнал завершения. Останавливаемся...")
-    running = False
+# --- Логика очистки (твоя без изменений) ---
 
 def clean_text(text):
     if not text: return ""
@@ -52,32 +59,61 @@ def clean_text(text):
     return " ".join(text.split())
 
 def clean_special_symbol(text: str):
-    """Очистка через регулярные выражения — это быстрее и не ломает индексы."""
     if not text: return ""
-    # Оставляем только буквы, цифры и пробелы
     return re.sub(r'[^a-zа-яё0-9\s]', '', text.lower())
 
-# Загружаем стоп-слова один раз
 try:
     with open('stopwords-ru.json', 'r', encoding='utf-8') as f:
-        stopwords = set(json.load(f)) # set работает в разы быстрее для поиска
+        stopwords = set(json.load(f))
 except Exception as e:
     logger.error(f"Не удалось загрузить стоп-слова: {e}")
     stopwords = set()
 
 def receive_tokens(text: str, stopwords):
-    """Лемматизация и фильтрация."""
     if not text: return []
-    
-    # Mystem лучше всего работает с целой строкой, а не со списком токенов
     lemmas = mystem.lemmatize(text)
-    
-    # Оставляем только значимые слова (не пробелы и не стоп-слова)
     tokens = [
         word for word in lemmas 
         if word.strip() and word not in stopwords and len(word) > 1
     ]
     return tokens
+
+# --- НОВАЯ ЛОГИКА: Скрейпинг и БД ---
+
+def fetch_full_article(url: str):
+    """Скачивает полную статью по ссылке."""
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    try:
+        with httpx.Client(timeout=10.0, headers=headers, follow_redirects=True) as client:
+            r = client.get(url)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                # Ищем параграфы (стандарт для большинства новостных сайтов)
+                paragraphs = soup.find_all('p')
+                if paragraphs:
+                    return " ".join([p.get_text() for p in paragraphs])
+    except Exception as e:
+        logger.error(f"Ошибка скрейпинга {url}: {e}")
+    return None
+
+def update_article_in_db(article_id, full_text):
+    """Обновляет запись в PostgreSQL."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                sql_text("UPDATE articles SET text = :text WHERE id = :id"),
+                {"text": full_text, "id": article_id}
+            )
+            logger.info(f"Статья ID {article_id} успешно обновлена в БД.")
+    except Exception as e:
+        logger.error(f"Ошибка БД при обновлении ID {article_id}: {e}")
+
+# --- Обработка сигналов и Kafka ---
+
+def signal_handler(sig, frame):
+    global running
+    logger.info("Остановка...")
+    running = False
 
 def delivery_callback(err, msg):
     if err is not None:
@@ -92,7 +128,7 @@ def main():
     consumer.subscribe([INPUT_TOPIC])
     producer = Producer(PRODUCER_CONFIG)
 
-    logger.info(f"Сервис препроцессинга запущен. Слушаем {INPUT_TOPIC}...")
+    logger.info(f"Препроцессинг запущен. Режим: Scraper + DB Update. Слушаем {INPUT_TOPIC}...")
 
     try:
         while running:
@@ -103,23 +139,34 @@ def main():
                 continue
 
             try:
-                raw_message = msg.value().decode('utf-8')
-                article_data = json.loads(raw_message)
+                article_data = json.loads(msg.value().decode('utf-8'))
+                article_id = article_data.get('id')
+                article_link = article_data.get('link')
                 
+                # 1. Проверяем, нужно ли скачивать полный текст
+                # Если текст короткий (например, только описание из RSS), идем на сайт
                 original_text = article_data.get('text', '')
                 
-                # Обработка
+                if article_link and len(original_text) < 300:
+                    logger.info(f"Скачиваю полную статью для ID {article_id}...")
+                    scraped_text = fetch_full_article(article_link)
+                    if scraped_text:
+                        original_text = scraped_text
+                        # 2. СРАЗУ ОБНОВЛЯЕМ БАЗУ ДАННЫХ
+                        update_article_in_db(article_id, original_text)
+
+                # 3. Твоя стандартная обработка NLP
                 cleaned = clean_text(original_text)
                 cleared = clean_special_symbol(cleaned)
                 tokens = receive_tokens(cleared, stopwords)
 
                 # Собираем результат
                 processed_data = article_data.copy()
-                processed_data['text'] = cleaned
+                processed_data['text'] = cleaned # В Kafka пойдет уже очищенный полный текст
                 processed_data['clean_text'] = cleared
                 processed_data['tokens'] = tokens
 
-                # Отправка
+                # 4. Отправка во все топики-потребители
                 message_bytes = json.dumps(processed_data, ensure_ascii=False).encode('utf-8')
                 for out_topic in OUTPUT_TOPICS:
                     producer.produce(topic=out_topic, value=message_bytes, callback=delivery_callback)
@@ -128,12 +175,10 @@ def main():
                 consumer.commit(msg)
 
             except Exception as e:
-                logger.error(f"Ошибка при обработке конкретного сообщения: {e}")
-                # Коммитим, чтобы не застрять на «битом» сообщении навсегда
+                logger.error(f"Ошибка при обработке сообщения: {e}")
                 consumer.commit(msg) 
 
     finally:
-        logger.info("Закрытие соединений...")
         producer.flush()
         consumer.close()
 

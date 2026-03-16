@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: '/api/v1', // Прокси настроен в vite.config.ts
+  baseURL: '/api/v1', 
 });
 
-// Перехватчик: перед каждым запросом добавляем токен из памяти браузера
+// Перехватчик для токена
 instance.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -17,18 +17,29 @@ export default {
   // Авторизация
   async login(login: string, password: string) {
     const response = await instance.post('/auth/login', { login, password });
-    return response.data; // Вернет { access_token, refresh_token, ... }
-  },
-
-  // Посты для Dashboard
-  async getPosts() {
-    const response = await instance.get('/core/posts');
     return response.data;
   },
 
-  // Конкретный пост для NewsDetail
+  // Исправленный метод для получения списка постов
+  async getPosts(page = 1, pageSize = 20) {
+    // Путь теперь совпадает с тем, что мы видели в логах бэкенда
+    const response = await instance.get('/posts', {
+      params: {
+        page: page,
+        page_size: pageSize,
+        order: 'desc',
+        sort: 'created_at'
+      }
+    });
+    // Важно: возвращаем всё response.data, так как там лежат { items, total, page, page_size }
+    return response.data;
+  },
+
+  // Конкретный пост
   async getPostById(id: number) {
-    const response = await instance.get(`/core/posts/${id}`);
+    // Убираем /core/, так как роутинг в FastAPI, судя по логам, плоский
+    const response = await instance.get(`/posts/${id}`);
     return response.data;
   }
+  
 };

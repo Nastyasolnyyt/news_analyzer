@@ -6,78 +6,60 @@ import StatsWidget from '../components/StatsWidget.vue';
 import TopEntities from '../components/TopEntities.vue';
 import EventFeed from '../components/EventFeed.vue';
 import RiskLegend from '../components/RiskLegend.vue';
-import ActionPanel from '../components/ActionPanel.vue';
 import api from '../api'; 
-// Оставляем сущности из моков, если бэкенд их пока не отдает
-import { entities as mockEntities } from '../mockData';
 
 const router = useRouter();
 
 const articles = ref<any[]>([]);
+const totalNews = ref(0);
 const isLoading = ref(true);
 
 onMounted(async () => {
   try {
-    // ВАЖНО: Если бэкенд требует авторизацию, проверь, что в api.ts 
-    // добавляется заголовок Authorization: Bearer <твой_токен>
     const data = await api.getPosts();
-    
-    // Проверяем структуру: на FastAPI обычно возвращается объект, 
-    // в котором список лежит в ключе 'items'
-    articles.value = data.items || data; 
+    // На FastAPI обычно структура { items: [...], total: 10 }
+    articles.value = data.items || [];
+    totalNews.value = data.total || articles.value.length;
   } catch (error) {
-    console.error("Ошибка загрузки реальных данных:", error);
-    // Если бэкенд пустой, можно временно оставить articles.value = []
+    console.error("Бэкенд недоступен:", error);
   } finally {
     isLoading.value = false;
   }
 });
 
-const stats = computed(() => ({
-  relevantNews: articles.value.length,
-}));
-
-// Сущности (пока моки, как ты просила)
+// Вытягиваем сущности динамически из новостей
 const topEntities = computed(() => {
-  return mockEntities
-    .filter((e) => e.changePercent !== undefined)
-    .map((e) => ({
-      id: e.id,
-      name: e.name,
-      changePercent: e.changePercent!,
-      direction: e.direction!,
-      category: e.category || e.type,
-    }));
+  const allEntities = articles.value.flatMap(item => item.entities || []);
+  // Убираем дубликаты по тексту
+  const unique = Array.from(new Map(allEntities.map(e => [e.text, e])).values());
+  
+  return unique.slice(0, 5).map((e: any) => ({
+    id: e.id,
+    name: e.text,
+    changePercent: 0, 
+    direction: 'flat' as const,
+    category: e.type,
+  }));
 });
 
-// ПРАВИЛЬНЫЙ МАППИНГ: Берем данные из твоей БД (PostWithExternalModelsDTO)
 const events = computed(() => {
-  return articles.value.map((item: any) => {
-    // В зависимости от того, как бэкенд отдает пост: 
-    // либо item.post.title, либо просто item.title
-    const post = item.post || item;
-    const analysis = item.analysis || { tonality: 0 };
-
-    return {
-      id: post.id,
-      title: post.title,
-      date: post.created_at ? new Date(post.created_at).toLocaleDateString('ru-RU') : 'Сегодня',
-      source: post.source || 'Источник',
-      summary: post.content ? post.content.slice(0, 150) + '...' : 'Нет описания',
-      // Тональность из БД переводим в уровень риска для EventFeed
-      risk: analysis.tonality < -0.3 ? 'high' : (analysis.tonality < 0 ? 'medium' : 'low'),
-    };
-  });
+  return articles.value.map((item: any) => ({
+    id: item.post.id,
+    title: item.post.title,
+    date: new Date(item.post.created_at).toLocaleString('ru-RU'),
+    source: item.post.source,
+    summary: item.post.content?.substring(0, 160) + '...',
+    risk: (item.analysis?.risk_level || 'low') as 'high' | 'medium' | 'low',
+  }));
 });
 
 const riskLegend = [
-  { level: 'high', label: 'Высокий риск', description: 'Отрицательная тональность' },
-  { level: 'medium', label: 'Средний риск', description: 'Нейтрально-негативно' },
-  { level: 'low', label: 'Низкий риск', description: 'Положительно' },
+  { level: 'high' as const, label: 'Высокий риск', description: 'Критическое событие' },
+  { level: 'medium' as const, label: 'Средний риск', description: 'Внимание' },
+  { level: 'low' as const, label: 'Низкий риск', description: 'Инфо' },
 ];
-
-const handleEntityClick = (entityId: number) => router.push(`/entity/${entityId}`);
-const handleNewsClick = (newsId: number) => router.push(`/news/${newsId}`);
+const handleNewsClick = (id: number) => router.push(`/news/${id}`);
+const handleEntityClick = (id: number) => router.push(`/entity/${id}`);
 </script>
 
 <template>
@@ -85,14 +67,30 @@ const handleNewsClick = (newsId: number) => router.push(`/news/${newsId}`);
     <HeaderBar />
     <main class="layout">
       <section class="primary">
-        <StatsWidget :count="stats.relevantNews" />
-        <TopEntities :entities="topEntities" @entity-click="handleEntityClick" />
-        <div v-if="isLoading" style="color: var(--text-dim); padding: 20px;">Загрузка новостей...</div>
-        <EventFeed v-else :events="events" @news-click="handleNewsClick" />
+        <StatsWidget :count="totalNews" />
+        
+        <TopEntities 
+          v-if="topEntities.length > 0" 
+          :entities="topEntities" 
+          @entity-click="handleEntityClick" 
+        />
+        
+        <div v-if="isLoading" class="loading">Загрузка данных из API...</div>
+        
+        <template v-else>
+          <EventFeed 
+            v-if="events.length > 0" 
+            :events="events" 
+            @news-click="handleNewsClick" 
+          />
+          <div v-else class="empty-state">
+            <p>База данных пуста. Записи появятся здесь после работы парсера.</p>
+          </div>
+        </template>
       </section>
+      
       <aside class="secondary">
         <RiskLegend :levels="riskLegend" />
-        <ActionPanel />
       </aside>
     </main>
   </section>

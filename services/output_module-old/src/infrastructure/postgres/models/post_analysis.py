@@ -4,10 +4,10 @@ from src.infrastructure.postgres.connection import Base
 
 
 class PostAnalysis(Base):
-    __tablename__ = "post_analysis"
+    __tablename__ = "articles_analysis"
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
     topic_id = Column(Integer, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
     emotion = Column(Float, nullable=False)
     tonality = Column(Float, nullable=False)

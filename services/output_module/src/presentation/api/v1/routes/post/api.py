@@ -1,35 +1,23 @@
-from dishka import FromDishka
-from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Depends
-from src.application.schemas.post import (
-    PostFilterDTO,
-    PostListResponseDTO,
-    PostWithExternalModelsDTO,
-)
-from src.application.schemas.user import UserDTO
-from src.presentation.api.v1.routes.auth_dependencies import get_current_user
+from dishka import FromDishka
+from dishka.integrations.fastapi import inject
+
+from src.application.schemas.post import PostFilterDTO, PostListResponseDTO
 from src.services.post import PostService
 
+router = APIRouter(prefix="/posts", tags=["Posts"])
 
-ROUTER = APIRouter(prefix="/posts", route_class=DishkaRoute)
-
-
-@ROUTER.get("", response_model=PostListResponseDTO, summary="Список постов")
-async def get_posts(
-    post_service: FromDishka[PostService],
+@router.get("", response_model=PostListResponseDTO)
+@inject  # Позволяет Dishka прокидывать PostService автоматически
+async def get_all_posts(
+    service: FromDishka[PostService],
     filters: PostFilterDTO = Depends(),
-    user: UserDTO = Depends(get_current_user),
 ) -> PostListResponseDTO:
-    """Получение списка постов с фильтрацией, сортировкой и пагинацией."""
-    return await post_service.get_posts(filters)
-
-
-@ROUTER.get("/{post_id}", response_model=PostWithExternalModelsDTO, summary="Получить пост")
-async def get_post(
-    post_id: int,
-    post_service: FromDishka[PostService],
-    user: UserDTO = Depends(get_current_user),
-) -> PostWithExternalModelsDTO:
-    """Получение поста по ID с полной информацией."""
-    result = await post_service.get_post(post_id)
-    return result
+    items, total = await service.get_posts(filters)
+    
+    return PostListResponseDTO(
+        items=items,
+        total=total,
+        page=filters.page,
+        page_size=filters.page_size
+    )

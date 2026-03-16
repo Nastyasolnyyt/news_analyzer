@@ -78,16 +78,25 @@ services:
 
   text-preprocessing:
     build: ./services/text-preprocessing-service
+    # 1. Обязательно подключаем файл с секретами
+    env_file:
+      - .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # 2. Пробрасываем URL базы данных из .env
+      DATABASE_URL: ${DATABASE_URL}
       INPUT_TOPIC: raw_articles
       OUTPUT_TOPIC_NER: text_for_ner
       OUTPUT_TOPIC_RISK: text_for_risk
       OUTPUT_TOPIC_SENTIMENT: text_for_sentiment
+      # 3. Добавляем недостающие топики для соответствия коду
+      OUTPUT_TOPIC_ANOMALY: text_for_anomaly
+      OUTPUT_TOPIC_SYNC: text_for_kg_sync
     depends_on:
       kafka:
         condition: service_healthy
     restart: on-failure
+    # Проверьте, что имя файла в команде совпадает с вашим (в коде обычно main.py или preprocessing.py)
     command: >
       sh -c "sleep 10 && python text_preprocessing_service_kafka.py"
     networks:

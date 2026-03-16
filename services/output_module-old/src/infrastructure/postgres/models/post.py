@@ -11,7 +11,7 @@ from src.infrastructure.postgres.connection import Base
 
 
 class Post(Base):
-    __tablename__ = "posts"
+    __tablename__ = "articles"
 
     id = Column(Integer, primary_key=True)
     author = Column(String(255), nullable=False)
@@ -21,5 +21,5 @@ class Post(Base):
     source = Column(Text, nullable=False)
 
     # Relationships
-    analyses = relationship("PostAnalysis", back_populates="post")
-    entities = relationship("PostEntity", back_populates="post")
+    ##analyses = relationship("PostAnalysis", back_populates="post")
+    ##entities = relationship("PostEntity", back_populates="post")
