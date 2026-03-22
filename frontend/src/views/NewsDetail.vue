@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue'; // Добавили computed
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api';
 
@@ -9,12 +9,28 @@ const articleData = ref<any>(null);
 const isLoading = ref(true);
 const showSummary = ref(true);
 
+// Создаем удобную переменную, которая сама поймет структуру данных
+const post = computed(() => {
+  if (!articleData.value) return null;
+  // Если бэкенд прислал { post: {...} }, берем post. Иначе берем весь объект.
+  return articleData.value.post || articleData.value;
+});
+
+const entities = computed(() => {
+  return articleData.value?.entities || [];
+});
+
 onMounted(async () => {
+  console.log("ЗАПРОС ПО ID:", route.params.id);
   try {
     const id = Number(route.params.id);
-    articleData.value = await api.getPostById(id);
+    if (isNaN(id)) throw new Error("Неверный ID");
+    
+    const data = await api.getPostById(id);
+    console.log("Данные из БД:", data); // Посмотри в консоль F12, что пришло
+    articleData.value = data;
   } catch (e) {
-    console.error("Новость не найдена");
+    console.error("Новость не найдена или ошибка сервера");
   } finally {
     isLoading.value = false;
   }
@@ -23,44 +39,54 @@ onMounted(async () => {
 
 <template>
   <div v-if="isLoading" class="loading">Загрузка...</div>
-  <section v-else-if="articleData" class="news-page">
+  
+  <section v-else-if="post" class="news-page">
     <header class="page-header">
-      <button class="logo" @click="router.push('/')">PulseSight</button>
+      <button class="logo" @click="router.push('/')">Atlas Insight</button>
     </header>
 
     <section class="hero">
       <div class="meta">
-        <span>{{ articleData.post.source }}</span>
-        <span>{{ new Date(articleData.post.created_at).toLocaleString() }}</span>
+        <span>{{ post.source }}</span>
+        <span v-if="post.created_at">
+          {{ new Date(post.created_at).toLocaleString('ru-RU') }}
+        </span>
       </div>
-      <h1>{{ articleData.post.title }}</h1>
+      <h1>{{ post.title }}</h1>
     </section>
 
     <section class="body card">
       <div class="switch">
         <button :class="{active: showSummary}" @click="showSummary = true">AI-Саммари</button>
-        <button :class="{active: !showSummary}" @click="showSummary = false">Текст</button>
+        <button :class="{active: !showSummary}" @click="showSummary = false">Полный текст</button>
       </div>
       
-      <p v-if="showSummary" class="content">
-        {{ articleData.post.content.substring(0, 300) }}...
+      <p v-if="showSummary" class="content summary-text">
+        {{ post.content?.substring(0, 400) || "Нет описания" }}...
       </p>
-      <div v-else class="content">
-        {{ articleData.post.content }}
+      <div v-else class="content full-text">
+        {{ post.content || post.text || "Текст отсутствует" }}
       </div>
     </section>
 
-    <section v-if="articleData.entities?.length" class="entities card">
+    <section v-if="entities.length" class="entities card">
       <h3>Выделенные сущности</h3>
       <div class="entity-grid">
-        <div v-for="e in articleData.entities" :key="e.id" class="e-badge">
-          <small>{{ e.type }}</small>
-          <span>{{ e.text }}</span>
+        <div v-for="(e, index) in entities" :key="index" class="e-badge">
+          <small>{{ e.label || e.type }}</small>
+          <span>{{ e.name || e.text }}</span>
         </div>
       </div>
     </section>
   </section>
+
+  <div v-else class="error-page">
+    <h2>Ошибка 404</h2>
+    <p>Новость с ID {{ route.params.id }} не найдена в базе данных.</p>
+    <button @click="router.push('/search')">Вернуться к поиску</button>
+  </div>
 </template>
+
 
 <style scoped>
 
