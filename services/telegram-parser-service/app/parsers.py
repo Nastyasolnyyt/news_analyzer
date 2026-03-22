@@ -26,18 +26,19 @@ async def parse_telegram_channels() -> list[ArticleModel]:
         try:
             channel_entity = await client.get_entity(channel_username)
             async for post in client.iter_messages(channel_entity, limit=100):
+                # Внутри цикла async for post in client.iter_messages...
                 if post.text:
-                    # Формируем ссылку
-                    link = f"https://t.me/{channel_username}/{post.id}"
-                    # Создаем объект ArticleModel
+                    # Берем первые 80 символов первой строки как заголовок
+                    first_line = post.text.split('\n')[0]
+                    title = (first_line[:77] + '...') if len(first_line) > 80 else first_line
+                    
                     article_model = ArticleModel(
-                        title=" ",
-                        link=link,
+                        title=title, # Вместо " "
+                        link=f"https://t.me/{channel_username}/{post.id}",
                         text=post.text,
-                        pub_date=post.date.isoformat(), 
+                        pub_date=post.date, 
                         source=f"Telegram: {channel_username}"
                     )
-                    articles.append(article_model)
 
         except Exception as e:
             print(f"Error reading channel {channel_username}: {e}")

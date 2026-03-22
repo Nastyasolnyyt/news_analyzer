@@ -26,11 +26,17 @@ async def get_kafka_producer():
 async def send_article_to_kafka(article: Article):
     prod = await get_kafka_producer()
     
-    # Используем model_dump_json() для сериализации datetime
-    json_str = article.model_dump_json(exclude_none=True) 
+    # Формируем словарь, который поймет Очиститель Текста
+    message = {
+        "id": article.id,
+        "title": article.title,
+        "text": article.text,
+        "link": article.link,
+        "source": article.source
+    }
     
     try:
-        
-        await prod.send_and_wait(KAFKA_TOPIC, json_str.encode("utf-8")) 
+        value = json.dumps(message, ensure_ascii=False).encode("utf-8")
+        await prod.send_and_wait(KAFKA_TOPIC, value) 
     except Exception as e:
-        print(f"Failed to send article to Kafka: {e}")
+        print(f"Failed to send article {article.id} to Kafka: {e}")

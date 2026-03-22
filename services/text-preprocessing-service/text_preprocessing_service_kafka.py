@@ -97,16 +97,17 @@ def fetch_full_article(url: str):
     return None
 
 def update_article_in_db(article_id, full_text):
-    """Обновляет запись в PostgreSQL."""
+    """Обновляет содержимое статьи в основной таблице articles."""
+    if not full_text:
+        return
+    
+    query = sql_text("UPDATE articles SET content = :content WHERE id = :id")
     try:
-        with engine.begin() as conn:
-            conn.execute(
-                sql_text("UPDATE articles SET text = :text WHERE id = :id"),
-                {"text": full_text, "id": article_id}
-            )
-            logger.info(f"Статья ID {article_id} успешно обновлена в БД.")
+        with engine.begin() as conn: # engine.begin() сам делает commit
+            conn.execute(query, {"content": full_text, "id": article_id})
+        logger.info(f"Текст статьи {article_id} успешно обновлен в БД.")
     except Exception as e:
-        logger.error(f"Ошибка БД при обновлении ID {article_id}: {e}")
+        logger.error(f"Ошибка при обновлении статьи {article_id} в БД: {e}")
 
 # --- Обработка сигналов и Kafka ---
 
@@ -130,54 +131,47 @@ def main():
 
     logger.info(f"Препроцессинг запущен. Режим: Scraper + DB Update. Слушаем {INPUT_TOPIC}...")
 
+# Внутри цикла while True:
     try:
-        while running:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None: continue
-            if msg.error():
-                logger.error(f'Ошибка Kafka: {msg.error()}')
-                continue
-
-            try:
                 article_data = json.loads(msg.value().decode('utf-8'))
-                article_id = article_data.get('id')
+                # Убеждаемся, что ID есть (в разных парсерах может называться id или article_id)
+                article_id = article_data.get('id') or article_data.get('article_id')
                 article_link = article_data.get('link')
-                
-                # 1. Проверяем, нужно ли скачивать полный текст
-                # Если текст короткий (например, только описание из RSS), идем на сайт
                 original_text = article_data.get('text', '')
-                
-                if article_link and len(original_text) < 300:
+
+                # 1. Если текста мало — пытаемся скачать полный контент
+                if len(original_text) < 200 and article_link:
                     logger.info(f"Скачиваю полную статью для ID {article_id}...")
                     scraped_text = fetch_full_article(article_link)
                     if scraped_text:
                         original_text = scraped_text
-                        # 2. СРАЗУ ОБНОВЛЯЕМ БАЗУ ДАННЫХ
+                        # СРАЗУ сохраняем в БД, чтобы данные не потерялись
                         update_article_in_db(article_id, original_text)
 
-                # 3. Твоя стандартная обработка NLP
+                # 2. Очистка текста для NLP моделей
                 cleaned = clean_text(original_text)
-                cleared = clean_special_symbol(cleaned)
-                tokens = receive_tokens(cleared, stopwords)
+                # (Тут твои функции clean_special_symbol и receive_tokens...)
 
-                # Собираем результат
-                processed_data = article_data.copy()
-                processed_data['text'] = cleaned # В Kafka пойдет уже очищенный полный текст
-                processed_data['clean_text'] = cleared
-                processed_data['tokens'] = tokens
+                # 3. Формируем сообщение для КЛАСТЕРИЗАЦИИ, РИСКОВ и СЕНТИМЕНТА
+                processed_data = {
+                    'article_id': article_id,  # Единый ключ для всех
+                    'text': cleaned,           # Очищенный текст для моделей
+                    'title': article_data.get('title'),
+                    'link': article_link,
+                    'source': article_data.get('source')
+                }
 
-                # 4. Отправка во все топики-потребители
+                # 4. Рассылка по всем топикам
                 message_bytes = json.dumps(processed_data, ensure_ascii=False).encode('utf-8')
                 for out_topic in OUTPUT_TOPICS:
-                    producer.produce(topic=out_topic, value=message_bytes, callback=delivery_callback)
+                    producer.produce(topic=out_topic, value=message_bytes)
                 
-                producer.poll(0)
+                producer.flush() # Гарантируем отправку
                 consumer.commit(msg)
 
-            except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
-                consumer.commit(msg) 
-
+    except Exception as e:
+                logger.error(f"Ошибка при обработке сообщения: {e}")    
+    
     finally:
         producer.flush()
         consumer.close()

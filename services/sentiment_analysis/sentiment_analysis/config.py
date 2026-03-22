@@ -1,5 +1,4 @@
 from functools import lru_cache
-
 from pydantic import BaseSettings, Field
 
 
@@ -22,12 +21,9 @@ class Settings(BaseSettings):
         False, env="KAFKA_ENABLE_AUTO_COMMIT"
     )
 
-    database_url: str = Field(
-        # Значение по умолчанию — предоставленный URL, может быть переопределён через env
-        "postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz"
-        "@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386",
-        env="DATABASE_URL",
-    )
+    # Публичная ссылка удалена. Теперь значение берется строго из ENV.
+    # Если переменная не будет найдена, Pydantic выдаст ошибку при старте.
+    database_url: str = Field(..., env="DATABASE_URL")
 
     sentiment_model_name: str = Field(
         "cointegrated/rubert-tiny-sentiment", env="SENTIMENT_MODEL_NAME"
@@ -43,8 +39,4 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Возвращает кэшированный экземпляр настроек."""
-
     return Settings()
-
-
-

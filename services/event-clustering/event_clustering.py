@@ -1,444 +1,135 @@
 # -*- coding: utf-8 -*-
 import os
-import argparse
 import logging
-from typing import List, Optional, Tuple, Dict
-from datetime import datetime, timezone
+from typing import List, Dict
+from datetime import datetime
 
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, JSON, Boolean
+    create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float, func
 )
-from sqlalchemy.orm import sessionmaker, declarative_base, relationship
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import or_
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.dialects.postgresql import insert
 
-# Embeddings & clustering
+# ML и Анализ
 from sentence_transformers import SentenceTransformer
 import numpy as np
-
-# Optional algorithms
-try:
-    import hdbscan
-    HAS_HDBSCAN = True
-except Exception:
-    HAS_HDBSCAN = False
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-import warnings
-warnings.filterwarnings("ignore")
-
-
-# Optional: for queue (Redis)
-try:
-    import redis
-    HAS_REDIS = True
-except Exception:
-    HAS_REDIS = False
-
-# %%
-# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("event_clustering")
 
 Base = declarative_base()
 
+# --- СИНХРОНИЗИРОВАННЫЕ МОДЕЛИ (ОТВЕЧАЮТ OUTPUT_MODEL) ---
 
-# %%
-# --- SQLAlchemy models (DB-agnostic) ---
 class Article(Base):
     __tablename__ = "articles"
     id = Column(Integer, primary_key=True)
-    external_id = Column(String(255), unique=True, index=True, nullable=True)  # optional id from upstream
-    title = Column(String(2000), nullable=True)
-    text = Column(Text, nullable=False)
-    published_at = Column(DateTime(timezone=True), nullable=True)
-    processed = Column(Boolean, default=False)  # whether preprocessed
-    clustered_at = Column(DateTime(timezone=True), nullable=True)
-    cluster_id = Column(Integer, ForeignKey("clusters.id"), nullable=True)
-    meta = Column(JSON, nullable=True)
+    author = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False) 
+    source = Column(Text, nullable=False)
+    link = Column(Text, unique=True, nullable=False)
 
-    cluster = relationship("Cluster", back_populates="articles")
-
-
-# %%
-class Entity(Base):
-    __tablename__ = "entities"
+class Topic(Base):
+    __tablename__ = "topics"
     id = Column(Integer, primary_key=True)
-    article_id = Column(Integer, ForeignKey("articles.id"), index=True, nullable=False)
-    text = Column(String(500), nullable=False)
-    label = Column(String(50), nullable=True)  # PER/ORG/LOC
-    external_refs = Column(JSON, nullable=True)
+    name = Column(String(255), nullable=False) # Сюда запишем ключевые слова
+    created_at = Column(DateTime, server_default=func.now())
 
-
-
-# %%
-class Cluster(Base):
-    __tablename__ = "clusters"
+class PostAnalysis(Base):
+    __tablename__ = "articles_analysis"
     id = Column(Integer, primary_key=True)
-    name = Column(String(1000), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
-    algorithm = Column(String(100), nullable=True)
-    params = Column(JSON, nullable=True)
-    vector_center = Column(JSON, nullable=True)  # centroid/rep vector
-    size = Column(Integer, default=0)
-    top_terms = Column(JSON, nullable=True)
+    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, unique=True)
+    topic_id = Column(Integer, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
+    emotion = Column(Float, nullable=False, default=0.0)
+    tonality = Column(Float, nullable=False, default=0.0)
+    relevance = Column(Float, nullable=False, default=0.0)
 
-    articles = relationship("Article", back_populates="cluster")
+# --- ЛОГИКА ГЕНЕРАЦИИ НАЗВАНИЙ ---
 
+def generate_topic_name(texts: List[str]) -> str:
+    """Извлекает 3 главных слова из группы текстов для названия темы."""
+    if not texts:
+        return "Неизвестное событие"
+    
+    vectorizer = TfidfVectorizer(max_features=5, stop_words=None) # Можно добавить стоп-слова
+    try:
+        tfidf_matrix = vectorizer.fit_transform(texts)
+        words = vectorizer.get_feature_names_out()
+        return "Событие: " + ", ".join(words[:3])
+    except:
+        return f"Событие от {datetime.now().strftime('%d.%m %H:%M')}"
 
-# %%
-# --- DB utility ---
-def get_engine(database_url: Optional[str] = None):
-    if database_url is None:
-        database_url = os.getenv("DATABASE_URL", "sqlite:///./event_clustering.db")
-    engine = create_engine(database_url, echo=False, future=True)
-    return engine
+# --- ОСНОВНОЙ КЛАСС ---
 
-def create_tables(engine):
-    Base.metadata.create_all(engine)
-
-
-# %%
-from langdetect import detect, DetectorFactory
-DetectorFactory.seed = 0  # стабильность детекции
-
-import re
-from nltk.corpus import stopwords as nltk_stopwords
-from nltk.stem import WordNetLemmatizer
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-from pymystem3 import Mystem
-
-def lemmatize_ru(text: str) -> str:
-    return "".join(mystem.lemmatize(text)).replace("\n", " ").strip()
-
-_word_re = re.compile(r"[A-Za-zА-Яа-яёЁ]+", flags=re.U)
-
-# %%
-# --- Clustering component ---
 class EventClustering:
-    def __init__(
-        self,
-        db_url: Optional[str] = None,
-        embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2",
-        min_cluster_size: int = 5,
-        use_hdbscan: bool = True,
-        umap_n_components: int = 5,
-        redis_url: Optional[str] = None,
-    ):
-        # DB / session
-        self.engine = get_engine(db_url)
-        self.Session = sessionmaker(bind=self.engine, autoflush=False, expire_on_commit=False)
+    def __init__(self, db_url: str):
+        self.engine = create_engine(db_url)
+        self.Session = sessionmaker(bind=self.engine)
+        self.embedder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
-        # Embeddings model (multilingual by default)
-        self.embedding_model_name = embedding_model
-        self.embedder = SentenceTransformer(embedding_model)
-
-        # clustering params
-        self.min_cluster_size = min_cluster_size
-        self.use_hdbscan = use_hdbscan and HAS_HDBSCAN
-        if use_hdbscan and not HAS_HDBSCAN:
-            logger.warning("hdbscan not installed -> fallback to KMeans will be used")
-            self.use_hdbscan = False
-        self.umap_n_components = umap_n_components
-
-        # optional redis
-        self.redis = None
-        if redis_url and HAS_REDIS:
-            self.redis = redis.from_url(redis_url)
-
-        # --- language tools ---
-        # russian lemmatizer
-        self.mystem = Mystem()
-
-        # english lemmatizer
-        try:
-            self.en_lemmatizer = WordNetLemmatizer()
-        except Exception:
-            self.en_lemmatizer = None
-
-        # stop-words
-        try:
-            self.stop_en = set(nltk_stopwords.words("english"))
-        except Exception:
-            self.stop_en = set()
-        try:
-            self.stop_ru = set(nltk_stopwords.words("russian"))
-        except Exception:
-            self.stop_ru = set()
-
-    # ---- функция детекции языка ----
-    def detect_language(self, text: str) -> str:
-        """Возвращает 'ru' или 'en' (fallback 'en')."""
-        try:
-            lang = detect(text)
-            if lang.startswith("ru"):
-                return "ru"
-            if lang.startswith("en"):
-                return "en"
-            # fallback: если неизвестно — решить по наличию кириллицы
-            if re.search("[а-яА-Я]", text):
-                return "ru"
-        except Exception:
-            pass
-        return "en"
-    
-    def preprocess_for_tfidf(self, text: str, lang: str) -> str:
-        """
-        Возвращает строку токенов (лемматизированных), готовую для TfidfVectorizer.
-        Для RU — pymystem3, для EN — WordNetLemmatizer.
-        Убираем короткие токены и стоп-слова.
-        """
-        text = text.lower()
-        tokens = _word_re.findall(text)
-        out_tokens = []
-        if lang == "ru":
-            for t in tokens:
-                if len(t) <= 2:
-                    continue
-                if t in self.stop_ru:
-                    continue
-                lemma = "".join(self.mystem.lemmatize(t)).strip()
-                if lemma and len(lemma) > 1:
-                    out_tokens.append(lemma)
-        else:  # english
-            for t in tokens:
-                if len(t) <= 2:
-                    continue
-                if t in self.stop_en:
-                    continue
-                lemma = self.en_lemmatizer.lemmatize(t)
-                if lemma and len(lemma) > 1:
-                    out_tokens.append(lemma)
-        return " ".join(out_tokens)
-
-    def fetch_unclustered_articles(self, limit: int = 500) -> List[Article]:
+    def run_once(self):
         session = self.Session()
         try:
-            q = (
-                session.query(Article)
-                .filter(Article.text.isnot(None))
-                .filter(or_(Article.cluster_id.is_(None), Article.clustered_at.is_(None)))
-                .order_by(Article.published_at.desc().nullslast())
-                .limit(limit)
-            )
-            res = q.all()
-            logger.info("Fetched %d unclustered articles", len(res))
-            return res
-        finally:
-            session.close()
+            # 1. Берем статьи без темы
+            subquery = session.query(PostAnalysis.post_id).filter(PostAnalysis.topic_id.isnot(None))
+            articles = session.query(Article).filter(Article.id.not_in(subquery)).limit(50).all()
+            
+            if not articles:
+                logger.info("Новых статей для кластеризации нет.")
+                return
 
-    def embed_texts(self, texts: List[str], batch_size: int = 64) -> np.ndarray:
-        # embed title + text for better signal
-        embeddings = self.embedder.encode(texts, show_progress_bar=False, batch_size=batch_size, convert_to_numpy=True)
-        # normalize
-        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-        norms[norms == 0.0] = 1.0
-        embeddings = embeddings / norms
-        return embeddings
-    
-    def extract_top_terms(self, texts: List[str], indices: List[int], top_n: int = 10) -> List[str]:
-        """
-        Делает TF-IDF на лемматизированных текстах (RU/EN).
-        Возвращает top_n терминов для набора документов indices.
-        """
-        if len(indices) == 0:
-            return []
-        corpus_prepared = []
-        for i in indices:
-            txt = texts[i]
-            lang = self.detect_language(txt)
-            prep = self.preprocess_for_tfidf(txt, lang)
-            corpus_prepared.append(prep if prep.strip() else txt.lower())
-    
-        # Используем стандартный векторизатор — наши тексты уже токенизированы/лемматизированы
-        vect = TfidfVectorizer(max_features=2000, token_pattern=r"(?u)\b\w+\b")
-        X = vect.fit_transform(corpus_prepared)
-        # усредняем TF-IDF по документам, берём top_n
-        import numpy as np
-        scores = np.array(X.mean(axis=0)).ravel()
-        if scores.size == 0:
-            return []
-        top_idx = np.argsort(scores)[-top_n:][::-1]
-        terms = [vect.get_feature_names_out()[i] for i in top_idx]
-        return terms
-
-    def cluster_embeddings(self, embeddings: np.ndarray) -> Tuple[np.ndarray, Dict]:
-        """
-        Return labels array and metadata
-        """
-        meta = {}
-        if self.use_hdbscan and embeddings.shape[0] >= self.min_cluster_size:
-            # HDBSCAN expects float32
-            clusterer = hdbscan.HDBSCAN(min_cluster_size=self.min_cluster_size, metric='euclidean', prediction_data=True)
-            labels = clusterer.fit_predict(embeddings)
-            meta["algorithm"] = "hdbscan"
-            # convert -1 to noise label
-            return labels, meta
-        else:
-            # fallback KMeans: choose k by heuristic: sqrt(n/2) or min_cluster_size
-            n = embeddings.shape[0]
-            k = max(2, int(max(2, min(n // self.min_cluster_size, int(np.sqrt(n/2)+1)))))
-            k = min(k, n)  # cannot exceed n
-            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+            # 2. Векторизация
+            texts = [f"{a.title} {a.content}" for a in articles]
+            embeddings = self.embedder.encode(texts)
+            
+            # 3. Кластеризация
+            n_clusters = max(2, len(articles) // 4)
+            kmeans = KMeans(n_clusters=n_clusters, n_init='auto', random_state=42)
             labels = kmeans.fit_predict(embeddings)
-            meta["algorithm"] = "kmeans"
-            meta["k"] = k
-            return labels, meta
 
-    def persist_clusters(
-        self,
-        articles: List[Article],
-        texts: List[str],
-        labels: np.ndarray,
-        algo_meta: Dict,
-        embeddings: np.ndarray
-    ):
-        session = self.Session()
-        try:
-            label2idxs = {}
-            for idx, lab in enumerate(labels.tolist()):
-                label2idxs.setdefault(int(lab), []).append(idx)
-    
-            logger.info("persist_clusters: labels present = %s", list(label2idxs.keys()))
-            created = 0
-    
-            for lab, idxs in label2idxs.items():
-                if lab == -1:
-                    for i in idxs:
-                        art = articles[i]
-                        art.cluster_id = None
-                        art.clustered_at = datetime.now(timezone.utc)
-                        session.merge(art)
-                    continue
-    
-                top_terms = self.extract_top_terms(texts, idxs, top_n=10)
-                centroid_vec = embeddings[idxs].mean(axis=0).tolist()
-    
-                cluster = Cluster(
-                    name=f"cluster_{int(datetime.now().timestamp())}_{lab}",
-                    algorithm=algo_meta.get("algorithm"),
-                    params=algo_meta,
-                    vector_center=centroid_vec,
-                    size=len(idxs),
-                    top_terms=top_terms,
-                )
-                session.add(cluster)
+            # 4. Сохранение
+            cluster_map = {} # label -> topic_id
+            for cluster_idx in range(n_clusters):
+                cluster_texts = [texts[i] for i, l in enumerate(labels) if l == cluster_idx]
+                if not cluster_texts: continue
+                
+                # Создаем красивое имя темы
+                topic_name = generate_topic_name(cluster_texts)
+                new_topic = Topic(name=topic_name)
+                session.add(new_topic)
                 session.flush()
-                logger.info(
-                    "persist_clusters: created cluster id=%s, lab=%s, size=%d, top_terms=%s",
-                    cluster.id,
-                    lab,
-                    len(idxs),
-                    top_terms,
+                cluster_map[cluster_idx] = new_topic.id
+
+            # 5. Привязка статей к темам через UPSERT
+            for i, article in enumerate(articles):
+                label = labels[i]
+                topic_id = cluster_map.get(label)
+                
+                stmt = insert(PostAnalysis).values(
+                    post_id=article.id,
+                    topic_id=topic_id,
+                    emotion=0.0, tonality=0.0, relevance=0.0
+                ).on_conflict_do_update(
+                    index_elements=['post_id'],
+                    set_={'topic_id': topic_id}
                 )
-    
-                for i in idxs:
-                    art = articles[i]
-                    art.cluster_id = cluster.id
-                    art.clustered_at = datetime.now(timezone.utc)
-                    session.merge(art)
-    
-                created += 1
-    
+                session.execute(stmt)
+            
             session.commit()
-            logger.info("Persisted %d clusters (and updated %d articles)", created, len(articles))
+            logger.info(f"Кластеризация завершена. Создано {n_clusters} тем.")
+            
         except Exception as e:
             session.rollback()
-            logger.exception("Error while persisting clusters: %s", e)
-            raise
+            logger.error(f"Ошибка в работе сервиса: {e}")
         finally:
             session.close()
 
-    def run_once(self, limit: int = 500):
-        articles = self.fetch_unclustered_articles(limit=limit)
-        logger.info("run_once: fetched %d articles to cluster", len(articles))
-    
-        if not articles:
-            logger.info("No articles to cluster")
-            return
-    
-        texts = []
-        for a in articles:
-            title = (a.title or "").strip()
-            text = (a.text or "").strip()
-            combined = title + " . " + text if title else text
-            texts.append(combined)
-    
-        logger.info("run_once: prepared %d combined texts", len(texts))
-    
-        embeddings = self.embed_texts(texts)
-        logger.info("run_once: got embeddings shape=%s", embeddings.shape)
-    
-        labels, meta = self.cluster_embeddings(embeddings)
-        unique_labels, counts = np.unique(labels, return_counts=True)
-        logger.info(
-            "run_once: clustering done, algo=%s, labels=%s, counts=%s",
-            meta.get("algorithm"),
-            unique_labels.tolist(),
-            counts.tolist(),
-        )
-    
-        try:
-            if len(set(labels.tolist())) > 1 and len(labels) >= 5:
-                sil = silhouette_score(embeddings, labels)
-                meta["silhouette"] = float(sil)
-                logger.info("run_once: silhouette score = %.4f", sil)
-        except Exception:
-            logger.exception("run_once: error computing silhouette")
-    
-        self.persist_clusters(articles, texts, labels, meta, embeddings)
-
-    # utility for testing: populate sample rows
-    def create_sample_data(self):
-        session = self.Session()
-        try:
-            session.query(Article).filter(Article.external_id.like("sample_%")).delete()
-            sample_texts = [
-                ("Bankruptcies sweep across small banks", "Several regional banks reported sudden withdrawals and may file for bankruptcy..."),
-                ("Центробанк повысил ставку", "Центробанк поднял ключевую ставку на 50 б.п...."),
-                ("Банкротство регионального банка", "Региональный банк объявил о возможном банкротстве..."),
-                ("Tech company files for IPO", "The startup announced intention to go public..."),
-                ("Political protest downtown", "Thousands rallied in the capital demanding policy changes..."),
-                ("Local elections heating up", "Candidates for mayor debate infrastructure and taxes..."),
-                ("Major bank merger announced", "Two large banks agreed to merge in a deal worth billions..."),
-                ("Reports: CEO of BigCorp resigns", "In an unexpected move, CEO leaves after scandals..."),
-                ("Sports: football team wins cup", "Underdogs beat champions in a dramatic final..."),
-            ]
-            for i, (t, b) in enumerate(sample_texts):
-                art = Article(
-                    external_id=f"sample_{i}",
-                    title=t,
-                    text=b,
-                    published_at=datetime.now(timezone.utc),
-                    processed=True,
-                )
-                session.add(art)
-            session.commit()
-            logger.info("Inserted sample %d articles", len(sample_texts))
-        finally:
-            session.close()
-            
 if __name__ == "__main__":
-    # Загружаем настройки
-    db_url = os.getenv("DATABASE_URL")
-    
-    clustering = EventClustering(db_url=db_url)
-    
-    # Создаем таблицы, если их нет
-    create_tables(clustering.engine)
-    
-    logger.info("Starting Event Clustering service...")
-    
-    # Запускаем бесконечный цикл (например, раз в 10 минут)
-    import time
-    while True:
-        try:
-            clustering.run_once(limit=100)
-            logger.info("Clustering cycle finished. Sleeping...")
-            time.sleep(600) 
-        except Exception as e:
-            logger.error(f"Error in clustering loop: {e}")
-            time.sleep(60)
+    url = os.getenv("DATABASE_URL")
+    if url:
+        EventClustering(url).run_once()
+    else:
+        logger.error("Переменная DATABASE_URL не найдена!")

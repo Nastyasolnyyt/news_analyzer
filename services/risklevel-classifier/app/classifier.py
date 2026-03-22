@@ -63,15 +63,20 @@ class MistralNeuralClassifier:
             logger.error(f"Error in Mistral API: {e}")
             return RiskResult(risk_type="low", confidence=0.0)
 
-    def _parse_risk_level(self, response: str) -> tuple[str, float]:
-        # Убираем все кроме букв
-        response_clean = re.sub(r'[^a-z]', '', response)
+def _parse_risk_level(self, response: str) -> tuple[str, float]:
+    response_clean = re.sub(r'[^a-z]', '', response.lower())
+    
+    # Ищем точное совпадение или проверяем наличие с приоритетом
+    if response_clean == "high":
+        return "high", 0.95
+    if response_clean == "medium":
+        return "medium", 0.85
+    if response_clean == "low":
+        return "low", 0.85
         
-        if "high" in response_clean:
-            return "high", 0.95
-        if "medium" in response_clean:
-            return "medium", 0.85
-        if "low" in response_clean:
-            return "low", 0.75
+    # Если ответила длинно, берем по приоритету опасности
+    for level, conf in [("high", 0.9), ("medium", 0.8), ("low", 0.7)]:
+        if level in response_clean:
+            return level, conf
             
-        return "low", 0.1
+    return "low", 0.1   
