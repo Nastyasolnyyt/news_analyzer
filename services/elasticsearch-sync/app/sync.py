@@ -80,16 +80,32 @@ class SyncService:
             return []
 
 
+    # sync.py
+
     def article_to_doc(self, article):
-        return {
+        # Собираем данные из связанных таблиц (SQLAlchemy relationship)
+        # Убедись, что в моделях прописаны отношения!
+        
+        doc = {
             "id": article.id,
             "title": article.title,
             "text": article.text,
             "source": article.source,
             "pub_date": article.pub_date.isoformat() if article.pub_date else None,
-            "created_at": article.created_at.isoformat(),
-            "updated_at": article.updated_at.isoformat()
+            "updated_at": article.updated_at.isoformat(),
+            
+            # Подтягиваем аналитику (если она уже готова)
+            "risk_level": article.risk.risk_type if article.risk else "low",
+            "sentiment": article.sentiment.sentiment_label if hasattr(article, 'sentiment') and article.sentiment else "neutral",
         }
+        
+        # Если есть сущности (NER)
+        if hasattr(article, 'entities') and article.entities:
+            doc["entities"] = [
+                {"text": e.text, "type": e.type} for e in article.entities
+            ]
+            
+        return doc
     
     def sync_articles(self):
         logger.info("Starting articles sync")

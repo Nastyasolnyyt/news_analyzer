@@ -6,24 +6,33 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 
+# elasticsearch_client.py
+
 ARTICLES_MAPPING = {
     "properties": {
         "id": {"type": "integer"},
         "title": {
             "type": "text",
             "analyzer": "russian",
-            "fields": {
-                "keyword": {"type": "keyword"}  # для сортировки и агрегаций
-            }
+            "fields": {"keyword": {"type": "keyword"}}
         },
         "text": {
             "type": "text",
             "analyzer": "russian"
         },
-        "source": {"type": "keyword"},  # для фильтрации по источникам
-        "pub_date": {"type": "date"},   # для сортировки по дате
-        #для синхронизации
-        "created_at": {"type": "date"},
+        "source": {"type": "keyword"},
+        "pub_date": {"type": "date"},
+        # НОВЫЕ ПОЛЯ ДЛЯ АНАЛИТИКИ
+        "risk_level": {"type": "keyword"},      # high, medium, low
+        "sentiment": {"type": "keyword"},       # positive, negative, neutral
+        "cluster_id": {"type": "integer"},      # для группировки похожих новостей
+        "entities": {                           # для поиска по именам/компаниям
+            "type": "nested",
+            "properties": {
+                "text": {"type": "keyword"},
+                "type": {"type": "keyword"}
+            }
+        },
         "updated_at": {"type": "date"}
     }
 }
