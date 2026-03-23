@@ -18,7 +18,12 @@ SENTIMENT_MAP = {
 
 def process_message(msg):
     try:
-        data = json.loads(msg.value().decode("utf-8"))
+        # msg.value is already bytes, deserialize it
+        if isinstance(msg.value, bytes):
+            value = msg.value.decode("utf-8")
+        else:
+            value = msg.value
+        data = json.loads(value)
         article_id = data.get("article_id")
         text_to_analyze = data.get("text")
 
