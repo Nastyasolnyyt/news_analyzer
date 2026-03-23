@@ -2,7 +2,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.schemas.post import PostFilterDTO
-from src.infrastructure.postgres.models import Article, Entity
+from src.infrastructure.postgres.models import Article, NamedEntity
 
 class PostDBGateWay:
     def __init__(self, session: AsyncSession):
@@ -11,9 +11,8 @@ class PostDBGateWay:
     async def get_posts_with_filters(self, filters: PostFilterDTO):
         # Загружаем статью вместе со всеми связанными данными одним махом
         query = select(Article).options(
-            joinedload(Article.sentiment),
-            joinedload(Article.risk),
-            joinedload(Article.anomaly),
+            joinedload(Article.risks),
+            joinedload(Article.analyses),
             selectinload(Article.entities)
         )
 
@@ -23,7 +22,7 @@ class PostDBGateWay:
             query = query.where(
                 or_(
                     Article.title.ilike(search_term),
-                    Article.content.ilike(search_term)
+                    Article.text.ilike(search_term)
                 )
             )
 
@@ -32,7 +31,7 @@ class PostDBGateWay:
         if filters.search:
             search_term = f"%{filters.search}%"
             count_query = count_query.where(
-                or_(Article.title.ilike(search_term), Article.content.ilike(search_term))
+                or_(Article.title.ilike(search_term), Article.text.ilike(search_term))
             )
         
         total_result = await self.session.execute(count_query)
@@ -52,12 +51,21 @@ class PostDBGateWay:
         # Формируем список для DTO
         response_items = []
         for article in articles:
+            # Получаем анализ (первый, если есть)
+            analysis = article.analyses[0] if article.analyses else None
+            # Получаем риск (первый, если есть)
+            risk = article.risks[0] if article.risks else None
+            
             response_items.append({
                 "post": article,
                 "analysis": {
-                    "tonality": article.sentiment.tonality if article.sentiment else 0.0,
-                    "risk_level": article.risk.risk_level if article.risk else "low",
-                    "is_anomaly": article.anomaly.is_anomaly if article.anomaly else False
+                    "tonality": analysis.tonality if analysis else 0.0,
+                    "confidence": analysis.confidence if analysis else None,
+                    "sentiment_label": analysis.sentiment_label if analysis else "neutral"
+                },
+                "risk": {
+                    "risk_type": risk.risk_type if risk else "unknown",
+                    "confidence": risk.confidence if risk else None
                 },
                 "entities": article.entities
             })
@@ -66,9 +74,8 @@ class PostDBGateWay:
 
     async def get_post_by_id(self, post_id: int):
         query = select(Article).options(
-            joinedload(Article.sentiment),
-            joinedload(Article.risk),
-            joinedload(Article.anomaly),
+            joinedload(Article.risks),
+            joinedload(Article.analyses),
             selectinload(Article.entities)
         ).where(Article.id == post_id)
 
@@ -78,12 +85,21 @@ class PostDBGateWay:
         if not article:
             return None
 
+        # Получаем анализ (первый, если есть)
+        analysis = article.analyses[0] if article.analyses else None
+        # Получаем риск (первый, если есть)
+        risk = article.risks[0] if article.risks else None
+
         return {
             "post": article,
             "analysis": {
-                "tonality": article.sentiment.tonality if article.sentiment else 0.0,
-                "risk_level": article.risk.risk_level if article.risk else "low",
-                "is_anomaly": article.anomaly.is_anomaly if article.anomaly else False
+                "tonality": analysis.tonality if analysis else 0.0,
+                "confidence": analysis.confidence if analysis else None,
+                "sentiment_label": analysis.sentiment_label if analysis else "neutral"
+            },
+            "risk": {
+                "risk_type": risk.risk_type if risk else "unknown",
+                "confidence": risk.confidence if risk else None
             },
             "entities": article.entities
         }

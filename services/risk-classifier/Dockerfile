@@ -19,5 +19,8 @@ COPY . .
 # Устанавливаем PYTHONPATH, чтобы импорты типа "from .models" работали
 ENV PYTHONPATH=/app
 
+# Запускаем Kafka consumer
+CMD ["python", "-m", "app.main"]
+
 # Запуск модуля
 CMD ["python", "-m", "app.main"]

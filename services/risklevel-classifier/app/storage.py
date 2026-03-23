@@ -18,7 +18,7 @@ class Risk(Base):
     risk_type = Column(String, nullable=False)
     confidence = Column(Float, default=0.0)
 
-engine = create_engine(settings.db_url)
+engine = create_engine(settings.database_url)
 SessionLocal = sessionmaker(bind=engine)
 
 def save_risk_result(article_id: int, result):

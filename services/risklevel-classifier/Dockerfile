@@ -5,6 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ ./app/
+COPY . .
 
-CMD ["python", "-c", "from app.kafka_consumer import consume_from_kafka; consume_from_kafka()"]
+ENV PYTHONPATH=/app
+
+# Запускаем Kafka consumer для обработки risk_types_done топика
+CMD ["python", "-m", "app.main"]

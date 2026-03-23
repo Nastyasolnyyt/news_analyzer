@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import insert
 from .config import settings
@@ -13,12 +13,10 @@ class Risk(Base):
     risk_type = Column(String)
     confidence = Column(Float)
 
-    __table_args__ = (UniqueConstraint('article_id', name='unique_article_risk'),)
-
-engine = create_engine(settings.db_url)
+engine = create_engine(settings.database_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def save_risk_result(article_id: int, result: RiskResult):
+def save_risk_result(article_id: int, result):
     with SessionLocal() as db:
         try:
             stmt = insert(Risk).values(
@@ -28,7 +26,7 @@ def save_risk_result(article_id: int, result: RiskResult):
             )
             # Если запись уже есть — обновляем её
             stmt = stmt.on_conflict_do_update(
-                constraint="unique_article_risk",
+                index_elements=['article_id'],
                 set_={
                     "risk_type": result.risk_type,
                     "confidence": result.confidence
@@ -36,7 +34,7 @@ def save_risk_result(article_id: int, result: RiskResult):
             )
             db.execute(stmt)
             db.commit()
-        except Exception:
+        except Exception as e:
             db.rollback()
             raise
 

@@ -3,7 +3,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # База данных
-    db_url: str
+    database_url: str
     
     # API
     openrouter_api_key: str
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str = "kafka:9092"
     kafka_group_id: str = "risk-classifier-group"
     input_topic: str = "text_for_risk"
-    output_topic: str = "risk_classified"
+    output_topic: str = "risk_types_done"
     
     # Логирование
     log_level: str = "INFO"
