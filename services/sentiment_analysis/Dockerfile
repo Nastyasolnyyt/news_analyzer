@@ -9,15 +9,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY requirements.txt .
-
-
-RUN pip install --no-cache-dir --upgrade pip setuptools
-
-
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
 
-ENV HF_HUB_OFFLINE=0
-
-COPY . ./sentiment_analysis/
+COPY . .
 
 CMD ["python", "-m", "sentiment_analysis.main"]

@@ -9,3 +9,4 @@ langdetect
 nltk
 redis
 python-dotenv
+psycopg2-binary
