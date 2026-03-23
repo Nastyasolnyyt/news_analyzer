@@ -26,9 +26,8 @@ Base = declarative_base()
 class Article(Base):
     __tablename__ = "articles"
     id = Column(Integer, primary_key=True)
-    author = Column(String(255), nullable=False)
-    title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=False) 
+    title = Column(String(255), nullable=True)     
+    content = Column(Text, nullable=False, name="text")  
     source = Column(Text, nullable=False)
     link = Column(Text, unique=True, nullable=False)
 
@@ -75,7 +74,7 @@ class EventClustering:
         try:
             # 1. Берем статьи без темы
             subquery = session.query(PostAnalysis.post_id).filter(PostAnalysis.topic_id.isnot(None))
-            articles = session.query(Article).filter(Article.id.not_in(subquery)).limit(50).all()
+            articles = session.query(Article).order_by(Article.id.desc()).limit(50).all()
             
             if not articles:
                 logger.info("Новых статей для кластеризации нет.")

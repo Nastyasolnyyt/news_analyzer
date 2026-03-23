@@ -1,5 +1,6 @@
 from functools import lru_cache
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -21,8 +22,6 @@ class Settings(BaseSettings):
         False, env="KAFKA_ENABLE_AUTO_COMMIT"
     )
 
-    # Публичная ссылка удалена. Теперь значение берется строго из ENV.
-    # Если переменная не будет найдена, Pydantic выдаст ошибку при старте.
     database_url: str = Field(..., env="DATABASE_URL")
 
     sentiment_model_name: str = Field(
