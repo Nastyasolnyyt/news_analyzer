@@ -23,11 +23,14 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      # Помогает избежать ошибки NodeExists при быстрых перезапусках
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 6000
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 6000
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - news_network
 
@@ -36,12 +39,11 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env  # Чтобы Docker прочитал твой файл с паролями
+      - .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: raw_articles
-      # Берем переменную из твоего .env
-      DATABASE_URL: ${DATABASE_URL} 
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       kafka:
         condition: service_healthy
@@ -52,9 +54,12 @@ services:
     build: ./services/news-site-parser-service
     ports:
       - "8001:8000"
+    env_file:
+      - .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: raw_articles
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       kafka:
         condition: service_healthy
@@ -70,6 +75,7 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: raw_articles
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       kafka:
         condition: service_healthy
@@ -78,27 +84,24 @@ services:
 
   text-preprocessing:
     build: ./services/text-preprocessing-service
-    # 1. Обязательно подключаем файл с секретами
     env_file:
       - .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      # 2. Пробрасываем URL базы данных из .env
       DATABASE_URL: ${DATABASE_URL}
       INPUT_TOPIC: raw_articles
       OUTPUT_TOPIC_NER: text_for_ner
       OUTPUT_TOPIC_RISK: text_for_risk
       OUTPUT_TOPIC_SENTIMENT: text_for_sentiment
-      # 3. Добавляем недостающие топики для соответствия коду
       OUTPUT_TOPIC_ANOMALY: text_for_anomaly
       OUTPUT_TOPIC_SYNC: text_for_kg_sync
     depends_on:
       kafka:
         condition: service_healthy
     restart: on-failure
-    # Проверьте, что имя файла в команде совпадает с вашим (в коде обычно main.py или preprocessing.py)
+    # Увеличил sleep, чтобы Кафка точно успела прочухаться
     command: >
-      sh -c "sleep 10 && python text_preprocessing_service_kafka.py"
+      sh -c "sleep 15 && python text_preprocessing_service_kafka.py"
     networks:
       - news_network
 
@@ -110,52 +113,15 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: text_for_risk
       OUTPUT_TOPIC: risk_classified
-      db_url: ${POSTGRES_DB_URL}
+      db_url: ${DATABASE_URL}
       PYTHONUNBUFFERED: "1"
     depends_on:
       kafka:
         condition: service_healthy
-    restart: on-failure
     networks:
       - news_network
 
-  #sentiment-analysis:
-  #  build:
-   #   context: ./services/sentiment_analysis  
-    #  dockerfile: Dockerfile        
-   # container_name: news_analyzer-sentiment
-   # env_file:
-    #  - .env
-    #environment:
-    #  - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-     # - DATABASE_URL=${DATABASE_URL}
-    #deploy:
-     # resources:
-     #  limits:
-       #   memory: 1.5G
-   # depends_on:
-    #  kafka:
-     #   condition: service_healthy
-   # networks:
-    #  - news_network
-
- # event-clustering:
-   # build: ./services/event-clustering
-   # container_name: news_analyzer-event-clustering
-   # env_file:
-    #  - .env
-   # environment:
-  #    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-   #   DATABASE_URL: ${DATABASE_URL}
-  #  deploy:
-    #  resources:
-    #    limits:
-    #      memory: 2G
- #   depends_on:
-    #  kafka:
-   #     condition: service_healthy
-    #networks:
-    #  - news_network
+  
 
   redis:
     image: redis:7-alpine
@@ -170,11 +136,12 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "9200:9200"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 30s
+      interval: 20s
       timeout: 10s
       retries: 5
     networks:
@@ -190,7 +157,6 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
-    restart: on-failure
     networks:
       - news_network
 
@@ -201,21 +167,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - elasticsearch
-    networks:
-      - news_network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8003
-    depends_on:
-      - output_module
-    profiles: ["with-frontend"]
+      elasticsearch:
+        condition: service_healthy
     networks:
       - news_network
 

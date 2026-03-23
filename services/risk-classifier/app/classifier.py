@@ -22,7 +22,7 @@ class MistralNeuralClassifier:
             },
             timeout=30.0
         )
-        self.model = "openrouter/hunter-alpha"
+        self.model = "minimax/minimax-m2.5:free"
 
     def classify(self, text: str) -> RiskResult:
         """Основной входной метод"""
