@@ -1,0 +1,22 @@
+# Core
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# Data & DB
+sqlalchemy==2.0.23
+pydantic==2.8.2  
+pydantic-settings==2.4.0
+psycopg2-binary==2.9.9
+
+# Kafka
+confluent-kafka==2.5.0
+
+# LLM
+huggingface-hub==0.20.3
+openai==1.12.0
+mistralai==1.0.0
+
+# Utils
+requests==2.31.0
+python-dotenv==1.0.0
+asyncpg

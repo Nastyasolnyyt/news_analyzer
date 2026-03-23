@@ -1,0 +1,11 @@
+sqlalchemy
+pydantic-settings
+sentence-transformers
+numpy
+scikit-learn
+hdbscan
+pymystem3
+langdetect
+nltk
+redis
+python-dotenv

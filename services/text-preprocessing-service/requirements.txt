@@ -1,0 +1,17 @@
+# Работа с Kafka
+confluent-kafka
+
+# Анализ текста и HTML
+beautifulsoup4
+nltk
+pymystem3
+
+# Сетевые запросы (для скрейпинга полных статей)
+httpx
+
+# Работа с базой данных PostgreSQL
+sqlalchemy
+psycopg2-binary
+
+# Дополнительно (обычно уже есть, но лучше зафиксировать)
+lxml

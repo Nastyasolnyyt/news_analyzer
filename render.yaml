@@ -1,0 +1,78 @@
+services:
+  # (Background Workers)
+  - type: web
+    name: aggregator-parser
+    env: python
+    region: oregon  
+    plan: free
+    buildCommand: pip install --only-binary=all -r requirements.txt  
+    startCommand: python app.py
+    rootDir: services/aggregator-parser-service
+    autoDeploy: true
+    envVars:
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: your-kafka-url:9092
+      - key: POSTGRES_URL
+        value: DATABASE_UR
+
+  - type: web
+    name: telegram-parser
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --only-binary=all -r requirements.txt  
+    startCommand: python main.py
+    rootDir: services/telegram-parser-service
+    autoDeploy: true
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: your_token_here
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: your-kafka-url:9092
+      - key: POSTGRES_URL
+        value: DATABASE_UR
+  - type: web
+    name: text-preprocessing
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --only-binary=all -r requirements.txt  
+    startCommand: python kafka_consumer.py
+    rootDir: services/text-preprocessing-service
+    autoDeploy: true
+    envVars:
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: your-kafka-url:9092
+      - key: POSTGRES_URL
+        value: DATABASE_UR
+
+  #AHAЛИТИЧЕСКИЕ СЕРВИСЫ (Background Workers)
+  - type: web
+    name: risk-classifier
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --only-binary=all -r requirements.txt 
+    startCommand: python classifier_service.py
+    rootDir: services/risk-classifier
+    autoDeploy: true
+    envVars:
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        value: your-kafka-url:9092
+      - key: POSTGRES_URL
+        value: DATABASE_UR
+      - key: OPENROUTER_API_KEY   
+        value: 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
+
+  - type: web
+    name: event-clustering
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install --only-binary=all -r requirements.txt  
+    startCommand: python event_clustering.py
+    rootDir: services/event
+    autoDeploy: true
+    envVars:
+      - key: POSTGRES_URL
+        value: DATABASE_UR

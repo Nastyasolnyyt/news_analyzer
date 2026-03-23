@@ -1,0 +1,230 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: always
+    networks:
+      - news_network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - news_network
+
+  # ОСНОВНОЙ МОДУЛЬ (ВРЕМЕННО ОТКЛЮЧЕН)
+  # output_module:
+  #   build: ./services/output_module
+  #   ports:
+  #     - "8003:8000"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - elasticsearch
+  #   healthcheck:
+  #     test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: always
+  #   networks:
+  #     - news_network
+
+  # НОВЫЙ СЕРВИС: Анализ тональности
+  sentiment_analysis:
+    build: ./services/sentiment_analysis # Проверь путь к папке с сервисом
+    container_name: sentiment_analysis
+    restart: always
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: text_for_sentiment
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - news_network
+
+  # НОВЫЙ СЕРВИС: Кластеризация событий
+  event-clustering:
+    build: ./services/event-clustering # Проверь путь к папке с сервисом
+    container_name: event_clustering
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - news_network
+
+  # СЕРВИСЫ-ПАРСЕРЫ
+  aggregator-parser:
+    build: ./services/aggregator-parser-service
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: raw_articles
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      # output_module:
+      #   condition: service_healthy
+    restart: always
+    networks:
+      - news_network
+
+  telegram-parser:
+    build: ./services/telegram-parser-service
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: raw_articles
+    depends_on:
+      kafka:
+        condition: service_healthy
+      # output_module:
+      #   condition: service_healthy
+    restart: always
+    networks:
+      - news_network
+
+  # СИНХРОНИЗАТОР
+  elasticsearch-sync:
+    build: ./services/elasticsearch-sync
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB_URL: ${POSTGRES_DB_URL}
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      # output_module:
+      #   condition: service_healthy
+    restart: always
+    networks:
+      - news_network
+
+  # ОСТАЛЬНЫЕ СЕРВИСЫ
+  text-preprocessing:
+    build: ./services/text-preprocessing-service
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: ${DATABASE_URL}
+      INPUT_TOPIC: raw_articles
+      OUTPUT_TOPIC_NER: text_for_ner
+      OUTPUT_TOPIC_RISK: text_for_risk
+      OUTPUT_TOPIC_SENTIMENT: text_for_sentiment
+      OUTPUT_TOPIC_ANOMALY: text_for_anomaly
+      OUTPUT_TOPIC_SYNC: text_for_kg_sync
+    depends_on:
+      kafka:
+        condition: service_healthy
+      # output_module:
+      #   condition: service_healthy
+    restart: always
+    networks:
+      - news_network
+
+  risk-classifier:
+    build: ./services/risk-classifier
+    container_name: risk-classifier
+    restart: always
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: text_for_risk
+      OUTPUT_TOPIC: risk_types_done
+      DB_URL: ${DATABASE_URL}
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      # output_module:
+      #   condition: service_healthy
+    networks:
+      - news_network
+
+  risklevel-classifier:
+    build: ./services/risklevel-classifier
+    container_name: risklevel-classifier
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DB_URL: ${DATABASE_URL}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: risk_types_done
+      OUTPUT_TOPIC: risk_final_ready
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      # output_module:
+      #   condition: service_healthy
+    networks:
+      - news_network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+    networks:
+      - news_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://${SERVER_IP:-localhost}:8003
+    ports:
+      - "80:3000"
+    environment:
+      REACT_APP_API_URL: http://${SERVER_IP:-localhost}:8003
+    # depends_on:
+    #   output_module:
+    #     condition: service_healthy
+    restart: always
+    networks:
+      - news_network
+
+networks:
+  news_network:
+    driver: bridge
