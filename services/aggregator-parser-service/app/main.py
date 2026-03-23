@@ -22,7 +22,6 @@ async def parse_aggregator(urls: List[str]):
             for art_data in articles:
                 # 1. Готовим UPSERT
                 stmt = insert(ArticleORM).values(
-	            author="RSS_Aggregator",
                     title=art_data.title,
                     content=art_data.text, # Синхронизируем: пишем в content
                     link=art_data.link,

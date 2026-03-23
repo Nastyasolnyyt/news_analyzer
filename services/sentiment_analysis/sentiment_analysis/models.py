@@ -4,12 +4,9 @@ from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 class PostAnalysis(Base):
-    __tablename__ = "articles_analysis"
+    __tablename__ = "sentiments"
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, unique=True)
-    topic_id = Column(Integer, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
-    emotion = Column(Float, nullable=False, default=0.0)
-    tonality = Column(Float, nullable=False, default=0.0)
-    relevance = Column(Float, nullable=False, default=0.0)
-    confidence = Column(Float, nullable=True) # Добавим для хранения уверенности модели
+    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, unique=True, name="article_id")
+    tonality = Column(Float, nullable=False, default=0.0, name="confidence")
+    label = Column(String, nullable=True, name="sentiment_label")

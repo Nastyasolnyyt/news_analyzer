@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     database_url: str = Field(..., env="DATABASE_URL")
 
     sentiment_model_name: str = Field(
-        "cointegrated/rubert-tiny-sentiment", env="SENTIMENT_MODEL_NAME"
+    "blanchefort/rubert-base-cased-sentiment", env="SENTIMENT_MODEL_NAME"
     )
 
     log_level: str = Field("INFO", env="LOG_LEVEL")

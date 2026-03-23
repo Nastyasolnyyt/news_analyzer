@@ -30,18 +30,16 @@ def process_message(msg):
         # 2. UPSERT в общую таблицу анализа
         with get_session() as session:
             stmt = insert(PostAnalysis).values(
-                post_id=article_id,
-                tonality=numeric_tonality,
-                confidence=score,
-                emotion=0.0, # Если модель не выдает эмоции, ставим 0
-                relevance=0.0
-            ).on_conflict_do_update(
-                index_elements=['post_id'],
-                set_={
-                    'tonality': numeric_tonality,
-                    'confidence': score
-                }
-            )
+            post_id=article_id,          
+            tonality=numeric_tonality,   
+            label=label,                 
+        ).on_conflict_do_update(
+            index_elements=['article_id'],   
+            set_={
+                'confidence': numeric_tonality,  
+                'sentiment_label': label
+            }
+        )
             session.execute(stmt)
             session.commit()
             
