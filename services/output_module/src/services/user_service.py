@@ -15,14 +15,14 @@ class UserService:
         self.auth_service = auth_service
 
     async def create_user(self, user_data: UserCreateDTO) -> UserDTO:
-	password_hash = self.auth_service.hash_password(user_data.password)
-	return await self.user_gateway.create_user(
-		login=user_data.login,
-	        username=user_data.username, # Добавлено username
-	        password_hash=password_hash,
-	        name=user_data.name,
-	        role=user_data.role,
-	       )
+        password_hash = self.auth_service.hash_password(user_data.password)
+        return await self.user_gateway.create_user(
+            login=user_data.login,
+            username=user_data.username,
+            password_hash=password_hash,
+            name=user_data.name,
+            role=user_data.role,
+        )
     async def get_user(self, user_id: int) -> UserDTO:
         """Получает пользователя по ID."""
         return await self.user_gateway.get_user_by_id(user_id)
