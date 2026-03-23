@@ -2,11 +2,19 @@
 # src/infrastructure/postgres/models/__init__.py
 
 from .user import User
-from .post import Article  # или Post, смотря как назван класс
+from .post import Article
 from .post_analysis import PostAnalysis
 from .post_entity import PostEntity
 from .named_entity import NamedEntity
 from .topic import Topic
+from .risk import Risk
 
-# Теперь ты сможешь импортировать их красиво:
-# from src.infrastructure.postgres.models import User, Topic
+__all__ = [
+    "User",
+    "Article",
+    "PostAnalysis",
+    "PostEntity",
+    "NamedEntity",
+    "Topic",
+    "Risk",
+]

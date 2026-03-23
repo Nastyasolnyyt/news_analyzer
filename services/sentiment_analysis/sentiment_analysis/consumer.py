@@ -1,9 +1,11 @@
 import json
 import logging
+from kafka import KafkaConsumer
 from sqlalchemy.dialects.postgresql import insert
 from .db import get_session
 from .models import PostAnalysis
 from .sentiment_model import analyze_sentiment
+from .config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +49,29 @@ def process_message(msg):
 
     except Exception as exc:
         logger.error(f"Failed to process sentiment for article: {exc}")
+
+
+def run_consumer():
+    """Main Kafka consumer loop for processing sentiment analysis messages."""
+    settings = get_settings()
+    logger.info(f"Starting Kafka consumer for topic: {settings.kafka_topic}")
+    
+    consumer = KafkaConsumer(
+        settings.kafka_topic,
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        group_id="sentiment-analysis-group",
+        auto_offset_reset="earliest",
+        value_deserializer=lambda m: m,
+    )
+    
+    try:
+        for message in consumer:
+            try:
+                process_message(message)
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                continue
+    except KeyboardInterrupt:
+        logger.info("Shutting down consumer")
+    finally:
+        consumer.close()

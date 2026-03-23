@@ -7,12 +7,12 @@ class PostAnalysis(Base):
     __tablename__ = "post_analysis"
 
     id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
     topic_id = Column(Integer, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
     emotion = Column(Float, nullable=False)
     tonality = Column(Float, nullable=False)
     relevance = Column(Float, nullable=False)
 
     # Relationships
-    post = relationship("Post", back_populates="analyses")
+    article = relationship("Article", back_populates="analyses")
     topic = relationship("Topic", back_populates="analyses")

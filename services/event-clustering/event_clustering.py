@@ -27,18 +27,21 @@ class Article(Base):
     __tablename__ = "articles"
     id = Column(Integer, primary_key=True)
     title = Column(String(255), nullable=True)     
-    content = Column(Text, nullable=False, name="text")  
+    text = Column(Text, nullable=False)
     source = Column(Text, nullable=False)
-    link = Column(Text, unique=True, nullable=False)
+    link = Column(Text, nullable=True)
+    pub_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
 
 class Topic(Base):
     __tablename__ = "topics"
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False) # Сюда запишем ключевые слова
+    name = Column(String(255), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
 class PostAnalysis(Base):
-    __tablename__ = "articles_analysis"
+    __tablename__ = "post_analysis"
     id = Column(Integer, primary_key=True)
     post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, unique=True)
     topic_id = Column(Integer, ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
@@ -81,7 +84,7 @@ class EventClustering:
                 return
 
             # 2. Векторизация
-            texts = [f"{a.title} {a.content}" for a in articles]
+            texts = [f"{a.title} {a.text}" for a in articles]
             embeddings = self.embedder.encode(texts)
             
             # 3. Кластеризация

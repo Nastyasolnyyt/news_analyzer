@@ -91,12 +91,13 @@ class SyncService:
             "title": article.title,
             "text": article.text,
             "source": article.source,
+            "link": article.link,
             "pub_date": article.pub_date.isoformat() if article.pub_date else None,
             "updated_at": article.updated_at.isoformat(),
             
             # Подтягиваем аналитику (если она уже готова)
-            "risk_level": article.risk.risk_type if article.risk else "low",
-            "sentiment": article.sentiment.sentiment_label if hasattr(article, 'sentiment') and article.sentiment else "neutral",
+            "risk_level": article.risks[0].risk_type if article.risks else "unknown",
+            "risk_confidence": article.risks[0].confidence if article.risks else None,
         }
         
         # Если есть сущности (NER)

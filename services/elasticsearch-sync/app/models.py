@@ -1,4 +1,4 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from sqlalchemy import ForeignKey,  JSON, ARRAY, Integer, Text
 from datetime import datetime
@@ -17,6 +17,9 @@ class Article(Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    
+    # Relationships
+    risks: Mapped[List["Risk"]] = relationship("Risk", back_populates="article")
 
 
 class Risk(Base):
@@ -26,6 +29,9 @@ class Risk(Base):
     risk_type: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[Optional[float]]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    
+    # Relationships
+    article: Mapped["Article"] = relationship("Article", back_populates="risks")
 
 
 class Entity(Base):
