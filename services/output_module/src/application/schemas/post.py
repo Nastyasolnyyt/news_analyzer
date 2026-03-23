@@ -44,3 +44,20 @@ class PostFilterDTO(BaseModel):
     page_size: int = 10
     search: Optional[str] = None
     order: str = "desc" # asc или desc
+
+# 6. DTO с внешними моделями (для service слоя)
+class PostWithExternalModelsDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    post: PostBaseDTO
+    analysis: Optional['PostAnalysisWithExternalModelsDTO'] = None
+    entities: List[EntityDTO] = []
+
+# 7. Список постов для ответа
+class PostListResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    posts: List[PostResponseDTO]
+    total: int
+    page: int
+    page_size: int
