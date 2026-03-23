@@ -78,6 +78,8 @@ services:
   # СЕРВИСЫ-ПАРСЕРЫ
   aggregator-parser:
     build: ./services/aggregator-parser-service
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     environment:
