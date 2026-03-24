@@ -4,15 +4,6 @@ const instance = axios.create({
   baseURL: '/api/v1',
 });
 
-// Перехватчик для токена
-instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 export default {
   // Авторизация
   async login(login: string, password: string) {
