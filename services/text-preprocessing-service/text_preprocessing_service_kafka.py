@@ -26,7 +26,7 @@ OUTPUT_TOPICS = [
     os.getenv('OUTPUT_TOPIC_SENTIMENT', 'text_for_sentiment'),
     os.getenv('OUTPUT_TOPIC_ANOMALY', 'text_for_anomaly'),
     os.getenv('OUTPUT_TOPIC_SYNC', 'text_for_kg_sync'),
-    os.getenv('OUTPUT_TOPIC_RISKLEV',' risk_final_ready')
+    os.getenv('OUTPUT_TOPIC_RISKLEV', 'risk_final_ready')
 ]
 
 # Настройка БД (как в твоем агрегаторе)
