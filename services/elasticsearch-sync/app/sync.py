@@ -1,6 +1,6 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 import logging
 from typing import List, Optional
@@ -70,7 +70,10 @@ class SyncService:
     def get_changed_articles(self, last_sync: datetime) -> List[Article]:
         try:
             with Session(self.engine) as session:
-                data = session.query(Article).filter(
+                data = session.query(Article).options(
+                    joinedload(Article.risks),
+                    joinedload(Article.entities)
+                ).filter(
                     Article.updated_at >= last_sync
                 ).all()
                 logger.info(f"Found {len(data)} changed articles")
