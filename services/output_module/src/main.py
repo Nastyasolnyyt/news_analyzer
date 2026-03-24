@@ -29,8 +29,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 # ИСПРАВЛЕНО: Используем env_settings.DATABASE_URL для инициализации контейнера
+# Добавляем +asyncpg драйвер для асинхронного SQLAlchemy
+db_url = env_settings.DATABASE_URL
+if not "+asyncpg" in db_url:
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
+
 container = make_async_container(
-    DBProvider(env_settings.DATABASE_URL),
+    DBProvider(db_url),
     ConfigProvider(),
     ServiceProvider(),
     CacheProvider(),
