@@ -22,5 +22,4 @@ class PostAnalysisWithExternalModelsDTO(BaseModel):
     relevance: float
     sentiment_label: Optional[str] = None # Заменяем category на то, что есть в БД
     # Если фронтенд ОЧЕНЬ хочет эти поля, задаем им дефолты, чтобы не было ошибки
-    category: Optional[str] = "General" 
     risk_level: str = "low"
