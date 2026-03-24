@@ -48,29 +48,7 @@ class PostDBGateWay:
         result = await self.session.execute(query)
         articles = result.scalars().unique().all()
 
-        # Формируем список для DTO
-        response_items = []
-        for article in articles:
-            # Получаем анализ (первый, если есть)
-            analysis = article.analyses[0] if article.analyses else None
-            # Получаем риск (первый, если есть)
-            risk = article.risks[0] if article.risks else None
-            
-            response_items.append({
-                "post": article,
-                "analysis": {
-                    "tonality": analysis.tonality if analysis else 0.0,
-                    "confidence": analysis.confidence if analysis else None,
-                    "sentiment_label": analysis.sentiment_label if analysis else "neutral"
-                },
-                "risk": {
-                    "risk_type": risk.risk_type if risk else "unknown",
-                    "confidence": risk.confidence if risk else None
-                },
-                "entities": article.entities
-            })
-
-        return response_items, total
+        return articles, total
 
     async def get_post_by_id(self, post_id: int):
         query = select(Article).options(

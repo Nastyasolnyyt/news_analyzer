@@ -62,9 +62,8 @@ class PostService:
         posts_with_external = []
         for post in posts:
             try:
-                # В оптимизированном варианте (в гейтвее) analysis уже подгружен через joinedload
-                # Но если мы идем по текущей логике сервиса:
-                analysis = await self.post_analysis_gateway.get_post_analysis(post.id)
+                # Анализ уже загружен через joinedload в гейтвее
+                analysis = post.analyses[0] if post.analyses else None
                 
                 topic = None
                 if analysis and analysis.topic_id:
@@ -81,16 +80,14 @@ class PostService:
                     risk_level=analysis.risk_level if analysis else "low"
                 )
 
-                post_entities = await self.post_entity_gateway.get_ners_by_post(post.id)
-                entities = [
-                    await self.ner_gateway.get_named_entity(e.entity_id)
-                    for e in post_entities
-                ]
+                # Сущности уже загружены через selectinload
+                entities = post.entities if post.entities else []
 
                 posts_with_external.append(
                     PostWithExternalModelsDTO(post=post, analysis=analysis_dto, entities=entities)
                 )
-            except Exception:
+            except Exception as e:
+                print(f"Error processing post {post.id}: {e}")
                 continue
 
         return PostListResponseDTO(
