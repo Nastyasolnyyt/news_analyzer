@@ -56,37 +56,50 @@ class PostService:
         )
 
     async def get_posts(self, filters: PostFilterDTO) -> PostListResponseDTO:
-        posts, total = await self.post_gateway.get_posts_with_filters(filters)
+        # Репозиторий возвращает список словарей/Row, так как там есть join или несколько сущностей
+        items, total = await self.post_gateway.get_posts_with_filters(filters)
         
         posts_with_external = []
-        for post in posts:
+        for item in items:
             try:
-                # Анализ уже загружен через joinedload в гейтвее
-                article_obj = post['post']  # Извлекаем сам объект SQLAlchemy
-                analysis = article_obj.analyses[0] if article_obj.analyses else None
+                # 1. Извлекаем сам объект SQLAlchemy из словаря
+                # Если в репозитории select(Article, ...), то ключ будет 'Article' или 'post'
+                # Судя по твоему коду, ключ называется 'post'
+                post_obj = item['post'] 
+                
+                # 2. Получаем анализ из связей объекта
+                analysis = post_obj.analyses[0] if post_obj.analyses else None
                 
                 topic = None
                 if analysis and analysis.topic_id:
                     topic = await self.topic_gateway.get_topic(analysis.topic_id)
 
+                # 3. Создаем DTO анализа
+                # Везде используем post_obj (объект), а не item (словарь)
                 analysis_dto = PostAnalysisWithExternalModelsDTO(
                     topic=topic,
                     id=analysis.id if analysis else None,
-                    post_id=post.id,
+                    post_id=post_obj.id,  # ИСПРАВЛЕНО: было post.id
                     emotion=analysis.emotion if analysis else 0.0,
                     tonality=analysis.tonality if analysis else 0.0,
                     relevance=analysis.relevance if analysis else 0.0,
-                   
                 )
 
-                # Сущности уже загружены через selectinload
-                entities = post.entities if post.entities else []
+                # 4. Сущности (Entities)
+                # ИСПРАВЛЕНО: берем из объекта post_obj, а не из словаря item
+                entities = post_obj.entities if post_obj.entities else []
 
+                # 5. Собираем итоговый DTO
                 posts_with_external.append(
-                    PostWithExternalModelsDTO(post=post, analysis=analysis_dto, entities=entities)
+                    PostWithExternalModelsDTO(
+                        post=post_obj,  # ИСПРАВЛЕНО: передаем объект для маппинга в PostBaseDTO
+                        analysis=analysis_dto, 
+                        entities=entities
+                    )
                 )
             except Exception as e:
-                print(f"Error processing post {post['post'].id}: {e}")
+                # Теперь здесь будет печататься правильный ID, так как мы берем его из объекта
+                print(f"Error processing post {item['post'].id if 'post' in item else 'unknown'}: {e}")
                 continue
 
         return PostListResponseDTO(
