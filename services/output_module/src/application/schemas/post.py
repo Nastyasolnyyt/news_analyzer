@@ -8,7 +8,7 @@ class PostBaseDTO(BaseModel):
     
     id: int
     title: Optional[str]
-    content: str  # В БД это колонка 'text'
+    text: str  # В БД это колонка 'text'
     source: str
     link: Optional[str]
     pub_date: Optional[datetime]
@@ -57,7 +57,7 @@ class PostWithExternalModelsDTO(BaseModel):
 class PostListResponseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    posts: List[PostResponseDTO]
+    items: List[PostResponseDTO]
     total: int
     page: int
     page_size: int
