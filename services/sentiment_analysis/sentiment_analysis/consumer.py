@@ -30,6 +30,9 @@ def process_message(msg):
         if not article_id or not text_to_analyze:
             return
 
+        # Обрезаем текст до 512 символов (безопасный лимит для RuBERT)
+        text_to_analyze = text_to_analyze[:512]
+
         # 1. Анализ
         label, score = analyze_sentiment(text_to_analyze)
         numeric_tonality = SENTIMENT_MAP.get(label, 0.0)
@@ -37,16 +40,18 @@ def process_message(msg):
         # 2. UPSERT в общую таблицу анализа
         with get_session() as session:
             stmt = insert(PostAnalysis).values(
-            post_id=article_id,          
-            tonality=numeric_tonality,   
-            label=label,                 
-        ).on_conflict_do_update(
-            index_elements=['article_id'],   
-            set_={
-                'confidence': numeric_tonality,  
-                'sentiment_label': label
-            }
-        )
+                post_id=article_id,          
+                tonality=numeric_tonality,   
+                confidence=numeric_tonality,
+                sentiment_label=label
+            ).on_conflict_do_update(
+                index_elements=['post_id'],   
+                set_={
+                    'tonality': numeric_tonality,
+                    'confidence': numeric_tonality,  
+                    'sentiment_label': label
+                }
+            )
             session.execute(stmt)
             session.commit()
             
