@@ -14,9 +14,11 @@ class PostAnalysisDTO(BaseModel):
 
 
 class PostAnalysisWithExternalModelsDTO(BaseModel):
-    id: int
+    id: Optional[int] = None
     post_id: int
     topic: Optional[TopicDTO] = None
     emotion: float
     tonality: float
     relevance: float
+    category: Optional[str] = None
+    risk_level: str = "low"

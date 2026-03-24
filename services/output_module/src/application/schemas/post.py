@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
+from src.application.schemas.post_analysis import PostAnalysisWithExternalModelsDTO
+from src.application.schemas.topic import TopicDTO
 
 # 1. Основная информация о новости
 class PostBaseDTO(BaseModel):
@@ -14,15 +16,7 @@ class PostBaseDTO(BaseModel):
     pub_date: Optional[datetime]
     created_at: datetime
 
-# 2. Объединенная аналитика (Sentiment + Risk + Anomaly)
-class PostAnalysisDTO(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    tonality: float        # Из таблицы sentiments (confidence)
-    risk_level: str        # Из таблицы risks (risk_type)
-    is_anomaly: Union[bool, str] # Из таблицы anomalies (anomaly_type)
-
-# 3. Сущность (NER)
+# 2. Сущность (NER)
 class EntityDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
@@ -30,30 +24,30 @@ class EntityDTO(BaseModel):
     text: str
     type: Optional[str] = None
 
-# 4. Итоговый объект, который летит на фронтенд
+# 3. Итоговый объект, который летит на фронтенд
 class PostResponseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     post: PostBaseDTO
-    analysis: PostAnalysisDTO
+    analysis: Optional[PostAnalysisWithExternalModelsDTO] = None
     entities: List[EntityDTO] = []
 
-# 5. Схема для фильтрации (используется в репозитории)
+# 4. Схема для фильтрации (используется в репозитории)
 class PostFilterDTO(BaseModel):
     page: int = 1
     page_size: int = 10
     search: Optional[str] = None
     order: str = "desc" # asc или desc
 
-# 6. DTO с внешними моделями (для service слоя)
+# 5. DTO с внешними моделями (для service слоя)
 class PostWithExternalModelsDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     post: PostBaseDTO
-    analysis: Optional['PostAnalysisWithExternalModelsDTO'] = None
+    analysis: Optional[PostAnalysisWithExternalModelsDTO] = None
     entities: List[EntityDTO] = []
 
-# 7. Список постов для ответа
+# 6. Список постов для ответа
 class PostListResponseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
