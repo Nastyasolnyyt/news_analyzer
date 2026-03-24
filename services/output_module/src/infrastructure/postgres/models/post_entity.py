@@ -14,3 +14,6 @@ class PostEntity(Base):
     # Relationships
     article = relationship("Article", back_populates="entities")
     entity = relationship("NamedEntity", back_populates="posts")
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

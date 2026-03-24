@@ -18,3 +18,6 @@ class PostAnalysis(Base):
     # Relationships
     article = relationship("Article", back_populates="analyses")
     topic = relationship("Topic", back_populates="analyses")
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
