@@ -15,7 +15,7 @@ class PostAnalysis(Base):
     confidence = Column(Float, nullable=True)
     sentiment_label = Column(String(50), nullable=True)
 
-    # Relationships
+    # Relationships5
     article = relationship("Article", back_populates="analyses")
     topic = relationship("Topic", back_populates="analyses")
 
