@@ -62,7 +62,8 @@ class PostService:
         for post in posts:
             try:
                 # Анализ уже загружен через joinedload в гейтвее
-                analysis = post.analyses[0] if post.analyses else None
+                article_obj = post['post']  # Извлекаем сам объект SQLAlchemy
+                analysis = article_obj.analyses[0] if article_obj.analyses else None
                 
                 topic = None
                 if analysis and analysis.topic_id:
@@ -85,7 +86,7 @@ class PostService:
                     PostWithExternalModelsDTO(post=post, analysis=analysis_dto, entities=entities)
                 )
             except Exception as e:
-                print(f"Error processing post {post.id}: {e}")
+                print(f"Error processing post {post['post'].id}: {e}")
                 continue
 
         return PostListResponseDTO(
