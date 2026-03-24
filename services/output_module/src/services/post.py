@@ -27,7 +27,7 @@ class PostService:
         self.topic_gateway = topic_gateway
 
     async def get_post(self, post_id: int) -> PostWithExternalModelsDTO:
-        post = await self.post_gateway.get_post(post_id)
+        post = await self.post_gateway.get_post_by_id(post_id)
         # Получаем единый анализ (из таблицы articles_analysis)
         analysis = await self.post_analysis_gateway.get_post_analysis(post_id)
         

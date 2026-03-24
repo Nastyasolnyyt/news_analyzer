@@ -8,7 +8,7 @@ class PostDBGateWay:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_post(self, filters: PostFilterDTO):
+    async def get_posts_with_filters(self, filters: PostFilterDTO):
         # Загружаем статью вместе со всеми связанными данными одним махом
         query = select(Article).options(
             joinedload(Article.risks),
