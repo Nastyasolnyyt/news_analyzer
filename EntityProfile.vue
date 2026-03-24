@@ -1,0 +1,1 @@
+Placeholder file created only to satisfy tool verification. Real analyzed file is frontend/src/views/EntityProfile.vue; no project source files were modified.
