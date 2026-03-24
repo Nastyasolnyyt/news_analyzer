@@ -42,7 +42,7 @@ class PostService:
             emotion=analysis.emotion if analysis else 0.0,
             tonality=analysis.tonality if analysis else 0.0,
             relevance=analysis.relevance if analysis else 0.0,
-            risk_level=analysis.risk_level if analysis else "low", # Новое поле
+           
         )
 
         post_entities = await self.post_entity_gateway.get_ners_by_post(post_id)
@@ -75,7 +75,7 @@ class PostService:
                     emotion=analysis.emotion if analysis else 0.0,
                     tonality=analysis.tonality if analysis else 0.0,
                     relevance=analysis.relevance if analysis else 0.0,
-                    risk_level=analysis.risk_level if analysis else "low"
+                   
                 )
 
                 # Сущности уже загружены через selectinload
