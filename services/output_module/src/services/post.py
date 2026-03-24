@@ -42,7 +42,6 @@ class PostService:
             emotion=analysis.emotion if analysis else 0.0,
             tonality=analysis.tonality if analysis else 0.0,
             relevance=analysis.relevance if analysis else 0.0,
-            category=analysis.category if analysis else None, # Новое поле
             risk_level=analysis.risk_level if analysis else "low", # Новое поле
         )
 
@@ -76,7 +75,6 @@ class PostService:
                     emotion=analysis.emotion if analysis else 0.0,
                     tonality=analysis.tonality if analysis else 0.0,
                     relevance=analysis.relevance if analysis else 0.0,
-                    category=analysis.category if analysis else None,
                     risk_level=analysis.risk_level if analysis else "low"
                 )
 
