@@ -39,6 +39,7 @@ class MistralNeuralClassifier:
             return RiskResult(risk_type="ошибка_нейросети", confidence=0.0)
     
     def _call_mistral_model(self, text: str) -> RiskResult:
+        time.sleep(8)
         prompt = self._create_mistral_prompt(text)
         logger.debug(f"Qwen request: {text[:50]}...")
         
