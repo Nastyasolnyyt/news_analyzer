@@ -102,10 +102,10 @@ def update_article_in_db(article_id, full_text):
     if not full_text:
         return
     
-    query = sql_text("UPDATE articles SET content = :content WHERE id = :id")
+    query = sql_text("UPDATE articles SET text = :text WHERE id = :id")
     try:
         with engine.begin() as conn: # engine.begin() сам делает commit
-            conn.execute(query, {"content": full_text, "id": article_id})
+            conn.execute(query, {"text": full_text, "id": article_id})
         logger.info(f"Текст статьи {article_id} успешно обновлен в БД.")
     except Exception as e:
         logger.error(f"Ошибка при обновлении статьи {article_id} в БД: {e}")

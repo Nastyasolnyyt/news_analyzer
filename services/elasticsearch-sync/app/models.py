@@ -7,6 +7,26 @@ from typing import Optional, List
 class Base(DeclarativeBase):
     pass
 
+class NamedEntity(Base):
+    __tablename__ = "named_entities"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Relationships
+    entities: Mapped[List["PostEntity"]] = relationship("PostEntity", back_populates="entity")
+
+
+class PostEntity(Base):
+    __tablename__ = "post_entities"
+    post_id: Mapped[int] = mapped_column(ForeignKey("articles.id"), primary_key=True)
+    entity_id: Mapped[int] = mapped_column(ForeignKey("named_entities.id"), primary_key=True)
+    
+    # Relationships
+    article: Mapped["Article"] = relationship("Article", back_populates="entities")
+    entity: Mapped["NamedEntity"] = relationship("NamedEntity", back_populates="entities")
+
+
 class Article(Base):
     __tablename__ = "articles"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -20,6 +40,7 @@ class Article(Base):
     
     # Relationships
     risks: Mapped[List["Risk"]] = relationship("Risk", back_populates="article")
+    entities: Mapped[List["PostEntity"]] = relationship("PostEntity", back_populates="article")
 
 
 class Risk(Base):

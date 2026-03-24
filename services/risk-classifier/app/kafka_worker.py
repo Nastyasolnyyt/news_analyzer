@@ -10,7 +10,7 @@ from app.models import RiskResult
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("risk-worker")
 
-async def consume():
+async def consume_from_kafka():
     # Инициализируем классификатор
     classifier = MistralNeuralClassifier(api_key=settings.openrouter_api_key)
     
