@@ -1,6 +1,7 @@
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Depends
+from src.infrastructure.postgres.repositories.topic import TopicDBGateWay
 # Добавь эту строку в импорты:
 from src.infrastructure.postgres.repositories.post_analysis import PostAnalysisDBGateWay
 from src.application.schemas.post import (
