@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Конфиг из переменных окружения
+# Конфиг из переменных о кружения
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 INPUT_TOPIC = os.getenv("KAFKA_TOPIC", "risk_types_done")
 OUTPUT_TOPIC = os.getenv("OUTPUT_TOPIC", "risk_final_ready")
