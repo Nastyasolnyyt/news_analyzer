@@ -91,11 +91,10 @@ class EventClustering:
         try:
             # 1. Берём статьи, у которых ещё нет topic_id в post_analysis
             #    Сначала находим post_id, которые УЖЕ имеют topic_id
-            assigned_post_ids = session.query(PostAnalysis.post_id).filter(
+            assigned_post_ids = select(PostAnalysis.post_id).where(
                 PostAnalysis.topic_id.isnot(None)
-            ).subquery()
-            
-            #    Берём статьи, которых нет в этом списке (лимит 50 для безопасности)
+            )
+
             articles = session.query(Article).filter(
                 Article.id.notin_(assigned_post_ids)
             ).limit(50).all()
@@ -169,18 +168,23 @@ class EventClustering:
 
 
 # --- ТОЧКА ВХОДА ---
-
 if __name__ == "__main__":
+    import time
+    
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         logger.error("Переменная окружения DATABASE_URL не задана!")
         exit(1)
     
-    logger.info("Запуск event_clustering...")
-    try:
-        clustering = EventClustering(db_url)
-        clustering.run_once()  
-        logger.info("Готово!")
-    except Exception as e:
-        logger.error(f"критическая ошибка: {e}")
-        exit(1)
+    logger.info("Запуск event_clustering (режим цикла)...")
+    clustering = EventClustering(db_url)
+    
+    # Бесконечный цикл: проверяем новые статьи каждые 5 минут
+    while True:
+        try:
+            clustering.run_once()
+        except Exception as e:
+            logger.error(f"Ошибка в цикле кластеризации: {e}", exc_info=True)
+        
+        logger.info("Пауза 300 секунд перед следующим прогоном...")
+        time.sleep(300)  # 5 минут между запусками

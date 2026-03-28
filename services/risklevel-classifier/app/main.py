@@ -32,14 +32,13 @@ class Risk(Base):
     id = Column(Integer, primary_key=True)
     article_id = Column(Integer, nullable=False, unique=True)
     
-    
-    risk_level = Column(String, nullable=True)        # high / medium / low
-    risk_confidence = Column(Float, nullable=True)    # уверенность уровня
-    
-    # Эти колонки заполняет risk-classifier (не трогаем их)
-    risk_type = Column(String, nullable=True)         # политический/экономический/социальный
+    # Заполняет risk-classifier (может быть пустым при первом запуске)
+    risk_type = Column(String, nullable=True)           
     risk_type_confidence = Column(Float, nullable=True)
-
+    
+    # Заполняет risklevel-classifier
+    risk_level = Column(String, nullable=True)          
+    risk_confidence = Column(Float, nullable=True)
 
 async def consume_and_classify():
     logger.info("Инициализирую классификатор Hugging Face...")
