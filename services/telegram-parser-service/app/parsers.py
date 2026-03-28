@@ -39,7 +39,7 @@ async def parse_telegram_channels() -> list[ArticleModel]:
                         pub_date=post.date, 
                         source=f"Telegram: {channel_username}"
                     )
-
+                    articles.append(article_model)
         except Exception as e:
             print(f"Error reading channel {channel_username}: {e}")
             continue  # Переходим к следующему каналу
