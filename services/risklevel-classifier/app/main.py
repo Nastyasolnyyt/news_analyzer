@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -21,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Конфиг из переменных о кружения
+# Конфиг из переменных окружения
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 INPUT_TOPIC = os.getenv("KAFKA_TOPIC", "risk_types_done")
 OUTPUT_TOPIC = os.getenv("OUTPUT_TOPIC", "risk_final_ready")
@@ -29,6 +30,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Модель БД для сохранения результатов
 Base = declarative_base()
+
 
 class Risk(Base):
     __tablename__ = "risks"
@@ -86,33 +88,37 @@ async def consume_and_classify():
                 
                 # Классифицируем с помощью Hugging Face
                 logger.info(f"Классифицирую статью {article_id}...")
-                result = classifier.classify(full_text)
+                result = classifier.classify(full_text)  # result — это dict!
                 
                 # Сохраняем в БД
                 session = Session()
                 try:
                     stmt = insert(Risk).values(
                         article_id=article_id,
-                        risk_type=result["risk_level"],        
-                        confidence=result["confidence"]        
+                        risk_type=result["risk_level"],        # ✅ доступ как к dict
+                        confidence=result["confidence"]         # ✅ доступ как к dict
                     ).on_conflict_do_update(
                         index_elements=['article_id'],
                         set_={
-                            'risk_type': result["risk_level"],      
-                            'confidence': result["confidence"]      
+                            'risk_type': result["risk_level"],      # ✅
+                            'confidence': result["confidence"]      # ✅
                         }
                     )
                     session.execute(stmt)
                     session.commit()
-                    logger.info(f"Статья {article_id}: {result.risk_type} (уверенность: {result.confidence:.2f})")
+                    # ✅ В логе тоже используем доступ по ключу
+                    logger.info(
+                        f"Статья {article_id}: {result['risk_level']} "
+                        f"(уверенность: {result['confidence']:.2f})"
+                    )
                 finally:
                     session.close()
                 
                 # Отправляем результат дальше для Elasticsearch-sync
                 output_message = {
                     **article_data,
-                    'risk_type': result["risk_level"],       
-                    'risk_confidence': result["confidence"]  
+                    'risk_type': result["risk_level"],           # ✅
+                    'risk_confidence': result["confidence"]      # ✅
                 }
                 await producer.send_and_wait(OUTPUT_TOPIC, output_message)
                 
