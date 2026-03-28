@@ -1,9 +1,7 @@
-transformers==4.42.4
-torch>=2.1.0
-confluent-kafka==2.4.0
-kafka-python==2.0.2
-SQLAlchemy==2.0.31
+# Специфичные зависимости (torch, transformers, numpy уже в базовом образе)
+aiokafka==0.10.0
+sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
-pydantic==2.8.2
+pydantic==2.6.1
+pydantic-settings==2.1.0
 python-dotenv==1.0.1
-pydantic-settings==2.2.1

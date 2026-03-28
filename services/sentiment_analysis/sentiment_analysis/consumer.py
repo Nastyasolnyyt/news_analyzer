@@ -42,7 +42,7 @@ def process_message(msg):
             stmt = insert(PostAnalysis).values(
                 post_id=article_id,          
                 tonality=numeric_tonality,   
-                confidence=numeric_tonality,
+                confidence=score,
                 sentiment_label=label
             ).on_conflict_do_update(
                 index_elements=['post_id'],   

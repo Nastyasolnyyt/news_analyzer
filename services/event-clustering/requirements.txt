@@ -1,8 +1,6 @@
+# Специфичные зависимости (sentence-transformers, numpy, scikit-learn уже в базовом образе)
 sqlalchemy
 pydantic-settings
-sentence-transformers
-numpy
-scikit-learn
 hdbscan
 pymystem3
 langdetect

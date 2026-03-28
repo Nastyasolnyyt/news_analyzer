@@ -1,4 +1,12 @@
 services:
+  ml-base:
+      build:
+        context: ./docker/ml-base
+        dockerfile: Dockerfile
+      image: news_analyzer-ml-base:latest
+      # Этот сервис не запускается, только для сборки
+      profiles: ["build"]
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     environment:
@@ -48,24 +56,25 @@ services:
 
   # НОВЫЙ СЕРВИС: Анализ тональности
   sentiment_analysis:
-    build: ./services/sentiment_analysis # Проверь путь к папке с сервисом
-    container_name: sentiment_analysis
-    restart: always
-    env_file:
-      - .env
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_TOPIC: text_for_sentiment
-      DATABASE_URL: ${DATABASE_URL}
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - news_network
+      build: ./services/sentiment_analysis
+      container_name: sentiment_analysis
+      restart: always
+      env_file:
+        - .env
+      environment:
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+        KAFKA_TOPIC: text_for_sentiment
+        DATABASE_URL: ${DATABASE_URL}
+      depends_on:
+        kafka:
+          condition: service_healthy
+      networks:
+        - news_network
 
   # НОВЫЙ СЕРВИС: Кластеризация событий
+
   event-clustering:
-    build: ./services/event-clustering # Проверь путь к папке с сервисом
+    build: ./services/event-clustering
     container_name: event_clustering
     restart: always
     env_file:
@@ -189,8 +198,6 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      # output_module:
-      #   condition: service_healthy
     networks:
       - news_network
 

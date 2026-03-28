@@ -1,13 +1,10 @@
-FROM python:3.10-slim
+FROM news_analyzer-ml-base:latest
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
 
 COPY . .
 
-ENV PYTHONPATH=/app
-
-# Запускаем Kafka consumer для обработки risk_types_done топика
-CMD ["python", "-m", "app.main"]
+CMD ["python", "risklevel_classifier.py"]
