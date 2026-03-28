@@ -1,6 +1,30 @@
+"""
+services/risk-classifier/app/main.py
+ИСПРАВЛЕННЫЙ: запускает Kafka consumer с HF классификатором
+"""
 import asyncio
-from .kafka_worker import consume_from_kafka
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Импортируем worker
+from app.kafka_worker import main as run_consumer
+
+
+async def main():
+    """Основная точка входа"""
+    logger.info("Запуск risk-classifier (Hugging Face модель)...")
+    try:
+        await run_consumer()
+    except Exception as e:
+        logger.error(f"Критическая ошибка: {e}", exc_info=True)
+        raise
+
 
 if __name__ == "__main__":
-    # Запускаем Kafka consumer для обработки риск-анализа
-    asyncio.run(consume_from_kafka())
+    asyncio.run(main())

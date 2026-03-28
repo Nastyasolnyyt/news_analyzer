@@ -1,65 +1,100 @@
+"""
+services/risk-classifier/app/kafka_worker.py
+ИСПРАВЛЕННЫЙ: использует локальную HF модель вместо OpenRouter
+"""
 import asyncio
 import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from app.config import settings
-from app.classifier import MistralNeuralClassifier
-from app.storage import save_risk_result
-from app.models import RiskResult
+from .config import settings
+from .classifier import RiskTypeClassifier
+from .storage import save_risk_type
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("risk-worker")
 
+
 async def consume_from_kafka():
-    # Инициализируем классификатор
-    classifier = MistralNeuralClassifier(api_key=settings.openrouter_api_key)
+    """Main Kafka consumer для анализа типов риска"""
+    
+    # Инициализируем классификатор ПОД ОДИН РАЗ (очень тяжелый объект)
+    logger.info("Инициализирую классификатор типов риска...")
+    classifier = RiskTypeClassifier()
+    logger.info("Классификатор готов")
     
     # Настраиваем потребителя Kafka
     consumer = AIOKafkaConsumer(
         settings.input_topic,
         bootstrap_servers=settings.kafka_bootstrap_servers,
         group_id=settings.kafka_group_id,
-        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+        value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+        auto_offset_reset="earliest"
     )
 
-    # (Опционально) Настраиваем продюсера, если хочешь отправлять результат дальше
-    producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)
+    # Продюсер для отправки результатов дальше
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        value_serializer=lambda m: json.dumps(m, ensure_ascii=False).encode('utf-8')
+    )
 
     await consumer.start()
     await producer.start()
     
-    logger.info(f"Worker started. Listening to topic: {settings.input_topic}")
+    logger.info(f"✅ Worker запущен. Слушаю топик: {settings.input_topic}")
 
     try:
         async for msg in consumer:
-            article_data = msg.value
-            article_id = article_data.get('id')
-            text = article_data.get('text') or article_data.get('title', "")
-
-            logger.info(f"Processing article ID: {article_id}")
-
-            # 1. Классифицируем нейросетью
-            result = classifier.classify(text)
-
-            # 2. Сохраняем в PostgreSQL (в таблицу 'risks')
-            if article_id:
-                save_risk_result(article_id, result)
-                logger.info(f"Saved risk for ID {article_id}: {result.risk_type}")
-
-                # 3. Отправляем в следующий топик для Elasticsearch-sync
-                article_data['risk_type'] = result.risk_type
-                article_data['confidence'] = result.confidence
+            try:
+                article_data = msg.value
+                article_id = article_data.get('article_id') or article_data.get('id')
                 
-                await producer.send_and_wait(
-                    settings.output_topic, 
-                    json.dumps(article_data).encode('utf-8')
-                )
+                if not article_id:
+                    logger.warning("Нет article_id в сообщении")
+                    continue
+                
+                # Собираем текст для анализа
+                title = article_data.get('title', '')
+                text = article_data.get('text', '')
+                full_text = f"{title} {text}"
+                
+                if not full_text.strip():
+                    logger.warning(f"Пустой текст для статьи {article_id}")
+                    continue
+                
+                # КЛАССИФИКАЦИЯ типа риска (политический/экономический/социальный)
+                logger.info(f"Анализирую тип риска для статьи {article_id}...")
+                result = classifier.classify(full_text)
+                
+                # Сохраняем в БД таблицу risks
+                save_risk_type(article_id, result["risk_type"], result["confidence"])
+                
+                # Отправляем результат дальше для risklevel-classifier
+                output_message = {
+                    **article_data,
+                    'risk_type': result['risk_type'],
+                    'risk_type_confidence': result['confidence']
+                }
+                await producer.send_and_wait(settings.output_topic, output_message)
+                
+                logger.info(f"Статья {article_id}: {result['risk_type']} ({result['confidence']:.2f})")
+                
+            except Exception as e:
+                logger.error(f"Ошибка обработки сообщения: {e}", exc_info=True)
+                continue
 
-    except Exception as e:
-        logger.error(f"Worker error: {e}")
+    except KeyboardInterrupt:
+        logger.info("Остановка worker...")
     finally:
         await consumer.stop()
         await producer.stop()
+        logger.info("Worker остановлен")
+
+
+async def main():
+    await consume_from_kafka()
+
 
 if __name__ == "__main__":
-    asyncio.run(consume())
+    asyncio.run(main())
