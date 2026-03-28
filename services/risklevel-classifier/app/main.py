@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import insert
 
 # Импортируем наш классификатор
-from classifier_hf import RiskClassifierCombined
+from classifier_hf import HFRiskClassifier
 
 # Настройка логирования
 logging.basicConfig(
@@ -43,7 +43,7 @@ async def consume_and_classify():
     
     # Инициализируем классификатор
     logger.info("Инициализирую классификатор Hugging Face...")
-    classifier = RiskClassifierCombined()
+    classifier = HFRiskClassifier()
     
     # Подключение к БД
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
