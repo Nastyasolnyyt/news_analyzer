@@ -93,13 +93,13 @@ async def consume_and_classify():
                 try:
                     stmt = insert(Risk).values(
                         article_id=article_id,
-                        risk_type=result.risk_type,
-                        confidence=result.confidence
+                        risk_type=result["risk_level"],        
+                        confidence=result["confidence"]        
                     ).on_conflict_do_update(
                         index_elements=['article_id'],
                         set_={
-                            'risk_type': result.risk_type,
-                            'confidence': result.confidence
+                            'risk_type': result["risk_level"],      
+                            'confidence': result["confidence"]      
                         }
                     )
                     session.execute(stmt)
@@ -111,8 +111,8 @@ async def consume_and_classify():
                 # Отправляем результат дальше для Elasticsearch-sync
                 output_message = {
                     **article_data,
-                    'risk_type': result.risk_type,
-                    'risk_confidence': result.confidence
+                    'risk_type': result["risk_level"],       
+                    'risk_confidence': result["confidence"]  
                 }
                 await producer.send_and_wait(OUTPUT_TOPIC, output_message)
                 

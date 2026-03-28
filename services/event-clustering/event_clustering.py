@@ -112,8 +112,11 @@ class EventClustering:
             
             # 3. Кластеризация KMeans
             n_articles = len(articles)
-            n_clusters = max(2, min(10, n_articles // 4))  # адаптивное число кластеров
-            
+            if n_articles < 2:
+                logger.info("Меньше 2 статей для кластеризации, пропускаю")
+                return
+            n_clusters = max(2, min(10, n_articles // 4))   # адаптивное число кластеров
+                        
             kmeans = KMeans(n_clusters=n_clusters, n_init='auto', random_state=42)
             labels = kmeans.fit_predict(embeddings)
 
