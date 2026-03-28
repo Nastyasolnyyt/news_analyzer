@@ -12,47 +12,43 @@ from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import insert
 
-# Импортируем наш классификатор
 from app.classifier import HFRiskClassifier
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Конфиг из переменных окружения
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 INPUT_TOPIC = os.getenv("KAFKA_TOPIC", "risk_types_done")
 OUTPUT_TOPIC = os.getenv("OUTPUT_TOPIC", "risk_final_ready")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Модель БД для сохранения результатов
 Base = declarative_base()
-
 
 class Risk(Base):
     __tablename__ = "risks"
     id = Column(Integer, primary_key=True)
     article_id = Column(Integer, nullable=False, unique=True)
-    risk_type = Column(String, nullable=False)  # high, medium, low
-    confidence = Column(Float, nullable=True)
+    
+    
+    risk_level = Column(String, nullable=True)        # high / medium / low
+    risk_confidence = Column(Float, nullable=True)    # уверенность уровня
+    
+    # Эти колонки заполняет risk-classifier (не трогаем их)
+    risk_type = Column(String, nullable=True)         # политический/экономический/социальный
+    risk_type_confidence = Column(Float, nullable=True)
 
 
 async def consume_and_classify():
-    """Основной цикл: читает из Kafka, классифицирует, сохраняет в БД."""
-    
-    # Инициализируем классификатор
     logger.info("Инициализирую классификатор Hugging Face...")
     classifier = HFRiskClassifier()
     
-    # Подключение к БД
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     
-    # Kafka потребитель и продюсер
     consumer = AIOKafkaConsumer(
         INPUT_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
@@ -77,7 +73,6 @@ async def consume_and_classify():
                 article_data = message.value
                 article_id = article_data.get('article_id') or article_data.get('id')
                 
-                # Собираем текст для анализа
                 title = article_data.get('title', '')
                 text = article_data.get('text', '')
                 full_text = f"{title} {text}"
@@ -86,27 +81,25 @@ async def consume_and_classify():
                     logger.warning(f"Пустой текст для статьи {article_id}")
                     continue
                 
-                # Классифицируем с помощью Hugging Face
                 logger.info(f"Классифицирую статью {article_id}...")
-                result = classifier.classify(full_text)  # result — это dict!
+                result = classifier.classify(full_text)  
                 
-                # Сохраняем в БД
                 session = Session()
                 try:
+                    
                     stmt = insert(Risk).values(
                         article_id=article_id,
-                        risk_type=result["risk_level"],        # ✅ доступ как к dict
-                        confidence=result["confidence"]         # ✅ доступ как к dict
+                        risk_level=result["risk_level"],        
+                        risk_confidence=result["confidence"]     
                     ).on_conflict_do_update(
                         index_elements=['article_id'],
                         set_={
-                            'risk_type': result["risk_level"],      # ✅
-                            'confidence': result["confidence"]      # ✅
+                            'risk_level': result["risk_level"],      
+                            'risk_confidence': result["confidence"]  
                         }
                     )
                     session.execute(stmt)
                     session.commit()
-                    # ✅ В логе тоже используем доступ по ключу
                     logger.info(
                         f"Статья {article_id}: {result['risk_level']} "
                         f"(уверенность: {result['confidence']:.2f})"
@@ -114,11 +107,11 @@ async def consume_and_classify():
                 finally:
                     session.close()
                 
-                # Отправляем результат дальше для Elasticsearch-sync
+                # Отправляем результат дальше
                 output_message = {
                     **article_data,
-                    'risk_type': result["risk_level"],           # ✅
-                    'risk_confidence': result["confidence"]      # ✅
+                    'risk_level': result["risk_level"],
+                    'risk_confidence': result["confidence"]
                 }
                 await producer.send_and_wait(OUTPUT_TOPIC, output_message)
                 

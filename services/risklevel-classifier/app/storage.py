@@ -92,38 +92,27 @@ def save_risk_result(article_id: int, risk_level: str, confidence: float):
         db.close()
 
 
-def save_risk_type(article_id: int, risk_type: str, confidence: float):
-    """
-    Обновляет ТИП риска для статьи (вызывается из risk-classifier)
-    
-    Args:
-        article_id: ID статьи
-        risk_type: Тип риска (политический/экономический/социальный)
-        confidence: Уверенность (0..1)
-    """
+def save_risk_result(article_id: int, risk_level: str, confidence: float):
     db = SessionLocal()
     try:
         stmt = insert(Risk).values(
             article_id=article_id,
-            risk_type=risk_type,
-            risk_type_confidence=confidence
+            risk_level=risk_level,           # ✅
+            risk_confidence=confidence       # ✅
         ).on_conflict_do_update(
             index_elements=['article_id'],
             set_={
-                "risk_type": risk_type,
-                "risk_type_confidence": confidence
+                "risk_level": risk_level,        # ✅
+                "risk_confidence": confidence    # ✅
             }
         )
-        
         db.execute(stmt)
         db.commit()
-        logger.debug(f"✅ Article {article_id}: type={risk_type} ({confidence:.2f})")
-        
+        logger.debug(f"✅ Article {article_id}: {risk_level} ({confidence:.2f})")
     except Exception as e:
         db.rollback()
-        logger.error(f"❌ Ошибка при сохранении типа риска для {article_id}: {e}")
+        logger.error(f"❌ Ошибка: {e}")
         raise
-    
     finally:
         db.close()
 
