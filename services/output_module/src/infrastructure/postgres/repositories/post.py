@@ -1,21 +1,58 @@
+"""
+Исправленный репозиторий для получения постов.
+Решает проблему "Статья не найдена".
+"""
+
+from typing import Optional, List, Tuple
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.application.schemas.post import PostFilterDTO
-from src.infrastructure.postgres.models import Article, NamedEntity
+from src.application.errors.post import PostNotFoundException
+from src.application.schemas.post import PostFilterDTO, PostBaseDTO
+from src.infrastructure.postgres.models.post import Article
 
-class PostDBGateWay:
+
+class PostDBGateWayFixed:
+    """Исправленный gateway для работы с постами."""
+    
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_posts_with_filters(self, filters: PostFilterDTO):
-        # Загружаем статью вместе со всеми связанными данными одним махом
+    async def get_post_by_id(self, post_id: int) -> Article:
+        """
+        Получить пост по ID.
+        Гарантированно загружает все связанные данные.
+        """
         query = select(Article).options(
-            joinedload(Article.risks),
+            # Eager loading всех связей
             joinedload(Article.analyses),
-            selectinload(Article.entities)
-        )
+            joinedload(Article.risks),
+            selectinload(Article.entities),
+        ).where(Article.id == post_id)
+        
+        result = await self.session.execute(query)
+        article = result.scalars().unique().one_or_none()
+        
+        if not article:
+            raise PostNotFoundException()
+        
+        return article
 
+    async def get_posts_with_filters(
+        self, filters: PostFilterDTO
+    ) -> Tuple[List[dict], int]:
+        """
+        Получить список постов с фильтрацией.
+        Возвращает список словарей для удобства в service слое.
+        """
+        
+        # Основной запрос с eager loading
+        query = select(Article).options(
+            joinedload(Article.analyses),
+            joinedload(Article.risks),
+            selectinload(Article.entities),
+        )
+        
         # Поиск по заголовку или контенту
         if filters.search:
             search_term = f"%{filters.search}%"
@@ -25,81 +62,108 @@ class PostDBGateWay:
                     Article.text.ilike(search_term)
                 )
             )
-
-        # Считаем общее количество для пагинации
-        count_query = select(func.count(Article.id))
+        
+        # Подсчет общего количества
+        count_query = select(func.count(Article.id)).select_from(Article)
         if filters.search:
             search_term = f"%{filters.search}%"
             count_query = count_query.where(
-                or_(Article.title.ilike(search_term), Article.text.ilike(search_term))
+                or_(
+                    Article.title.ilike(search_term),
+                    Article.text.ilike(search_term)
+                )
             )
         
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
-
-        # Сортировка и пагинация
+        
+        # Сортировка
         if filters.order == "desc":
             query = query.order_by(Article.created_at.desc())
         else:
             query = query.order_by(Article.created_at.asc())
-
-        query = query.offset((filters.page - 1) * filters.page_size).limit(filters.page_size)
-
+        
+        # Пагинация
+        offset = (filters.page - 1) * filters.page_size
+        query = query.offset(offset).limit(filters.page_size)
+        
+        # Выполнение запроса
         result = await self.session.execute(query)
         articles = result.scalars().unique().all()
-
-        # Формируем список для DTO
+        
+        # Формирование ответа
         response_items = []
         for article in articles:
-            # Получаем анализ (первый, если есть)
+            # Безопасно извлекаем данные
             analysis = article.analyses[0] if article.analyses else None
-            # Получаем риск (первый, если есть)
             risk = article.risks[0] if article.risks else None
             
             response_items.append({
                 "post": article,
-                "analysis": {
-                    "tonality": analysis.tonality if analysis else 0.0,
-                    "confidence": analysis.confidence if analysis else None,
-                    "sentiment_label": analysis.sentiment_label if analysis else "neutral"
-                },
-                "risk": {
-                    "risk_type": risk.risk_type if risk else "unknown",
-                    "confidence": risk.confidence if risk else None
-                },
-                "entities": article.entities
+                "analysis": analysis,
+                "risk": risk,
+                "entities": article.entities or []
             })
-
+        
         return response_items, total
 
-    async def get_post_by_id(self, post_id: int):
-        query = select(Article).options(
-            joinedload(Article.risks),
+    async def get_posts_by_topic_id(self, topic_id: int, limit: int = 10):
+        """Получить посты по теме."""
+        from src.infrastructure.postgres.models.post_analysis import PostAnalysis
+        
+        query = select(Article).join(PostAnalysis).options(
             joinedload(Article.analyses),
-            selectinload(Article.entities)
-        ).where(Article.id == post_id)
-
+            joinedload(Article.risks),
+            selectinload(Article.entities),
+        ).where(PostAnalysis.topic_id == topic_id).limit(limit)
+        
         result = await self.session.execute(query)
-        article = result.scalars().unique().one_or_none()
+        return result.scalars().unique().all()
 
-        if not article:
-            return None
+    async def search_posts(
+        self, query_text: str, limit: int = 20
+    ) -> List[Article]:
+        """Полнотекстовый поиск по постам."""
+        search_term = f"%{query_text}%"
+        query = select(Article).where(
+            or_(
+                Article.title.ilike(search_term),
+                Article.text.ilike(search_term),
+            )
+        ).options(
+            joinedload(Article.analyses),
+            joinedload(Article.risks),
+        ).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().unique().all()
 
-        # Получаем анализ (первый, если есть)
-        analysis = article.analyses[0] if article.analyses else None
-        # Получаем риск (первый, если есть)
-        risk = article.risks[0] if article.risks else None
+    async def get_recent_posts(self, limit: int = 10) -> List[Article]:
+        """Получить последние посты."""
+        query = select(Article).options(
+            joinedload(Article.analyses),
+            joinedload(Article.risks),
+            selectinload(Article.entities),
+        ).order_by(Article.created_at.desc()).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().unique().all()
 
-        return {
-            "post": article,
-            "analysis": {
-                "tonality": analysis.tonality if analysis else 0.0,
-                "confidence": analysis.confidence if analysis else None,
-                "sentiment_label": analysis.sentiment_label if analysis else "neutral"
-            },
-            "risk": {
-                "risk_type": risk.risk_type if risk else "unknown",
-                "confidence": risk.confidence if risk else None
-            },
-            "entities": article.entities
-        }
+    async def get_high_risk_posts(self, limit: int = 10) -> List[Article]:
+        """Получить посты с высоким риском."""
+        from src.infrastructure.postgres.models.risk import Risk
+        
+        query = select(Article).join(Risk).options(
+            joinedload(Article.analyses),
+            joinedload(Article.risks),
+        ).where(Risk.risk_type == "high").order_by(
+            Article.created_at.desc()
+        ).limit(limit)
+        
+        result = await self.session.execute(query)
+        return result.scalars().unique().all()
+
+    async def get_posts_count(self) -> int:
+        """Получить общее количество постов."""
+        result = await self.session.execute(select(func.count(Article.id)))
+        return result.scalar() or 0

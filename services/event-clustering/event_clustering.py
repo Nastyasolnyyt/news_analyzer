@@ -72,12 +72,13 @@ class EventClustering:
         self.Session = sessionmaker(bind=self.engine)
         self.embedder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
-    def run_once(self):
+    async def run_once(self):
         session = self.Session()
         try:
             # 1. Берем статьи без темы
             subquery = session.query(PostAnalysis.post_id).filter(PostAnalysis.topic_id.isnot(None))
-            articles = session.query(Article).order_by(Article.id.desc()).limit(50).all()
+            articles = await session.execute(select(Article).limit(50))
+            articles = articles.scalars().all()
             
             if not articles:
                 logger.info("Новых статей для кластеризации нет.")
