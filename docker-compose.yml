@@ -106,6 +106,8 @@ services:
 
   telegram-parser:
     build: ./services/telegram-parser-service
+    ports:
+    - "8002:8000" 
     env_file:
       - .env
     environment:
