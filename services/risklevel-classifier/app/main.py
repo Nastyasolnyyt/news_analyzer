@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import insert
 
 # Импортируем наш классификатор
-from classifier_hf import HFRiskClassifier
+from classifier import HFRiskClassifier
 
 # Настройка логирования
 logging.basicConfig(
