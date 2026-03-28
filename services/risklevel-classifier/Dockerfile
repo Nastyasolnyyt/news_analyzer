@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
 
 COPY . .
 
-CMD ["python", "risklevel_classifier.py"]
+CMD ["python", "classifier_hf.py"]

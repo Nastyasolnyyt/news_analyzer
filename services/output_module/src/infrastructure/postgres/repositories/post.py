@@ -12,7 +12,7 @@ from src.application.schemas.post import PostFilterDTO, PostBaseDTO
 from src.infrastructure.postgres.models.post import Article
 
 
-class PostDBGateWayFixed:
+class PostDBGateWay:
     """Исправленный gateway для работы с постами."""
     
     def __init__(self, session: AsyncSession):
