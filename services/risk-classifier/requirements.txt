@@ -1,11 +1,7 @@
-confluent-kafka==2.3.0
+# services/risk-classifier/requirements.txt
+aiokafka==0.10.0
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 pydantic==2.6.1
 pydantic-settings==2.1.0
-openai==1.12.0
 python-dotenv==1.0.1
-fastapi==0.104.1
-uvicorn==0.24.0
-httpx==0.27.2
-aiokafka==0.10.0

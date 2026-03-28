@@ -1,26 +1,19 @@
-FROM python:3.10-slim
+# services/risk-classifier/Dockerfile
+FROM news_analyzer-ml-base:latest
 
-# Установка системных зависимостей для psycopg2 и kafka
-RUN apt-get update && apt-get install -y \
+# Системные зависимости (если нужны дополнительные)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
-    gcc \
-    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Копируем зависимости
+# Копируем только специфичные зависимости (без torch/transformers!)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && rm requirements.txt
 
-# Копируем весь код
+# Копируем код
 COPY . .
 
-# Устанавливаем PYTHONPATH, чтобы импорты типа "from .models" работали
-ENV PYTHONPATH=/app
-
-# Запускаем Kafka consumer
-CMD ["python", "-m", "app.main"]
-
-# Запуск модуля
+# Запускаем
 CMD ["python", "-m", "app.main"]
