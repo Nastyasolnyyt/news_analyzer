@@ -33,10 +33,9 @@ const events = computed(() => {
     const post = item.post || item; 
     const analysis = item.analysis || {};
     
-    // Пытаемся найти риск в разных местах (зависит от твоего JOIN в БД)
     const dbRisk = analysis.risk_level || 
-                   item.risk_type || 
-                   (item.risks && item.risks[0]?.risk_type) || 
+                   item.risk_level|| 
+                   (item.risks && item.risks[0]?.risk_level) || 
                    'low';
 
     return {
