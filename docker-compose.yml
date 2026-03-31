@@ -139,24 +139,24 @@ services:
     networks:
       - news_network
   # docker-compose.yml
-ner-service:
-  build: ./services/ner-service
-  container_name: ner-service
-  env_file:
-    - .env
-  environment:
-    DATABASE_URL: ${DATABASE_URL}
-    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    INPUT_TOPIC: text_for_ner
-    OUTPUT_TOPIC: entities_extracted
-  depends_on:
-    kafka:
-      condition: service_healthy
-    postgres:
-      condition: service_healthy
-  restart: always
-  networks:
-    - news_network
+  ner-service:
+    build: ./services/ner-service
+    container_name: ner-service
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      INPUT_TOPIC: text_for_ner
+      OUTPUT_TOPIC: entities_extracted
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: always
+    networks:
+      - news_network
 
   # ОСТАЛЬНЫЕ СЕРВИСЫ
   text-preprocessing:
