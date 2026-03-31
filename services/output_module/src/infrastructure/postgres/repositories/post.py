@@ -95,7 +95,11 @@ class PostDBGateWay:
         response_items = []
         for article in articles:
             analysis = article.analyses[0] if article.analyses else None
-            risk = article.risks[0] if article.risks else None
+            risk = None
+            if hasattr(article, 'risk') and article.risk:
+                risk = article.risk  # one-to-one
+            elif hasattr(article, 'risks') and article.risks and len(article.risks) > 0:
+                risk = article.risks[0]  # one-to-many
             
             response_items.append({
                 "post": article,

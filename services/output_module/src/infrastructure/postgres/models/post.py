@@ -25,4 +25,4 @@ class Article(Base):
     # Relationships
     analyses = relationship("PostAnalysis", back_populates="article")
     entities = relationship("PostEntity", back_populates="article")
-    risks = relationship("Risk", back_populates="article", uselist=False)
+    risks = relationship("Risk", back_populates="article")
