@@ -1,13 +1,7 @@
-from typing import List, Optional, Tuple
-from sqlalchemy import or_, select, func
-from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.application.schemas.post import (
     PostFilterDTO,
     PostListResponseDTO,
     PostWithExternalModelsDTO,
-    PostBaseDTO,
 )
 from src.application.schemas.post_analysis import PostAnalysisWithExternalModelsDTO
 from src.infrastructure.postgres.repositories.named_entity import NamedEntityDBGateWay
@@ -15,8 +9,6 @@ from src.infrastructure.postgres.repositories.post import PostDBGateWay
 from src.infrastructure.postgres.repositories.post_analysis import PostAnalysisDBGateWay
 from src.infrastructure.postgres.repositories.post_entity import PostEntityDBGateWay
 from src.infrastructure.postgres.repositories.topic import TopicDBGateWay
-from src.infrastructure.postgres.models.post import Article
-from src.infrastructure.postgres.models.risk import Risk
 
 
 class PostService:
@@ -35,25 +27,13 @@ class PostService:
         self.topic_gateway = topic_gateway
 
     async def get_post(self, post_id: int) -> PostWithExternalModelsDTO:
-        """Получить один пост с полной информацией."""
         post = await self.post_gateway.get_post_by_id(post_id)
+        # Получаем единый анализ (из таблицы articles_analysis)
+        analysis = await self.post_analysis_gateway.get_post_analysis(post_id)
         
-        # Анализ
-        try:
-            analysis = await self.post_analysis_gateway.get_post_analysis(post_id)
-            topic = None
-            if analysis and analysis.topic_id:
-                topic = await self.topic_gateway.get_topic(analysis.topic_id)
-        except:
-            analysis = None
-            topic = None
-
-        # Сущности
-        post_entities = await self.post_entity_gateway.get_ners_by_post(post_id)
-        entities = [
-            await self.ner_gateway.get_named_entity(e.entity_id)
-            for e in post_entities
-        ]
+        topic = None
+        if analysis and analysis.topic_id:
+            topic = await self.topic_gateway.get_topic(analysis.topic_id)
 
         analysis_with_external = PostAnalysisWithExternalModelsDTO(
             topic=topic,
@@ -62,87 +42,68 @@ class PostService:
             emotion=analysis.emotion if analysis else 0.0,
             tonality=analysis.tonality if analysis else 0.0,
             relevance=analysis.relevance if analysis else 0.0,
-            sentiment_label=analysis.sentiment_label if analysis else None,
+           
         )
 
+        post_entities = await self.post_entity_gateway.get_ners_by_post(post_id)
+        entities = [
+            await self.ner_gateway.get_named_entity(e.entity_id)
+            for e in post_entities
+        ]
+
         return PostWithExternalModelsDTO(
-            post=post, 
-            analysis=analysis_with_external, 
-            entities=entities
+            post=post, analysis=analysis_with_external, entities=entities
         )
 
     async def get_posts(self, filters: PostFilterDTO) -> PostListResponseDTO:
-        """
-        Получить список постов с risk_level и risk_type в ответе.
-        КРИТИЧЕСКИ ВАЖНО: возвращаем ПЛОСКУЮ структуру для фронтенда!
-        """
-        # Используем репозиторий для основной фильтрации
+        # Репозиторий возвращает список словарей/Row, так как там есть join или несколько сущностей
         items, total = await self.post_gateway.get_posts_with_filters(filters)
         
-        # Обогащаем каждый пост risk_level и risk_type из таблицы risks
-        enriched_items = []
-        for item_dict in items:
-            post_obj = item_dict['post']
-            analysis_obj = item_dict.get('analysis')
-            risk_obj = item_dict.get('risk')
-            entities = item_dict.get('entities', [])
+        posts_with_external = []
+        for item in items:
+            try:
+                # 1. Извлекаем сам объект SQLAlchemy из словаря
+                # Если в репозитории select(Article, ...), то ключ будет 'Article' или 'post'
+                # Судя по твоему коду, ключ называется 'post'
+                post_obj = item['post'] 
+                
+                # 2. Получаем анализ из связей объекта
+                analysis = post_obj.analyses[0] if post_obj.analyses else None
+                
+                topic = None
+                if analysis and analysis.topic_id:
+                    topic = await self.topic_gateway.get_topic(analysis.topic_id)
 
-            # Получаем тему если есть
-            topic = None
-            if analysis_obj and analysis_obj.topic_id:
-                try:
-                    topic = await self.topic_gateway.get_topic(analysis_obj.topic_id)
-                except:
-                    pass
+                # 3. Создаем DTO анализа
+                # Везде используем post_obj (объект), а не item (словарь)
+                analysis_dto = PostAnalysisWithExternalModelsDTO(
+                    topic=topic,
+                    id=analysis.id if analysis else None,
+                    post_id=post_obj.id,  # ИСПРАВЛЕНО: было post.id
+                    emotion=analysis.emotion if analysis else 0.0,
+                    tonality=analysis.tonality if analysis else 0.0,
+                    relevance=analysis.relevance if analysis else 0.0,
+                )
 
-            # Создаём DTO анализа
-            analysis_dto = PostAnalysisWithExternalModelsDTO(
-                topic=topic,
-                id=analysis_obj.id if analysis_obj else None,
-                post_id=post_obj.id,
-                emotion=analysis_obj.emotion if analysis_obj else None,  
-                tonality=analysis_obj.tonality if analysis_obj else None,
-                relevance=analysis_obj.relevance if analysis_obj else None,
-                sentiment_label=analysis_obj.sentiment_label if analysis_obj else None,
-                confidence=analysis_obj.confidence if analysis_obj else None, 
-            )
+                # 4. Сущности (Entities)
+                # ИСПРАВЛЕНО: берем из объекта post_obj, а не из словаря item
+                entities = post_obj.entities if post_obj.entities else []
 
-            flattened = {
-                'id': post_obj.id,
-                'title': post_obj.title,
-                'text': post_obj.text,
-                'source': post_obj.source,
-                'link': post_obj.link,
-                'pub_date': post_obj.pub_date.isoformat() if post_obj.pub_date else None,
-                'created_at': post_obj.created_at.isoformat(),
-                'updated_at': post_obj.updated_at.isoformat(),
-                
-                # Безопасное приведение к float
-                'sentiment_label': analysis_dto.sentiment_label or 'neutral',
-                'tonality': float(analysis_dto.tonality) if analysis_dto.tonality is not None else 0.0,
-                'confidence': float(analysis_dto.confidence) if analysis_dto.confidence is not None else 0.0,
-                'emotion': float(analysis_dto.emotion) if analysis_dto.emotion is not None else 0.0,
-                'relevance': float(analysis_dto.relevance) if analysis_dto.relevance is not None else 0.0,
-                
-                # РИСК
-                'risk_level': risk_obj.risk_level if risk_obj else 'low',
-                'risk_type': risk_obj.risk_type if risk_obj else None,
-                'risk_confidence': float(risk_obj.confidence) if risk_obj and risk_obj.confidence is not None else 0.0,
-                
-                # Тема
-                'topic_id': analysis_dto.topic.id if analysis_dto.topic else None,
-                'topic_name': analysis_dto.topic.name if analysis_dto.topic else None,
-                
-                # Сущности
-                'entities': [
-                    {'id': e.id, 'name': e.name, 'entity_type': e.entity_type}
-                    for e in entities
-                ],
-            }
-            enriched_items.append(flattened)
+                # 5. Собираем итоговый DTO
+                posts_with_external.append(
+                    PostWithExternalModelsDTO(
+                        post=post_obj,  # ИСПРАВЛЕНО: передаем объект для маппинга в PostBaseDTO
+                        analysis=analysis_dto, 
+                        entities=entities
+                    )
+                )
+            except Exception as e:
+                # Теперь здесь будет печататься правильный ID, так как мы берем его из объекта
+                print(f"Error processing post {item['post'].id if 'post' in item else 'unknown'}: {e}")
+                continue
 
         return PostListResponseDTO(
-            items=enriched_items,
+            items=posts_with_external,
             total=total,
             page=filters.page,
             page_size=filters.page_size,
