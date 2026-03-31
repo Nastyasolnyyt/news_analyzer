@@ -1,55 +1,58 @@
-# src/application/schemas/post.py
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
+from src.application.schemas.post_analysis import PostAnalysisWithExternalModelsDTO
+from src.application.schemas.topic import TopicDTO
 
-# ✅ ПЛОСКАЯ структура для фронтенда (все поля на одном уровне)
-class FlattenedPostDTO(BaseModel):
+# 1. Основная информация о новости
+class PostBaseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    # Основная информация
     id: int
     title: Optional[str]
-    text: str
+    text: str  # В БД это колонка 'text'
     source: str
-    link: Optional[str] = None
-    pub_date: Optional[datetime] = None
+    link: Optional[str]
+    pub_date: Optional[datetime]
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    
-    # Анализ тональности
-    sentiment_label: Optional[str] = None
-    tonality: Optional[float] = None
-    confidence: Optional[float] = None
-    emotion: Optional[float] = None
-    relevance: Optional[float] = None
-    
-    # Риск (из risklevel-classifier и risk-classifier)
-    risk_level: Optional[str] = None  # 'high' | 'medium' | 'low'
-    risk_type: Optional[str] = None    # 'политический' | 'экономический' | 'социальный'
-    risk_confidence: Optional[float] = None
-    
-    # Тема/кластер
-    topic_id: Optional[int] = None
-    topic_name: Optional[str] = None
-    
-    # Сущности (NER)
-    entities: List[dict] = []  # [{'id': 1, 'name': 'Газпром', 'entity_type': 'ORG'}]
 
+# 2. Сущность (NER)
+class EntityDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    text: str
+    type: Optional[str] = None
 
-# Фильтр для поиска (используется в репозитории)
+# 3. Итоговый объект, который летит на фронтенд
+class PostResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    post: PostBaseDTO
+    analysis: Optional[PostAnalysisWithExternalModelsDTO] = None
+    entities: List[EntityDTO] = []
+
+# 4. Схема для фильтрации (используется в репозитории)
 class PostFilterDTO(BaseModel):
     page: int = 1
     page_size: int = 10
     search: Optional[str] = None
-    order: str = "desc"  # asc или desc
+    order: str = "desc" # asc или desc
 
+# 5. DTO с внешними моделями (для service слоя)
+class PostWithExternalModelsDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    post: PostBaseDTO
+    analysis: Optional[PostAnalysisWithExternalModelsDTO] = None
+    entities: List[EntityDTO] = []
 
-# Ответ для списка постов
+# 6. Список постов для ответа
 class PostListResponseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    items: List[FlattenedPostDTO]  # ✅ Теперь плоская структура
+    items: List[PostResponseDTO]
     total: int
     page: int
     page_size: int
+z

@@ -1,4 +1,3 @@
-# src/application/schemas/post_analysis.py
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 from src.application.schemas.topic import TopicDTO
@@ -8,27 +7,21 @@ class PostAnalysisDTO(BaseModel):
     id: int
     post_id: int
     topic_id: Optional[int] = None
-    emotion: Optional[float] = None
-    tonality: Optional[float] = None
-    relevance: Optional[float] = None
+    emotion: Optional[float] = 0.0
+    tonality: Optional[float] = 0.0
+    relevance: Optional[float] = 0.0
     sentiment_label: Optional[str] = None
-    confidence: Optional[float] = None  # ✅ Уже есть
-
 
 class PostAnalysisWithExternalModelsDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
     id: Optional[int] = None
     post_id: int
     topic: Optional[TopicDTO] = None
-    
-    # ✅ ДОБАВЬ ЭТИ ПОЛЯ (были пропущены):
-    emotion: Optional[float] = None
-    tonality: Optional[float] = None
-    relevance: Optional[float] = None
+    emotion: float = 0.0
+    tonality: float = 0.0
+    relevance: float = 0.0
     sentiment_label: Optional[str] = None
-    confidence: Optional[float] = None  # ✅ КРИТИЧНО: добавь это!
     
-    # Дополнительные поля
+    # ИСПОЛЬЗУЕМ Field с default, чтобы Pydantic не искал это в объекте БД
     category: Optional[str] = Field(default="General")
     risk_level: Optional[str] = Field(default="low")

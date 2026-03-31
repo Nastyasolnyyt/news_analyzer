@@ -1,20 +1,19 @@
 """
 Исправленный репозиторий для получения постов.
-КРИТИЧЕСКИ ВАЖНО: загружает данные из таблицы risks!
+Решает проблему "Статья не найдена".
 """
 
 from typing import Optional, List, Tuple
 from sqlalchemy import select, func, or_
-from sqlalchemy.orm import selectinload, joinedload, outerjoin
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.errors.post import PostNotFoundException
 from src.application.schemas.post import PostFilterDTO, PostBaseDTO
 from src.infrastructure.postgres.models.post import Article
-from src.infrastructure.postgres.models.risk import Risk
 
 
 class PostDBGateWay:
-    """Репозиторий для работы с постами + risks."""
+    """Исправленный gateway для работы с постами."""
     
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -25,6 +24,7 @@ class PostDBGateWay:
         Гарантированно загружает все связанные данные.
         """
         query = select(Article).options(
+            # Eager loading всех связей
             joinedload(Article.analyses),
             joinedload(Article.risks),
             selectinload(Article.entities),
@@ -43,10 +43,10 @@ class PostDBGateWay:
     ) -> Tuple[List[dict], int]:
         """
         Получить список постов с фильтрацией.
-        ВАЖНО: подключаем таблицу risks через outerjoin!
+        Возвращает список словарей для удобства в service слое.
         """
         
-        # Основной запрос: Article + анализ + сущности + РИСК
+        # Основной запрос с eager loading
         query = select(Article).options(
             joinedload(Article.analyses),
             joinedload(Article.risks),
@@ -91,20 +91,17 @@ class PostDBGateWay:
         result = await self.session.execute(query)
         articles = result.scalars().unique().all()
         
-        # Формирование ответа: обогащаем каждый пост данными из risks
+        # Формирование ответа
         response_items = []
         for article in articles:
+            # Безопасно извлекаем данные
             analysis = article.analyses[0] if article.analyses else None
-            risk = None
-            if hasattr(article, 'risk') and article.risk:
-                risk = article.risk  # one-to-one
-            elif hasattr(article, 'risks') and article.risks and len(article.risks) > 0:
-                risk = article.risks[0]  # one-to-many
+            risk = article.risks[0] if article.risks else None
             
             response_items.append({
                 "post": article,
                 "analysis": analysis,
-                "risk": risk,  # ЭТО КРИТИЧНО: загружаем risk из article.risks!
+                "risk": risk,
                 "entities": article.entities or []
             })
         
@@ -159,7 +156,7 @@ class PostDBGateWay:
         query = select(Article).join(Risk).options(
             joinedload(Article.analyses),
             joinedload(Article.risks),
-        ).where(Risk.risk_level == "high").order_by(
+        ).where(Risk.risk_type == "high").order_by(
             Article.created_at.desc()
         ).limit(limit)
         
