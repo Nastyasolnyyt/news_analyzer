@@ -39,10 +39,9 @@ class PostService:
             topic=topic,
             id=analysis.id if analysis else None,
             post_id=post_id,
-            emotion=analysis.emotion if analysis else 0.0,
-            tonality=analysis.tonality if analysis else 0.0,
-            relevance=analysis.relevance if analysis else 0.0,
-           
+            emotion=analysis.emotion if analysis and analysis.emotion is not None else None,
+            tonality=analysis.tonality if analysis and analysis.tonality is not None else None,
+            relevance=analysis.relevance if analysis and analysis.relevance is not None else None,
         )
 
         post_entities = await self.post_entity_gateway.get_ners_by_post(post_id)
@@ -79,10 +78,11 @@ class PostService:
                 analysis_dto = PostAnalysisWithExternalModelsDTO(
                     topic=topic,
                     id=analysis.id if analysis else None,
-                    post_id=post_obj.id,  # ИСПРАВЛЕНО: было post.id
-                    emotion=analysis.emotion if analysis else 0.0,
-                    tonality=analysis.tonality if analysis else 0.0,
-                    relevance=analysis.relevance if analysis else 0.0,
+                    post_id=post_obj.id,
+                    
+                    emotion=analysis.emotion if analysis and analysis.emotion is not None else None,
+                    tonality=analysis.tonality if analysis and analysis.tonality is not None else None,
+                    relevance=analysis.relevance if analysis and analysis.relevance is not None else None,
                 )
 
                 # 4. Сущности (Entities)
