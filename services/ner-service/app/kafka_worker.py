@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from .config import settings
@@ -10,6 +11,7 @@ from .database import get_engine, get_session, NamedEntity, PostEntity, Base
 from .extractor import EntityExtractor
 
 logger = logging.getLogger(__name__)
+
 
 async def consume_and_extract():
     # Инициализация
@@ -66,36 +68,50 @@ async def consume_and_extract():
                     logger.debug(f"⚠️ No entities found for article {article_id}")
                     continue
                 
-                # 💾 Сохраняем в БД
+                # 💾 Сохраняем в БД (безопасный UPSERT без ON CONFLICT)
                 db = Session()
                 saved_entities = []
                 
                 try:
                     for ent in entities:
-                        # UPSERT: если сущность уже есть — получаем её ID, если нет — создаём
-                        stmt = insert(NamedEntity).values(
-                            name=ent['text'],
-                            entity_type=ent['type']
-                        ).on_conflict_do_update(
-                            index_elements=['name'],
-                            set_={'entity_type': ent['type']}
-                        ).returning(NamedEntity.id)
+                        entity_name = ent['text']
+                        entity_type = ent['type']
                         
-                        result = db.execute(stmt).scalar_one()
-                        entity_id = result
+                        # 1. Пробуем найти существующую сущность по имени
+                        existing = db.execute(
+                            select(NamedEntity.id).where(NamedEntity.name == entity_name)
+                        ).scalar_one_or_none()
                         
-                        # Связываем статью с сущностью
-                        post_stmt = insert(PostEntity).values(
-                            post_id=article_id,
-                            entity_id=entity_id
-                        ).on_conflict_do_nothing(
-                            index_elements=['post_id', 'entity_id']
-                        )
-                        db.execute(post_stmt)
+                        if existing:
+                            # Если есть — обновляем тип (если нужно)
+                            db.execute(
+                                update(NamedEntity)
+                                .where(NamedEntity.id == existing)
+                                .values(entity_type=entity_type)
+                            )
+                            entity_id = existing
+                        else:
+                            # Если нет — создаём новую
+                            new_entity = NamedEntity(name=entity_name, entity_type=entity_type)
+                            db.add(new_entity)
+                            db.flush()  # Получаем ID без коммита
+                            entity_id = new_entity.id
+                        
+                        # 2. Связываем статью с сущностью (игнорируем дубликаты)
+                        existing_link = db.execute(
+                            select(PostEntity.id).where(
+                                (PostEntity.post_id == article_id) & 
+                                (PostEntity.entity_id == entity_id)
+                            )
+                        ).scalar_one_or_none()
+                        
+                        if not existing_link:
+                            post_entity = PostEntity(post_id=article_id, entity_id=entity_id)
+                            db.add(post_entity)
                         
                         saved_entities.append({
-                            'text': ent['text'],
-                            'type': ent['type'],
+                            'text': entity_name,
+                            'type': entity_type,
                             'id': entity_id
                         })
                     
@@ -104,7 +120,7 @@ async def consume_and_extract():
                     
                 except Exception as e:
                     db.rollback()
-                    logger.error(f"❌ DB error for article {article_id}: {e}")
+                    logger.error(f"❌ DB error for article {article_id}: {e}", exc_info=True)
                     continue
                 finally:
                     db.close()
