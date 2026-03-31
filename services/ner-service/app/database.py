@@ -1,5 +1,5 @@
 # services/ner-service/app/database.py
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, TIMESTAMP, func
+from sqlalchemy import create_engine, Column, Integer, String, TIMESTAMP, func
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -13,12 +13,14 @@ class NamedEntity(Base):
     entity_type = Column(String(50), nullable=False)
     created_at = Column(TIMESTAMP(timezone=False), server_default=func.now())
 
-# Таблица связи статья ↔ сущность (составной первичный ключ)
+# Таблица связи статья ↔ сущность (составной первичный ключ, без ForeignKey)
 class PostEntity(Base):
     __tablename__ = "post_entities"
     
-    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True, index=True)
-    entity_id = Column(Integer, ForeignKey("named_entities.id", ondelete="CASCADE"), primary_key=True, index=True)
+    # ✅ НЕТ ForeignKey — таблицы уже существуют в БД
+    # ✅ Составной первичный ключ, как в реальной БД
+    post_id = Column(Integer, primary_key=True, index=True)
+    entity_id = Column(Integer, primary_key=True, index=True)
 
 # Подключение к БД
 def get_engine(database_url: str):
