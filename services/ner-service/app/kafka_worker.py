@@ -97,12 +97,12 @@ async def consume_and_extract():
                         if not existing_link:
                             post_entity = PostEntity(post_id=article_id, entity_id=entity_id)
                             db.add(post_entity)
-                        
-                        saved_entities.append({
-                            'text': entity_name,
-                            'type': entity_type,
-                            'id': entity_id
-                        })
+
+                            saved_entities.append({
+                                'text': entity_name,
+                                'type': entity_type,
+                                'id': entity_id
+                            })
                     
                     db.commit()
                     logger.info(f"Article {article_id}: saved {len(saved_entities)} entities")
