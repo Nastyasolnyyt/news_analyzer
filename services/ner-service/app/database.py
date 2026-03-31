@@ -1,5 +1,14 @@
 # services/ner-service/app/database.py
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Table
+from sqlalchemy import (
+    create_engine, 
+    Column, 
+    Integer, 
+    String, 
+    ForeignKey, 
+    TIMESTAMP,     
+    func,          
+    UniqueConstraint  
+)
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.dialects.postgresql import insert
 
@@ -12,7 +21,7 @@ class NamedEntity(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True, index=True)  # Уникальное имя сущности
     entity_type = Column(String, nullable=False)  # ORG, PER, LOC, MISC
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())  
 
 # Таблица связи статья ↔ сущность
 class PostEntity(Base):
@@ -24,7 +33,7 @@ class PostEntity(Base):
     
     # Уникальная пара: одна сущность в статье только один раз
     __table_args__ = (
-        UniqueConstraint('post_id', 'entity_id', name='uq_post_entity'),
+        UniqueConstraint('post_id', 'entity_id', name='uq_post_entity'),  
     )
 
 # Подключение к БД
