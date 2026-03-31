@@ -1,5 +1,5 @@
 // frontend/src/api/client.ts
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8003/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 export type RiskLevel = 'high' | 'medium' | 'low';
 
@@ -10,7 +10,19 @@ export interface PostAnalysis {
   emotion?: number;
   tonality?: number;
   relevance?: number;
-  sentiment_label?: string;
+  // ✅ ИСПРАВЛЕНО: строгая типизация + string для совместимости
+  sentiment_label?: 'positive' | 'negative' | 'neutral' | string;
+  // ✅ ДОБАВЛЕНО: поля из risk-classifier и risklevel-classifier
+  risk_level?: 'high' | 'medium' | 'low';
+  risk_type?: 'политический' | 'экономический' | 'социальный';
+  risk_confidence?: number;
+  risk_type_confidence?: number;
+}
+
+export interface Topic {
+  id: number;
+  name: string;
+  created_at: string;
 }
 
 export interface Topic {
@@ -37,19 +49,25 @@ export interface News {
   created_at?: string;
   updated_at?: string;
   
-  // Для совместимости и отображения
+  // ✅ Риск — основные поля для отображения
   risk_level?: RiskLevel;
-  risk?: RiskLevel;
+  risk?: RiskLevel; // Для совместимости
   risk_type?: 'политический' | 'экономический' | 'социальный';
+  risk_confidence?: number;
+  risk_type_confidence?: number;
+  
+  // Анализ тональности
   tonality?: number;
   sentiment_label?: 'positive' | 'negative' | 'neutral';
-  topic_name?: string;
-  topic_id?: number;
   emotion?: number;
   relevance?: number;
   
-  // Для расширенного использования
+  // Темы и сущности
+  topic_name?: string;
+  topic_id?: number;
   relatedEntityIds?: number[];
+  
+  // Дополнительно
   summary?: string;
   fullText?: string[];
   date?: string;
@@ -89,6 +107,28 @@ export interface NewsListResponse {
   page_size: number;
 }
 
+// ✅ Вспомогательная функция: извлекает риск из analysis и добавляет в news
+function enrichNewsWithRisk(news: News, analysis?: PostAnalysis & { topic?: Topic }): News {
+  if (!analysis) return news;
+  
+  return {
+    ...news,
+    risk_level: news.risk_level || analysis.risk_level,
+    risk: news.risk || analysis.risk_level,
+    risk_type: news.risk_type || analysis.risk_type,
+    risk_confidence: news.risk_confidence || analysis.risk_confidence,
+    risk_type_confidence: news.risk_type_confidence || analysis.risk_type_confidence,
+    tonality: news.tonality || analysis.tonality,
+    // ✅ ИСПРАВЛЕНО: приводим к правильному типу
+    sentiment_label: (news.sentiment_label || analysis.sentiment_label) as 'positive' | 'negative' | 'neutral' | undefined,
+    emotion: news.emotion || analysis.emotion,
+    relevance: news.relevance || analysis.relevance,
+    // ✅ ИСПРАВЛЕНО: проверяем, что topic существует
+    topic_name: news.topic_name || (analysis as any).topic?.name,
+    topic_id: news.topic_id || analysis.topic_id || (analysis as any).topic?.id,
+  };
+}
+
 export const api = {
   // Получить список новостей
   async getNews(params?: {
@@ -118,13 +158,31 @@ export const api = {
       }
       
       const data = await res.json();
+      console.log('📦 Raw API response:', { 
+        total: data.total, 
+        itemsCount: Array.isArray(data.items) ? data.items.length : 0,
+        firstItem: data.items?.[0] 
+      });
       
-      // Нормализуем данные: если приходит { post, analysis, entities }, извлекаем post
+      // ✅ ПРАВИЛЬНО извлекаем и обогащаем данные:
       const items = Array.isArray(data.items) 
-        ? data.items.map((item: any) => item.post || item)
+        ? data.items.map((item: any) => {
+            // Если приходит { post, analysis, entities }, извлекаем post
+            const newsItem: News = item.post || item;
+            
+            // ✅ Обогащаем news данными из analysis (включая risk_level и risk_type)
+            return enrichNewsWithRisk(newsItem, item.analysis);
+          })
         : [];
       
-      console.log('✅ Loaded news:', items.length);
+      console.log('✅ Loaded news:', items.length, 'items');
+      if (items.length > 0) {
+        console.log('📊 First item risk:', {
+          risk_level: items[0].risk_level,
+          risk_type: items[0].risk_type,
+        });
+      }
+      
       return { items, total: data.total || 0 };
     } catch (error) {
       console.error('❌ Error fetching news:', error);
@@ -142,28 +200,25 @@ export const api = {
       if (!res.ok) throw new Error(`Not found: ${id}`);
       
       const data = await res.json();
-      // Если приходит { post, analysis, entities }, извлекаем post
-      const newsItem = data.post || data;
       
-      // Добавляем анализ если есть
-      if (data.analysis) {
-        newsItem.tonality = data.analysis.tonality;
-        newsItem.sentiment_label = data.analysis.sentiment_label;
-        newsItem.emotion = data.analysis.emotion;
-        newsItem.relevance = data.analysis.relevance;
-        if (data.analysis.topic) {
-          newsItem.topic_name = data.analysis.topic.name;
-          newsItem.topic_id = data.analysis.topic.id;
-        }
-      }
+      // Если приходит { post, analysis, entities }, извлекаем post
+      const newsItem: News = data.post || data;
+      
+      // ✅ Обогащаем данными из analysis
+      const enriched = enrichNewsWithRisk(newsItem, data.analysis);
       
       // Добавляем связанные сущности
       if (data.entities) {
-        newsItem.relatedEntityIds = data.entities.map((e: any) => e.id);
+        enriched.relatedEntityIds = data.entities.map((e: any) => e.id);
       }
       
-      console.log('✅ Loaded post:', newsItem.id);
-      return newsItem;
+      console.log('✅ Loaded post:', { 
+        id: enriched.id, 
+        risk_level: enriched.risk_level,
+        risk_type: enriched.risk_type 
+      });
+      
+      return enriched;
     } catch (error) {
       console.error('❌ Error fetching news:', error);
       throw error;
@@ -197,17 +252,14 @@ export const api = {
     }
   },
 
-  // Получить список сущностей (фиксированный список из темы или поиск)
+  // Получить список сущностей
   async getEntities(): Promise<Entity[]> {
-    // Это заглушка, т.к. бэкенд не предоставляет публичный endpoint для списка всех сущностей
-    // В реальном приложении можно использовать упоминания из постов
     return [];
   },
 
-  // Получить сущность по ID через упоминания
+  // Получить сущность по ID
   async getEntityById(id: number): Promise<Entity> {
     try {
-      // Используем endpoint упоминаний, чтобы получить информацию о сущности
       const mentions = await this.getEntityMentions(id);
       
       if (mentions.length === 0 || !mentions[0].entity) {
@@ -218,7 +270,7 @@ export const api = {
       return {
         id: entity.id,
         name: entity.name,
-        type: 'Company', // можно определить по entity_type
+        type: 'Company',
         entity_type: entity.entity_type,
       };
     } catch (error) {

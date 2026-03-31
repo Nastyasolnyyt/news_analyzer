@@ -1,103 +1,60 @@
-<script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { api, type News } from '../api/client';
-
-const router = useRouter();
-const query = ref('');
-const showFilters = ref(true);
-const results = ref<News[]>([]);
-const loading = ref(false);
-const total = ref(0);
-
-const sourceOptions = [
-  { id: 'media', label: 'СМИ' },
-  { id: 'telegram', label: 'Telegram' },
-  { id: 'registry', label: 'Реестры' },
-];
-
-const topicOptions = [
-  { id: 'economics', label: 'Экономика' },
-  { id: 'politics', label: 'Политика' },
-];
-
-const riskOptions = [
-  { id: 'high', label: 'Высокий' },
-  { id: 'medium', label: 'Средний' },
-  { id: 'low', label: 'Низкий' },
-];
-
-const infoChecklist = [
-  'Вводите ключевые слова, названия компаний или персон',
-  'Комбинируйте фильтры по источникам, темам и рискам',
-  'Просматривайте карточки найденных событий',
-  'Переходите в полную карточку для деталей и отчётов',
-];
-
-const fetchResults = async () => {
-  loading.value = true;
-  try {
-    const data = await api.getNews({
-      search: query.value || undefined,  // ← правильно: 'search'
-      page: 1,
-      page_size: 20,  // ← также исправил: page_size вместо per_page
-    });
-    results.value = data.items;
-    total.value = data.total;
-  } catch (e) {
-    console.error('Ошибка загрузки:', e);
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(fetchResults);
-watch(query, () => fetchResults());
-
-const handleNewsClick = (newsId: number) => {
-  router.push(`/news/${newsId}`);
-};
-
-const toggleFilters = () => {
-  showFilters.value = !showFilters.value;
-};
-</script>
-
 <template>
   <div class="search-page">
+    <!-- ПАНЕЛЬ ПОИСКА И ФИЛЬТРОВ -->
     <section class="search-panel">
       <label class="search-input" aria-label="Поисковый запрос">
-        <input v-model="query" type="text" placeholder="Например: санкции, дизельный рынок" />
+        <input
+          v-model="query"
+          type="text"
+          placeholder="Например: санкции, дизельный рынок, Газпром"
+          @input="handleSearchInput"
+        />
         <button type="button" @click="fetchResults">Искать</button>
       </label>
+
       <button class="filter-toggle" type="button" @click="toggleFilters">
         {{ showFilters ? 'Скрыть фильтры' : 'Показать фильтры' }}
       </button>
+
       <div v-if="showFilters" class="filters">
+        <!-- Фильтр по источникам -->
         <div class="filter-group">
           <p>Источники</p>
           <label v-for="option in sourceOptions" :key="option.id">
-            <input type="checkbox" checked />
+            <input type="checkbox" v-model="selectedSources" :value="option.id" />
             <span>{{ option.label }}</span>
           </label>
         </div>
-        <div class="filter-group">
-          <p>Темы</p>
-          <label v-for="option in topicOptions" :key="option.id">
-            <input type="checkbox" />
-            <span>{{ option.label }}</span>
-          </label>
-        </div>
+
+        <!-- Фильтр по уровню риска -->
         <div class="filter-group">
           <p>Уровень риска</p>
-          <label v-for="option in riskOptions" :key="option.id">
-            <input type="checkbox" :checked="option.id !== 'low'" />
+          <label v-for="option in riskLevelOptions" :key="option.id">
+            <input
+              type="checkbox"
+              v-model="selectedRiskLevels"
+              :value="option.id"
+            />
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+
+        <!-- Фильтр по типу риска -->
+        <div class="filter-group">
+          <p>Тип риска</p>
+          <label v-for="option in riskTypeOptions" :key="option.id">
+            <input
+              type="checkbox"
+              v-model="selectedRiskTypes"
+              :value="option.id"
+            />
             <span>{{ option.label }}</span>
           </label>
         </div>
       </div>
     </section>
 
+    <!-- ИНФОРМАЦИОННЫЙ БЛОК -->
     <section class="info-block">
       <h2>Что можно делать</h2>
       <ul>
@@ -108,29 +65,75 @@ const toggleFilters = () => {
       </ul>
     </section>
 
+    <!-- РЕЗУЛЬТАТЫ ПОИСКА -->
     <section class="results">
       <header>
         <div>
           <p class="overline">Найденные события</p>
           <h3>Актуальные новости по запросу</h3>
         </div>
-        <span class="count">{{ results.length }} результатов</span>
+        <span class="count">{{ filteredResults.length }} результатов</span>
       </header>
+
       <div class="card-list">
-        <article v-for="item in results" :key="item.id" class="result-card" tabindex="0">
-          <div class="card-top">
-            <h4>{{ item.title }}</h4>
-            <span class="date">{{ item.pub_date || item.date }}</span>
-          </div>
-          <p class="source">{{ item.source }}</p>
-          <p class="summary">{{ item.summary || item.text?.slice(0, 200) }}...</p>
-          <button class="inline-link" @click="handleNewsClick(item.id)">Перейти к карточке</button>
-        </article>
-        <p v-if="!results.length && !loading" class="placeholder">Нет результатов по вашему запросу</p>
+        <!-- Загрузка -->
         <p v-if="loading" class="placeholder">Загрузка...</p>
+
+        <!-- Нет результатов -->
+        <p v-if="!loading && query.trim() && filteredResults.length === 0" class="placeholder">
+          Нет результатов по вашему запросу
+        </p>
+
+        <!-- Пустой поиск — показываем все новости -->
+        <p v-if="!loading && !query.trim() && filteredResults.length === 0" class="placeholder">
+          Новости загружаются...
+        </p>
+
+        <!-- Список карточек -->
+        <article
+          v-for="item in displayedResults"
+          :key="item.id"
+          class="result-card"
+          tabindex="0"
+          @click="selectArticle(item)"
+        >
+          <div class="card-top">
+            <h4>{{ item.title || 'Без заголовка' }}</h4>
+            <span class="date">{{ formatDate(item.pub_date) }}</span>
+          </div>
+          <p class="source">{{ item.source || 'Unknown' }}</p>
+          <p class="summary">{{ (item.text || '').slice(0, 200) }}...</p>
+
+          <!-- Бейджи риска -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px">
+            <span
+              v-if="item.risk_level"
+              class="risk-badge"
+              :class="`risk-${item.risk_level}`"
+            >
+              <span class="dot" />
+              {{ riskLevelLabel(item.risk_level) }}
+            </span>
+            <span v-if="item.risk_type" class="type-badge">
+              {{ riskTypeLabel(item.risk_type) }}
+            </span>
+          </div>
+
+          <button class="inline-link" @click.stop="selectArticle(item)">
+            Перейти к карточке
+          </button>
+        </article>
+
+        <!-- Кнопка "Загрузить ещё" -->
+        <div v-if="canLoadMore" style="text-align: center; margin-top: 12px">
+          <button class="inline-link" @click="loadMore">
+            Загрузить ещё ({{ displayedCount }} из {{ filteredResults.length }})
+          </button>
+        </div>
       </div>
     </section>
 
+    <!-- ФУТЕР С ДЕЙСТВИЕМ -->
     <section class="action-footer">
       <div>
         <h4>Готовы зафиксировать выводы?</h4>
@@ -141,6 +144,209 @@ const toggleFilters = () => {
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { api, type News } from '../api/client'
+
+const router = useRouter()
+
+// ==================== ТИПЫ ====================
+interface NewsArticle extends News {
+  source_type?: 'media' | 'telegram' | 'registry'
+}
+
+// ==================== ОПЦИИ ФИЛЬТРОВ ====================
+const sourceOptions = [
+  { id: 'media', label: 'СМИ' },
+  { id: 'telegram', label: 'Telegram' },
+  { id: 'registry', label: 'Реестры' },
+]
+
+const riskLevelOptions = [
+  { id: 'high', label: 'Высокий' },
+  { id: 'medium', label: 'Средний' },
+  { id: 'low', label: 'Низкий' },
+]
+
+const riskTypeOptions = [
+  { id: 'политический', label: 'Политический' },
+  { id: 'экономический', label: 'Экономический' },
+  { id: 'социальный', label: 'Социальный' },
+]
+
+const infoChecklist = [
+  'Вводите ключевые слова, названия компаний или персон',
+  'Комбинируйте фильтры по источникам, темам и рискам',
+  'Просматривайте карточки найденных событий',
+  'Переходите в полную карточку для деталей и отчётов',
+]
+
+// ==================== СОСТОЯНИЕ ====================
+const query = ref('')
+const loading = ref(false)
+const showFilters = ref(true)
+const allResults = ref<NewsArticle[]>([])
+const selectedArticleId = ref<number | null>(null)
+const displayedCount = ref(20)
+const PAGE_SIZE = 20
+
+const selectedSources = ref<string[]>([])
+const selectedRiskLevels = ref<string[]>(['high', 'medium', 'low'])
+const selectedRiskTypes = ref<string[]>([])
+
+let searchTimeout: NodeJS.Timeout | null = null
+
+// ==================== ВЫЧИСЛЯЕМЫЕ СВОЙСТВА ====================
+const filteredResults = computed(() => {
+  let filtered = allResults.value
+
+  // Фильтр по тексту поиска
+  if (query.value.trim()) {
+    const searchLower = query.value.toLowerCase()
+    filtered = filtered.filter(
+      (item) =>
+        (item.title?.toLowerCase() || '').includes(searchLower) ||
+        (item.text?.toLowerCase() || '').includes(searchLower) ||
+        (item.source?.toLowerCase() || '').includes(searchLower)
+    )
+  }
+
+  // Фильтр по источнику
+  if (selectedSources.value.length > 0) {
+    filtered = filtered.filter((item) => {
+      const sourceType = getSourceType(item.source || '')
+      return selectedSources.value.includes(sourceType)
+    })
+  }
+
+  // Фильтр по уровню риска
+  if (selectedRiskLevels.value.length > 0) {
+    filtered = filtered.filter((item) =>
+      selectedRiskLevels.value.includes(item.risk_level || 'low')
+    )
+  }
+
+  // Фильтр по типу риска
+  if (selectedRiskTypes.value.length > 0) {
+    filtered = filtered.filter((item) =>
+      selectedRiskTypes.value.includes(item.risk_type || '')
+    )
+  }
+
+  return filtered
+})
+
+const displayedResults = computed(() => {
+  return filteredResults.value.slice(0, displayedCount.value)
+})
+
+const canLoadMore = computed(() => {
+  return displayedCount.value < filteredResults.value.length
+})
+
+// ==================== ФУНКЦИИ ====================
+const getSourceType = (source: string): 'media' | 'telegram' | 'registry' => {
+  if (source.toLowerCase().includes('telegram')) return 'telegram'
+  if (source.toLowerCase().includes('реестр') || source.toLowerCase().includes('registry')) return 'registry'
+  return 'media'
+}
+
+const handleSearchInput = (e: Event) => {
+  const target = e.target as HTMLInputElement
+  query.value = target.value
+
+  if (searchTimeout) clearTimeout(searchTimeout)
+
+  loading.value = true
+  searchTimeout = setTimeout(() => {
+    if (query.value.trim()) {
+      fetchResults()
+    } else {
+      fetchAllNews()
+    }
+  }, 500)
+}
+
+const fetchAllNews = async () => {
+  try {
+    const data = await api.getNews({ page: 1, page_size: 500 })
+    allResults.value = data.items as NewsArticle[]
+    displayedCount.value = 20
+    selectedArticleId.value = null
+  } catch (error) {
+    console.error('Ошибка при загрузке новостей:', error)
+    allResults.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchResults = async () => {
+  try {
+    const data = await api.getNews({
+      search: query.value || undefined,
+      page: 1,
+      page_size: 500,
+    })
+    allResults.value = data.items as NewsArticle[]
+    displayedCount.value = 20
+    selectedArticleId.value = null
+  } catch (error) {
+    console.error('Ошибка при поиске:', error)
+    allResults.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadMore = () => {
+  displayedCount.value += PAGE_SIZE
+}
+
+const selectArticle = (item: NewsArticle) => {
+  selectedArticleId.value = item.id
+  router.push(`/news/${item.id}`)
+}
+
+const toggleFilters = () => {
+  showFilters.value = !showFilters.value
+}
+
+const formatDate = (dateStr?: string): string => {
+  if (!dateStr) return 'Unknown'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('ru-RU', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+}
+
+const riskLevelLabel = (level?: string): string => {
+  const map: Record<string, string> = {
+    high: 'Высокий риск',
+    medium: 'Средний риск',
+    low: 'Низкий риск',
+  }
+  return map[level || 'low'] || 'Неизвестно'
+}
+
+const riskTypeLabel = (type?: string): string => {
+  const map: Record<string, string> = {
+    политический: 'Политический',
+    экономический: 'Экономический',
+    социальный: 'Социальный',
+  }
+  return map[type || ''] || type || 'Неизвестно'
+}
+
+// ==================== ИНИЦИАЛИЗАЦИЯ ====================
+onMounted(() => {
+  fetchAllNews()
+})
+</script>
+
 <style scoped>
 .search-page {
   display: flex;
@@ -150,67 +356,6 @@ const toggleFilters = () => {
   background: var(--surface-1);
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.search-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.home-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--surface-2);
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--positive));
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.icon-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--surface-2);
-  display: grid;
-  place-items: center;
-  color: inherit;
-}
-
-.icon-btn svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-}
-
-.profile {
-  width: auto;
-  min-width: 44px;
-  padding: 0 14px;
-}
-
-.initials {
-  font-weight: 600;
 }
 
 .search-panel {
@@ -236,6 +381,10 @@ const toggleFilters = () => {
   color: #fff;
   padding: 14px 18px;
   font-size: 1rem;
+}
+
+.search-input input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .search-input button {
@@ -288,6 +437,10 @@ const toggleFilters = () => {
   gap: 8px;
   font-size: 0.9rem;
   cursor: pointer;
+}
+
+.filter-group label input[type="checkbox"] {
+  accent-color: var(--accent);
 }
 
 .info-block {
@@ -412,6 +565,54 @@ const toggleFilters = () => {
   font-size: 0.95rem;
 }
 
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.risk-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.risk-badge.risk-high {
+  background: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+.risk-badge.risk-high .dot {
+  background: #ff3b30;
+}
+
+.risk-badge.risk-medium {
+  background: rgba(255, 152, 0, 0.15);
+  color: #ff9800;
+}
+.risk-badge.risk-medium .dot {
+  background: #ff9800;
+}
+
+.risk-badge.risk-low {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+.risk-badge.risk-low .dot {
+  background: #4caf50;
+}
+
+.type-badge {
+  padding: 4px 10px;
+  background: rgba(158, 158, 158, 0.15);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .inline-link {
   align-self: flex-start;
   border: none;
@@ -420,6 +621,13 @@ const toggleFilters = () => {
   font-weight: 600;
   padding: 0;
   cursor: pointer;
+}
+
+.placeholder {
+  margin: 0;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 20px;
 }
 
 .action-footer {
@@ -480,6 +688,9 @@ const toggleFilters = () => {
   .primary {
     width: 100%;
   }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
-

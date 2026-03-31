@@ -8,6 +8,7 @@ interface EventItem {
   source: string;
   summary: string;
   risk: RiskLevel;
+  riskType?: string | null;  // ✅ Добавили тип риска (политический/экономический/социальный)
 }
 
 defineProps<{
@@ -24,10 +25,20 @@ const riskLabel: Record<RiskLevel, string> = {
   low: 'Низкий риск',
 };
 
+// ✅ Форматируем тип риска для отображения
+const riskTypeLabel = (type?: string | null): string => {
+  if (!type) return '';
+  const map: Record<string, string> = {
+    'политический': 'Политический',
+    'экономический': 'Экономический',
+    'социальный': 'Социальный',
+  };
+  return map[type] || type;
+};
+
 const handleClick = (newsId: number) => {
   emit('news-click', newsId);
 };
-
 </script>
 
 <template>
@@ -39,8 +50,14 @@ const handleClick = (newsId: number) => {
       </div>
       <button>Экспорт ленты</button>
     </header>
+    
     <div class="cards">
-      <article v-for="item in events" :key="item.id" class="card" @click="handleClick(item.id)">
+      <article 
+        v-for="item in events" 
+        :key="item.id" 
+        class="card" 
+        @click="handleClick(item.id)"
+      >
         <div class="card-header">
           <div>
             <p class="source">{{ item.source }}</p>
@@ -48,12 +65,26 @@ const handleClick = (newsId: number) => {
           </div>
           <span class="date">{{ item.date }}</span>
         </div>
-        <p class="summary">
-          {{ item.summary }}
-        </p>
+        
+        <p class="summary">{{ item.summary }}</p>
+        
         <div class="footer">
-          <span class="risk" :data-risk="item.risk">{{ riskLabel[item.risk] }}</span>
-          <button class="inline-link" @click.stop="handleClick(item.id)">Открыть источник</button>
+          <!-- Бейджи рисков -->
+          <div class="badges">
+            <!-- Уровень риска -->
+            <span class="risk" :data-risk="item.risk">
+              {{ riskLabel[item.risk] }}
+            </span>
+            
+            <!-- Тип риска (если есть) -->
+            <span v-if="item.riskType" class="type-badge">
+              {{ riskTypeLabel(item.riskType) }}
+            </span>
+          </div>
+          
+          <button class="inline-link" @click.stop="handleClick(item.id)">
+            Открыть источник
+          </button>
         </div>
       </article>
     </div>
@@ -147,6 +178,12 @@ h3 {
   gap: 12px;
 }
 
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .risk {
   font-size: 0.85rem;
   font-weight: 600;
@@ -169,6 +206,15 @@ h3 {
   background: rgba(34, 197, 94, 0.12);
 }
 
+.type-badge {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(158, 158, 158, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
 .inline-link {
   border: none;
   background: none;
@@ -187,6 +233,10 @@ h3 {
   .card-header {
     flex-direction: column;
   }
+
+  .footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
-

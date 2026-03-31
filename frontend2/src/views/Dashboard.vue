@@ -64,9 +64,10 @@ const events = computed(() => {
     source: n.source,
     summary: n.summary || n.text?.slice(0, 200),
     risk: n.risk_level || 'low',
+    riskType: n.risk_type || null,  // ✅ Добавляем тип риска
   }));
 });
- 
+
 const riskLegend: Array<{ level: RiskLevel; label: string; description: string }> = [
   { level: 'high', label: 'Высокий риск', description: 'Требует немедленной реакции' },
   { level: 'medium', label: 'Средний риск', description: 'Нужен мониторинг' },
