@@ -29,6 +29,7 @@ class PostAnalysisWithExternalModelsDTO(BaseModel):
     sentiment_label: Optional[str] = None
     confidence: Optional[float] = None
     
+    
     # Дополнительные поля
     category: Optional[str] = Field(default="General")
     risk_level: Optional[str] = Field(default="low")
