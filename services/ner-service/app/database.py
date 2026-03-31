@@ -5,9 +5,9 @@ from sqlalchemy import (
     Integer, 
     String, 
     ForeignKey, 
-    TIMESTAMP,     
-    func,          
-    UniqueConstraint  
+    TIMESTAMP,    
+    func,           
+    UniqueConstraint 
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.dialects.postgresql import insert
@@ -19,22 +19,19 @@ class NamedEntity(Base):
     __tablename__ = "named_entities"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, unique=True, index=True)  # Уникальное имя сущности
-    entity_type = Column(String, nullable=False)  # ORG, PER, LOC, MISC
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())  
+   
+    name = Column(String(255), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=False), server_default=func.now())
 
-# Таблица связи статья ↔ сущность
+# Таблица связи статья ↔ сущность (без id, составной PK)
 class PostEntity(Base):
     __tablename__ = "post_entities"
     
-    id = Column(Integer, primary_key=True)
-    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, index=True)
-    entity_id = Column(Integer, ForeignKey("named_entities.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True, index=True)
+    entity_id = Column(Integer, ForeignKey("named_entities.id", ondelete="CASCADE"), primary_key=True, index=True)
     
-    # Уникальная пара: одна сущность в статье только один раз
-    __table_args__ = (
-        UniqueConstraint('post_id', 'entity_id', name='uq_post_entity'),  
-    )
+   
 
 # Подключение к БД
 def get_engine(database_url: str):
