@@ -55,4 +55,3 @@ class PostListResponseDTO(BaseModel):
     total: int
     page: int
     page_size: int
-z
