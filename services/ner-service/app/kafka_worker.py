@@ -3,14 +3,13 @@ import asyncio
 import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from sqlalchemy import select, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import select, update  
 
 from .config import settings
-from .database import get_engine, get_session, NamedEntity, PostEntity, Base
+from .database import get_engine, get_session, NamedEntity, PostEntity, Base  
 from .extractor import EntityExtractor
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  
 
 
 async def consume_and_extract():
