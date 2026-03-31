@@ -95,7 +95,7 @@ class PostDBGateWay:
         response_items = []
         for article in articles:
             analysis = article.analyses[0] if article.analyses else None
-            risk = article.risks[0] if article.risks else None
+            risk = relationship("Risk", back_populates="article", uselist=False)
             
             response_items.append({
                 "post": article,

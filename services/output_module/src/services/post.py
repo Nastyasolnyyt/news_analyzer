@@ -100,15 +100,14 @@ class PostService:
                 topic=topic,
                 id=analysis_obj.id if analysis_obj else None,
                 post_id=post_obj.id,
-                emotion=analysis_obj.emotion if analysis_obj else 0.0,
-                tonality=analysis_obj.tonality if analysis_obj else 0.0,
-                relevance=analysis_obj.relevance if analysis_obj else 0.0,
+                emotion=analysis_obj.emotion if analysis_obj else None,  
+                tonality=analysis_obj.tonality if analysis_obj else None,
+                relevance=analysis_obj.relevance if analysis_obj else None,
                 sentiment_label=analysis_obj.sentiment_label if analysis_obj else None,
+                confidence=analysis_obj.confidence if analysis_obj else None, 
             )
 
-            # ПЛОСКАЯ структура для фронтенда (БЕЗ вложенных объектов!)
             flattened = {
-                # Основная информация о статье
                 'id': post_obj.id,
                 'title': post_obj.title,
                 'text': post_obj.text,
@@ -118,33 +117,28 @@ class PostService:
                 'created_at': post_obj.created_at.isoformat(),
                 'updated_at': post_obj.updated_at.isoformat(),
                 
-                # Анализ тональности
+                # Безопасное приведение к float
                 'sentiment_label': analysis_dto.sentiment_label or 'neutral',
-                'tonality': float(analysis_dto.tonality) if analysis_dto.tonality else 0.0,
-                'confidence': float(analysis_dto.confidence) if analysis_dto.confidence else 0.0,
-                'emotion': float(analysis_dto.emotion) if analysis_dto.emotion else 0.0,
-                'relevance': float(analysis_dto.relevance) if analysis_dto.relevance else 0.0,
+                'tonality': float(analysis_dto.tonality) if analysis_dto.tonality is not None else 0.0,
+                'confidence': float(analysis_dto.confidence) if analysis_dto.confidence is not None else 0.0,
+                'emotion': float(analysis_dto.emotion) if analysis_dto.emotion is not None else 0.0,
+                'relevance': float(analysis_dto.relevance) if analysis_dto.relevance is not None else 0.0,
                 
-                # РИСК (эти поля ищет фронтенд!)
-                'risk_level': risk_obj.risk_level if risk_obj else 'low',  # 'high' | 'medium' | 'low'
-                'risk_type': risk_obj.risk_type if risk_obj else None,    # 'политический' | 'экономический' | 'социальный'
-                'risk_confidence': float(risk_obj.confidence) if risk_obj and risk_obj.confidence else 0.0,
+                # РИСК
+                'risk_level': risk_obj.risk_level if risk_obj else 'low',
+                'risk_type': risk_obj.risk_type if risk_obj else None,
+                'risk_confidence': float(risk_obj.confidence) if risk_obj and risk_obj.confidence is not None else 0.0,
                 
-                # Тема/кластер
+                # Тема
                 'topic_id': analysis_dto.topic.id if analysis_dto.topic else None,
                 'topic_name': analysis_dto.topic.name if analysis_dto.topic else None,
                 
                 # Сущности
                 'entities': [
-                    {
-                        'id': e.id,
-                        'name': e.name,
-                        'entity_type': e.entity_type,
-                    }
+                    {'id': e.id, 'name': e.name, 'entity_type': e.entity_type}
                     for e in entities
                 ],
             }
-
             enriched_items.append(flattened)
 
         return PostListResponseDTO(
