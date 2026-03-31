@@ -138,7 +138,8 @@ services:
     restart: always
     networks:
       - news_network
-  # docker-compose.yml
+
+
   ner-service:
     build: ./services/ner-service
     container_name: ner-service
@@ -151,8 +152,6 @@ services:
       OUTPUT_TOPIC: entities_extracted
     depends_on:
       kafka:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     restart: always
     networks:
