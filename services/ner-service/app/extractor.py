@@ -1,5 +1,7 @@
-from natasha import Segmenter, NewsEmbedding, NewsNERTagger, Doc
+from asyncio.log import logger
 
+from natasha import Segmenter, NewsEmbedding, NewsNERTagger, Doc
+import pymorphy2 
 
 class Config:
     """Настройки поисковой системы"""
@@ -11,46 +13,47 @@ class Config:
 
     }
 
-
 class EntityExtractor:
-    """Извлекает именованные сущности из текста"""
-
     def __init__(self):
-        # Natasha для NER
         self.segmenter = Segmenter()
         self.emb = NewsEmbedding()
         self.ner_tagger = NewsNERTagger(self.emb)
+        self.morph = pymorphy2.MorphAnalyzer()  #  Для лемматизации
 
     def normalize(self, word):
-        """Простая нормализация - к нижнему регистру"""
         return word.lower().strip()
 
     def extract(self, text):
-        """
-        Извлекает сущности из текста.
-        Возвращает: [{'text': 'Сбербанка', 'normalized': 'сбербанка', 'type': 'ORG'}]
-        """
-        doc = Doc(text)
-        doc.segment(self.segmenter)
-        doc.tag_ner(self.ner_tagger)
+        if not text or len(text.strip()) < 10:
+            return []
+        
+        try:
+            doc = Doc(text)
+            doc.segment(self.segmenter)
+            doc.tag_ner(self.ner_tagger)
 
-        entities = []
-        for span in doc.spans:
-            entity_text = span.text
-            entity_type = span.type  # ORG, PER, LOC
+            entities = []
+            for span in doc.spans:
+                entity_text = span.text.strip()
+                entity_type = span.type
+                normalized = self.normalize(entity_text)
+                
+                # Лемматизация к именительному падежу
+                lemma = self.morph.parse(normalized)[0].normal_form
 
-            # Нормализуем сущность (просто lower)
-            normalized = self.normalize(entity_text)
+                if len(normalized) >= 3:
+                    entities.append({
+                        'text': entity_text,      # Оригинальное написание
+                        'normalized': normalized, # Для поиска (lowercase)
+                        'lemma': lemma,           # Именительный падеж для БД
+                        'type': entity_type
+                    })
 
-            # Фильтруем слишком короткие сущности
-            if len(normalized) >= Config.MIN_WORD_LENGTH:
-                entities.append({
-                    'text': entity_text,
-                    'normalized': normalized,
-                    'type': entity_type
-                })
-
-        return entities
+            return entities
+            
+        except Exception as e:
+            logger.error(f"Error extracting entities: {e}")
+            return []
 
 
 class SmartSearch:

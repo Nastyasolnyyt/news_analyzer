@@ -66,7 +66,7 @@ async def consume_and_extract():
                 
                 try:
                     for ent in entities:
-                        entity_name = ent['text']
+                        entity_name = ent['lemma']
                         entity_type = ent['type']
                         
                         # 1. Find or create NamedEntity
