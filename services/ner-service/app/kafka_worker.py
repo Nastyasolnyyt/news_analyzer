@@ -70,6 +70,7 @@ async def consume_and_extract():
                         entity_name = ent['text']
                         entity_type = ent['type']
                         
+                        # 1. Find or create NamedEntity
                         existing = db.execute(
                             select(NamedEntity.id).where(NamedEntity.name == entity_name)
                         ).scalar_one_or_none()
@@ -87,22 +88,24 @@ async def consume_and_extract():
                             db.flush()
                             entity_id = new_entity.id
                         
+                        # 2. Check if link already exists (composite PK: post_id + entity_id)
                         existing_link = db.execute(
-                            select(PostEntity).where(
+                            select(1).where(
                                 (PostEntity.post_id == article_id) & 
                                 (PostEntity.entity_id == entity_id)
                             )
                         ).scalar_one_or_none()
                         
-                        if not existing_link:
-                            post_entity = PostEntity(post_id=article_id, entity_id=entity_id)
-                            db.add(post_entity)
-
-                            saved_entities.append({
-                                'text': entity_name,
-                                'type': entity_type,
-                                'id': entity_id
-                            })
+                        # Insert link only if it doesn't exist
+                        if existing_link is None:
+                            db.add(PostEntity(post_id=article_id, entity_id=entity_id))
+                        
+                        # Always add to saved_entities list
+                        saved_entities.append({
+                            'text': entity_name,
+                            'type': entity_type,
+                            'id': entity_id
+                        })
                     
                     db.commit()
                     logger.info(f"Article {article_id}: saved {len(saved_entities)} entities")
