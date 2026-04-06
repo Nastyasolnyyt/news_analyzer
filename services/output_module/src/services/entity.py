@@ -13,7 +13,8 @@ class EntityService:
         post_entity_gateway: PostEntityDBGateWay,
         post_gateway: PostDBGateWay,
     ):
-        (self.ner_gateway,) = (ner_gateway,)
+        # ИСПРАВЛЕНО: Убрали лишнюю упаковку в кортеж
+        self.ner_gateway = ner_gateway
         self.post_entity_gateway = post_entity_gateway
         self.post_gateway = post_gateway
 
@@ -22,10 +23,19 @@ class EntityService:
     ) -> List[EntityInfo]:
         """Получает упоминания сущности с фильтрацией по датам."""
         entity = await self.ner_gateway.get_named_entity(entity_id)
+        
+        # Защита: если сущность не найдена в БД
+        if not entity:
+            return []
+
         posts_entity = await self.post_entity_gateway.get_posts_by_ner(entity.id)
-        posts = [
-            await self.post_gateway.get_post(post_entity.post_id) for post_entity in posts_entity
-        ]
+        
+        # ИСПРАВЛЕНО: Заменили get_post на get_post_by_id и добавили проверку на существование поста
+        posts = []
+        for post_entity in posts_entity:
+            post = await self.post_gateway.get_post_by_id(post_entity.post_id)
+            if post:
+                posts.append(post)
 
         # Применяем фильтрацию по датам
         if filters:
