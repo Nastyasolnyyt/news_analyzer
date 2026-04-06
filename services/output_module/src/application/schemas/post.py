@@ -21,8 +21,8 @@ class EntityDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     id: int
-    text: str
-    type: Optional[str] = None
+    name: str  # Было text, стало name (как в БД)
+    entity_type: Optional[str] = None  # Было type, стало entity_type (как в БД)
 
 # 3. Итоговый объект, который летит на фронтенд
 class PostResponseDTO(BaseModel):

@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://159.194.200.32:8003',  // URL output_module на облаке
+        target: 'http://185.130.212.50:8003',  // URL output_module на облаке
         changeOrigin: true,
         secure: false
       }
