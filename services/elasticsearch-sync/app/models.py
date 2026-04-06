@@ -10,8 +10,12 @@ class Base(DeclarativeBase):
 class NamedEntity(Base):
     __tablename__ = "named_entities"
     id: Mapped[int] = mapped_column(primary_key=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    type: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Меняем text на name, так как в БД колонка называется name
+    name: Mapped[str] = mapped_column("name", Text, nullable=False)
+    
+    # Меняем type на entity_type, так как в БД колонка называется entity_type
+    type: Mapped[Optional[str]] = mapped_column("entity_type", Text)
     
     # Relationships
     entities: Mapped[List["PostEntity"]] = relationship("PostEntity", back_populates="entity")

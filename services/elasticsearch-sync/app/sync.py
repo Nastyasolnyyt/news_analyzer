@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional
 
 from config import POSTGRES_DB_URL, LAST_SYNC_FILE
-from models import Article
+from models import Article, PostEntity
 from elasticsearch_client import ElasticSearchClient, ARTICLES_MAPPING
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class SyncService:
             with Session(self.engine) as session:
                 data = session.query(Article).options(
                     joinedload(Article.risks),
-                    joinedload(Article.entities)
+                    joinedload(Article.entities).joinedload(PostEntity.entity) # <-- Изменили эту строку
                 ).filter(
                     Article.updated_at >= last_sync
                 ).all()
@@ -104,9 +104,11 @@ class SyncService:
         }
         
         # Если есть сущности (NER)
+        # Если есть сущности (NER)
         if hasattr(article, 'entities') and article.entities:
             doc["entities"] = [
-                {"text": e.text, "type": e.type} for e in article.entities
+                {"text": e.entity.name, "type": e.entity.type} 
+                for e in article.entities if e.entity is not None
             ]
             
         return doc
