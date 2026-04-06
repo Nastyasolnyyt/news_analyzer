@@ -2,6 +2,8 @@ from src.application.schemas.post import (
     PostFilterDTO,
     PostListResponseDTO,
     PostWithExternalModelsDTO,
+    EntityDTO,  # ДОБАВИЛ ИМПОРТ EntityDTO ДЛЯ ВАЛИДАЦИИ
+    PostBaseDTO,  # ДОБАВИЛ ИМПОРТ PostBaseDTO
 )
 from src.application.schemas.post_analysis import PostAnalysisWithExternalModelsDTO
 from src.infrastructure.postgres.repositories.named_entity import NamedEntityDBGateWay
@@ -45,13 +47,18 @@ class PostService:
         )
 
         post_entities = await self.post_entity_gateway.get_ners_by_post(post_id)
-        entities = [
-            await self.ner_gateway.get_named_entity(e.entity_id)
-            for e in post_entities
-        ]
+        
+        # ИСПРАВЛЕНИЕ: Превращаем каждую сущность из БД в EntityDTO
+        entities = []
+        for e in post_entities:
+            ner_obj = await self.ner_gateway.get_named_entity(e.entity_id)
+            if ner_obj:
+                entities.append(EntityDTO.model_validate(ner_obj))
 
         return PostWithExternalModelsDTO(
-            post=post, analysis=analysis_with_external, entities=entities
+            post=PostBaseDTO.model_validate(post), 
+            analysis=analysis_with_external, 
+            entities=entities
         )
 
     async def get_posts(self, filters: PostFilterDTO) -> PostListResponseDTO:
@@ -62,8 +69,6 @@ class PostService:
         for item in items:
             try:
                 # 1. Извлекаем сам объект SQLAlchemy из словаря
-                # Если в репозитории select(Article, ...), то ключ будет 'Article' или 'post'
-                # Судя по твоему коду, ключ называется 'post'
                 post_obj = item['post'] 
                 
                 # 2. Получаем анализ из связей объекта
@@ -74,31 +79,29 @@ class PostService:
                     topic = await self.topic_gateway.get_topic(analysis.topic_id)
 
                 # 3. Создаем DTO анализа
-                # Везде используем post_obj (объект), а не item (словарь)
                 analysis_dto = PostAnalysisWithExternalModelsDTO(
                     topic=topic,
                     id=analysis.id if analysis else None,
                     post_id=post_obj.id,
-                    
                     emotion=analysis.emotion if analysis and analysis.emotion is not None else None,
                     tonality=analysis.tonality if analysis and analysis.tonality is not None else None,
                     relevance=analysis.relevance if analysis and analysis.relevance is not None else None,
                 )
 
                 # 4. Сущности (Entities)
-                # ИСПРАВЛЕНО: берем из объекта post_obj, а не из словаря item
-                entities = post_obj.entities if post_obj.entities else []
+                # ИСПРАВЛЕНИЕ: превращаем объекты БД в схемы EntityDTO, чтобы Pydantic не ругался
+                db_entities = post_obj.entities if post_obj.entities else []
+                entities = [EntityDTO.model_validate(e) for e in db_entities]
 
                 # 5. Собираем итоговый DTO
                 posts_with_external.append(
                     PostWithExternalModelsDTO(
-                        post=post_obj,  # ИСПРАВЛЕНО: передаем объект для маппинга в PostBaseDTO
+                        post=PostBaseDTO.model_validate(post_obj),  # Явная валидация поста
                         analysis=analysis_dto, 
                         entities=entities
                     )
                 )
             except Exception as e:
-                # Теперь здесь будет печататься правильный ID, так как мы берем его из объекта
                 print(f"Error processing post {item['post'].id if 'post' in item else 'unknown'}: {e}")
                 continue
 
