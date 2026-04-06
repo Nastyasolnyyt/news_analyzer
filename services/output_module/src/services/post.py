@@ -62,23 +62,19 @@ class PostService:
         )
 
     async def get_posts(self, filters: PostFilterDTO) -> PostListResponseDTO:
-        # Репозиторий возвращает список словарей/Row, так как там есть join или несколько сущностей
         items, total = await self.post_gateway.get_posts_with_filters(filters)
         
         posts_with_external = []
         for item in items:
             try:
-                # 1. Извлекаем сам объект SQLAlchemy из словаря
                 post_obj = item['post'] 
                 
-                # 2. Получаем анализ из связей объекта
+                # 1. Получаем анализ
                 analysis = post_obj.analyses[0] if post_obj.analyses else None
-                
                 topic = None
                 if analysis and analysis.topic_id:
                     topic = await self.topic_gateway.get_topic(analysis.topic_id)
 
-                # 3. Создаем DTO анализа
                 analysis_dto = PostAnalysisWithExternalModelsDTO(
                     topic=topic,
                     id=analysis.id if analysis else None,
@@ -88,17 +84,24 @@ class PostService:
                     relevance=analysis.relevance if analysis and analysis.relevance is not None else None,
                 )
 
-                # 4. Сущности (Entities)
-                # ИСПРАВЛЕНИЕ: превращаем объекты БД в схемы EntityDTO, чтобы Pydantic не ругался
-                db_entities = post_obj.entities if post_obj.entities else []
-                entities = [EntityDTO.model_validate(e) for e in db_entities]
+                # 2. ПРАВИЛЬНОЕ РЕШЕНИЕ ДЛЯ СУЩНОСТЕЙ:
+                # Вместо post_obj.entities (который отдает ерунду), мы идем в БД 
+                # и честно берем сущности по ID поста через репозиторий
+                post_entities = await self.post_entity_gateway.get_ners_by_post(post_obj.id)
+                
+                entities = []
+                for pe in post_entities:
+                    ner_obj = await self.ner_gateway.get_named_entity(pe.entity_id)
+                    if ner_obj:
+                        # Валидируем в строгую схему EntityDTO
+                        entities.append(EntityDTO.model_validate(ner_obj))
 
-                # 5. Собираем итоговый DTO
+                # 3. Собираем итоговый DTO
                 posts_with_external.append(
                     PostWithExternalModelsDTO(
-                        post=PostBaseDTO.model_validate(post_obj),  # Явная валидация поста
+                        post=PostBaseDTO.model_validate(post_obj),
                         analysis=analysis_dto, 
-                        entities=entities
+                        entities=entities  # Теперь здесь лежат правильные EntityDTO!
                     )
                 )
             except Exception as e:
