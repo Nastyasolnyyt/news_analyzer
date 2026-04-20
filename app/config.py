@@ -1,6 +1,6 @@
 import logging
 
-DB_URL = "postgresql://news_db_r386_user:d3RdNiRIt1B1iWzamwc3Tblto5FxDpJz@dpg-d68bevrh46gs73fc7ln0-a.oregon-postgres.render.com/news_db_r386?sslmode=require"
+DB_URL = "postgresql://data_i2d0_user:D49vf1tZSSLWNHmmTxUUVl9Ui6hofFHK@dpg-d7063a7diees73devjt0-a.oregon-postgres.render.com/data_i2d0"
 DEFAULT_DAYS = 30
 Z_SCORE_THRESHOLD = 2.0
 
