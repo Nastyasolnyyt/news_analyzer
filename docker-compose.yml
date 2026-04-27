@@ -188,6 +188,16 @@ services:
         condition: service_started
     networks:
       - news_network
+      
+  anomaly_analyzer:
+    build:
+      context: ./news_analyzer
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://data_i2d0_user:D49vf1tZSSLWNHmmTxUUVl9Ui6hofFHK@dpg-d7063a7diees73devjt0-a.oregon-postgres.render.com/data_i2d0?sslmode=require
+    restart: always
+    depends_on:
+      - output_module
 
   # ОСТАЛЬНЫЕ СЕРВИСЫ
   text-preprocessing:
