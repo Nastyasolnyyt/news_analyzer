@@ -89,7 +89,8 @@ async def consume_and_classify():
                     stmt = insert(Risk).values(
                         article_id=article_id,
                         risk_level=result["risk_level"],        
-                        risk_confidence=result["confidence"]     
+                        risk_confidence=result["confidence"],
+                        risk_type="определяется..."  
                     ).on_conflict_do_update(
                         index_elements=['article_id'],
                         set_={
