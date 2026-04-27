@@ -16,7 +16,7 @@ from src.infrastructure.postgres.repositories.user import UserDBGateWay
 
 
 class DBProvider(Provider):
-    def __init__(self, url: URL):
+    def __init__(self, url: str):
         super().__init__()
         self.DATABASE_URL = url
         
@@ -27,7 +27,7 @@ class DBProvider(Provider):
         
         # ДЛЯ RENDER: если в хосте есть render.com, добавляем ssl=True
         # Это заменяет собой ?sslmode=require, который не понимает asyncpg
-        if url.host and "render.com" in url.host:
+        if "render.com" in url:
             self.SQLALCHEMY_CONNECT_ARGS["ssl"] = True
 
     @provide(scope=Scope.REQUEST)
