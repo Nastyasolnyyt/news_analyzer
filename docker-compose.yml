@@ -6,7 +6,14 @@ services:
       image: news_analyzer-ml-base:latest
       # Этот сервис не запускается, только для сборки
       profiles: ["build"]
-
+  redis:
+    image: redis:7-alpine
+    container_name: kg_redis
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - news_network
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     environment:
@@ -157,6 +164,29 @@ services:
     networks:
       - news_network
 
+  knowledge-graph-sync:
+    build: ./services/knowledge-graph-sync
+    container_name: knowledge_graph_sync
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    env_file:
+      - .env
+    environment:
+      # Настройки из твоего config.py
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_INPUT_TOPIC: entities_extracted
+      KAFKA_GROUP_ID: knowledge-graph-sync-group
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - news_network
+      
   # ОСТАЛЬНЫЕ СЕРВИСЫ
   text-preprocessing:
     build: ./services/text-preprocessing-service
