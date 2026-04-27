@@ -18,24 +18,29 @@ from src.infrastructure.postgres.repositories.user import UserDBGateWay
 class DBProvider(Provider):
     def __init__(self, url: URL):
         super().__init__()
-
         self.DATABASE_URL = url
+        
+        # Базовые настройки
         self.SQLALCHEMY_CONNECT_ARGS = {
             "prepared_statement_cache_size": 500,
         }
+        
+        # ДЛЯ RENDER: если в хосте есть render.com, добавляем ssl=True
+        # Это заменяет собой ?sslmode=require, который не понимает asyncpg
+        if url.host and "render.com" in url.host:
+            self.SQLALCHEMY_CONNECT_ARGS["ssl"] = True
 
     @provide(scope=Scope.REQUEST)
     async def get_connection(self) -> async_sessionmaker[AsyncSession]:
         engine = create_async_engine(
             self.DATABASE_URL,
-            connect_args=self.SQLALCHEMY_CONNECT_ARGS,
+            connect_args=self.SQLALCHEMY_CONNECT_ARGS, # Теперь здесь будет ssl=True если надо
             pool_size=30,
             max_overflow=50,
             pool_timeout=10,
             pool_recycle=1800,
             pool_pre_ping=True,
         )
-
         return async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
     @provide(scope=Scope.REQUEST)

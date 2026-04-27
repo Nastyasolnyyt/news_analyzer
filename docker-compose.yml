@@ -6,6 +6,7 @@ services:
       image: news_analyzer-ml-base:latest
       # Этот сервис не запускается, только для сборки
       profiles: ["build"]
+
   redis:
     image: redis:7-alpine
     container_name: kg_redis
@@ -179,6 +180,7 @@ services:
       KAFKA_GROUP_ID: knowledge-graph-sync-group
       REDIS_HOST: redis
       REDIS_PORT: 6379
+
     depends_on:
       kafka:
         condition: service_healthy
@@ -186,7 +188,7 @@ services:
         condition: service_started
     networks:
       - news_network
-      
+
   # ОСТАЛЬНЫЕ СЕРВИСЫ
   text-preprocessing:
     build: ./services/text-preprocessing-service
