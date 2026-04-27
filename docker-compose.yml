@@ -19,6 +19,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:          
+      - news_network
 
   redis:
     image: redis:7-alpine
