@@ -188,14 +188,17 @@ services:
         condition: service_started
     networks:
       - news_network
-      
-  anomaly_analyzer:
+
+  anomaly_detection:
     build:
-      context: ./news_analyzer
+      context: ./services/anomaly_detection
       dockerfile: Dockerfile
-    environment:
-      - DATABASE_URL=postgresql://data_i2d0_user:D49vf1tZSSLWNHmmTxUUVl9Ui6hofFHK@dpg-d7063a7diees73devjt0-a.oregon-postgres.render.com/data_i2d0?sslmode=require
+    container_name: news-anomaly-analyzer
     restart: always
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - news_network
     depends_on:
       - output_module
 
