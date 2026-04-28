@@ -1,116 +1,132 @@
-# services/risk-classifier/app/kafka_consumer.py
-import os
+"""
+risk-classifier/app/kafka_worker.py
+ИСПРАВЛЕНО:
+1. Добавлено подробное логирование для диагностики пайплайна
+2. Добавлена проверка что сообщения действительно отправляются в risk_types_done
+3. Исправлена передача article_id в сообщение
+"""
+import asyncio
 import json
 import logging
-import time
-from confluent_kafka import Consumer, Producer, KafkaError
-from .classifier import MistralNeuralClassifier
-from .storage import save_risk_result, settings
-from .models import Article
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from .config import settings
+from .classifier import RiskTypeClassifier
+from .storage import save_risk_type
+from sqlalchemy import create_engine, text as sql_text
+from sqlalchemy.orm import sessionmaker
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("risk-worker")
 
-def wait_for_topic(consumer, topic_name, timeout=5.0):
-    logger.info(f"Ожидание появления топика '{topic_name}'...")
-    while True:
-        try:
-            metadata = consumer.list_topics(topic=topic_name, timeout=timeout)
-            if topic_name in metadata.topics:
-                topic_metadata = metadata.topics[topic_name]
-                if topic_metadata.error is None:
-                    logger.info(f"Топик '{topic_name}' готов!")
-                    return True
-            time.sleep(5)
-        except Exception as e:
-            logger.warning(f"Ошибка при проверке топика: {e}")
-            time.sleep(5)
 
-def consume_from_kafka():
-    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
-    input_topic = os.getenv("KAFKA_TOPIC", "text_for_risk")
-    output_topic = os.getenv("OUTPUT_TOPIC", "risk_classified")
-    
-    consumer = Consumer({
-        'bootstrap.servers': bootstrap_servers,
-        'group.id': f'risk_classifier_v2_{int(time.time())}', 
-        'auto.offset.reset': 'latest', 
-        'enable.auto.commit': True,
-    })
-    
-    producer = Producer({'bootstrap.servers': bootstrap_servers})
-    
-    def delivery_callback(err, msg):
-        if err:
-            logger.error(f"Ошибка доставки: {err}")
+async def consume_from_kafka():
+    """Main Kafka consumer для анализа типов риска"""
 
-    # Инициализация классификатора
-    classifier = MistralNeuralClassifier(api_key=settings.openrouter_api_key)
-    
+    logger.info("Инициализирую классификатор типов риска...")
+    classifier = RiskTypeClassifier()
+    logger.info("Классификатор готов")
+
+    # Проверяем подключение к БД при старте
     try:
-        if not wait_for_topic(consumer, input_topic): return
-        consumer.subscribe([input_topic])
-        
-        message_count = 0
-        while True:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None: continue
-            if msg.error(): continue
+        engine = create_engine(settings.database_url, pool_pre_ping=True)
+        with engine.connect() as conn:
+            conn.execute(sql_text("SELECT 1"))
+        logger.info("Подключение к БД успешно")
+    except Exception as e:
+        logger.error(f"Ошибка подключения к БД: {e}")
+        raise
 
-            message_count += 1
+    consumer = AIOKafkaConsumer(
+        settings.input_topic,
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        group_id=settings.kafka_group_id,
+        value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+        auto_offset_reset="earliest"
+    )
+
+    producer = AIOKafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        value_serializer=lambda m: json.dumps(m, ensure_ascii=False).encode('utf-8')
+    )
+
+    await consumer.start()
+    await producer.start()
+
+    logger.info(f"Worker запущен.")
+    logger.info(f"  Читаю из топика: {settings.input_topic}")
+    logger.info(f"  Отправляю в топик: {settings.output_topic}")
+
+    processed_count = 0
+
+    try:
+        async for msg in consumer:
             try:
-                article_data = json.loads(msg.value().decode('utf-8'))
-                article = Article(**article_data)
-                
-                # Собираем текст для анализа: заголовок + описание + основной текст
-                text_parts = [article.title]
-                if article.description: text_parts.append(article.description)
-                if article.text: text_parts.append(article.text)
-                full_text = " ".join(text_parts)
-                
-                # КЛАССИФИКАЦИЯ (теперь возвращает high/medium/low)
+                article_data = msg.value
+
+                # Получаем ID статьи — поддерживаем оба варианта ключа
+                article_id = article_data.get('article_id') or article_data.get('id')
+
+                if not article_id:
+                    logger.warning(f"Пропускаю сообщение без article_id: {list(article_data.keys())}")
+                    continue
+
+                title = article_data.get('title', '')
+                text = article_data.get('text', '')
+                full_text = f"{title} {text}".strip()
+
+                if not full_text:
+                    logger.warning(f"Пустой текст для статьи {article_id}, пропускаю")
+                    continue
+
+                logger.info(f"Анализирую тип риска для статьи {article_id}...")
+
+                # Классификация типа риска
                 result = classifier.classify(full_text)
-                
-                # Сохранение в PostgreSQL через storage.py
-                temp_id = article.id or 0
-                save_risk_result(temp_id, result)
-                
-                # Подготовка сообщения для ФРОНТЕНДА (через выходной топик Kafka)
-                result_message = {
-                    'article_id': temp_id,
-                    'title': article.title,
-                    'risk': result.risk_type,  # ВАЖНО: поле 'risk' для фронтенда
-                    'confidence': float(result.confidence),
-                    'source': article.source,
-                    'date': article.pub_date.strftime('%d.%m.%Y') if article.pub_date else '',
-                    'summary': result.risk_type.upper() + ": Проанализировано системой", # Можно заменить на суммаризацию
-                    'url': article.link
-                }
-                
-                # Отправка в Kafka
-                producer.produce(
-                    topic=output_topic,
-                    value=json.dumps(result_message, ensure_ascii=False).encode('utf-8'),
-                    callback=delivery_callback,
-                    key=str(temp_id).encode('utf-8')
+
+                logger.info(
+                    f"Статья {article_id}: "
+                    f"risk_type={result['risk_type']}, "
+                    f"confidence={result['confidence']:.2f}"
                 )
-                producer.poll(0)
-                
-                logger.info(f"Статья {temp_id} классифицирована как: {result.risk_type}")
-                
-                # Небольшая пауза, чтобы не спамить API OpenRouter слишком быстро
-                time.sleep(2) 
-                
+
+                # Сохраняем в БД
+                save_risk_type(article_id, result["risk_type"], result["confidence"])
+
+                # ИСПРАВЛЕНО: явно указываем article_id в сообщении
+                # (некоторые сообщения могут иметь только 'id', а не 'article_id')
+                output_message = {
+                    **article_data,
+                    'article_id': article_id,  # гарантируем наличие article_id
+                    'risk_type': result['risk_type'],
+                    'risk_type_confidence': result['confidence']
+                }
+
+                await producer.send_and_wait(settings.output_topic, output_message)
+
+                processed_count += 1
+                logger.info(
+                    f"Статья {article_id} отправлена в {settings.output_topic} "
+                    f"(всего обработано: {processed_count})"
+                )
+
             except Exception as e:
-                logger.error(f"Ошибка обработки: {e}")
-    
+                logger.error(f"Ошибка обработки сообщения: {e}", exc_info=True)
+                continue
+
+    except KeyboardInterrupt:
+        logger.info("Остановка worker...")
     finally:
-        producer.flush()
-        consumer.close()
+        await consumer.stop()
+        await producer.stop()
+        logger.info(f"Worker остановлен. Обработано статей: {processed_count}")
+
+
+async def main():
+    await consume_from_kafka()
+
 
 if __name__ == "__main__":
-    consume_from_kafka()
+    asyncio.run(main())
