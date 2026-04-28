@@ -240,7 +240,7 @@ services:
     networks:
       - news_network
 
-risk-classifier:
+  risk-classifier:
     build: ./services/risk-classifier
     container_name: risk-classifier
     restart: always
@@ -260,7 +260,7 @@ risk-classifier:
     networks:
       - news_network
 
-risklevel-classifier:
+  risklevel-classifier:
     build: ./services/risklevel-classifier
     container_name: risklevel-classifier
     restart: always
@@ -284,7 +284,7 @@ risklevel-classifier:
     networks:
       - news_network
 
-elasticsearch:
+  elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     environment:
       - discovery.type=single-node
