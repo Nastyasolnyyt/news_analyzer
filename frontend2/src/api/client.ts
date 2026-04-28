@@ -135,6 +135,7 @@ export const api = {
     page?: number;
     page_size?: number;
     risk_level?: string;
+    risk_type?: string;
     source?: string;
     search?: string;
   }): Promise<{ items: News[]; total: number }> {
@@ -145,6 +146,7 @@ export const api = {
       if (params?.page_size) queryParams.append('page_size', String(params.page_size));
       if (params?.search) queryParams.append('search', params.search);
       if (params?.risk_level) queryParams.append('risk_level', params.risk_level);
+      if (params?.risk_type) queryParams.append('risk_type', params.risk_type);
       if (params?.source) queryParams.append('source', params.source);
 
       const qs = queryParams.toString();
