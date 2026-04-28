@@ -299,7 +299,7 @@ services:
     networks:
       - news_network
 
-frontend:
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
