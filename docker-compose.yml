@@ -240,30 +240,27 @@ services:
     networks:
       - news_network
 
-  risk-classifier:
+risk-classifier:
     build: ./services/risk-classifier
     container_name: risk-classifier
     restart: always
     env_file:
       - .env
     environment:
-      KAFKA_GROUP_ID: force-reset-group-v1
-      KAFKA_AUTO_OFFSET_RESET: earliest
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: text_for_risk
       OUTPUT_TOPIC: risk_types_done
       DB_URL: ${DATABASE_URL}
       PYTHONPATH: /app
       PYTHONUNBUFFERED: "1"
+      # ДОБАВЬ ЭТО, чтобы Kafka не выкидывала сервис, пока он грузит модель
+      KAFKA_SESSION_TIMEOUT_MS: 45000 
     depends_on:
-      kafka:
-        condition: service_healthy
-      # output_module:
-      #   condition: service_healthy
+      - kafka  # УПРОСТИЛИ: убрали condition, чтобы не зависеть от healthcheck
     networks:
       - news_network
 
-  risklevel-classifier:
+risklevel-classifier:
     build: ./services/risklevel-classifier
     container_name: risklevel-classifier
     restart: always
@@ -272,18 +269,22 @@ services:
     environment:
       DB_URL: ${DATABASE_URL}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      # Поменяй версию группы на v2 (так как v1 в логах Kafka уже помечена как упавшая)
+      KAFKA_GROUP_ID: force-reset-group-v2 
+      KAFKA_AUTO_OFFSET_RESET: earliest
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: risk_types_done
       OUTPUT_TOPIC: risk_final_ready
       PYTHONPATH: /app
       PYTHONUNBUFFERED: "1"
+      # Тоже добавь таймаут
+      KAFKA_SESSION_TIMEOUT_MS: 45000
     depends_on:
-      kafka:
-        condition: service_healthy
+      - kafka  # УПРОСТИЛИ
     networks:
       - news_network
 
-  elasticsearch:
+elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     environment:
       - discovery.type=single-node
@@ -298,7 +299,7 @@ services:
     networks:
       - news_network
 
-  frontend:
+frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
