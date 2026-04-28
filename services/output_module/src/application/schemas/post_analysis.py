@@ -33,3 +33,4 @@ class PostAnalysisWithExternalModelsDTO(BaseModel):
     # Дополнительные поля
     category: Optional[str] = Field(default="General")
     risk_level: Optional[str] = Field(default="low")
+    risk_type: Optional[str] = Field(default=None)

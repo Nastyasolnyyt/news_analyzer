@@ -21,7 +21,7 @@
         <div class="filter-group">
           <p>Источники</p>
           <label v-for="option in sourceOptions" :key="option.id">
-            <input type="checkbox" v-model="selectedSources" :value="option.id" />
+            <input type="checkbox" v-model="selectedSources" :value="option.id" @change="applyFilters" />
             <span>{{ option.label }}</span>
           </label>
         </div>
@@ -34,6 +34,7 @@
               type="checkbox"
               v-model="selectedRiskLevels"
               :value="option.id"
+              @change="applyFilters"
             />
             <span>{{ option.label }}</span>
           </label>
@@ -47,6 +48,7 @@
               type="checkbox"
               v-model="selectedRiskTypes"
               :value="option.id"
+              @change="applyFilters"
             />
             <span>{{ option.label }}</span>
           </label>
@@ -197,6 +199,15 @@ const selectedRiskTypes = ref<string[]>([])
 
 let searchTimeout: NodeJS.Timeout | null = null
 
+// ==================== WATCHERS ДЛЯ ФИЛЬТРОВ ====================
+// Перегружаем результаты при изменении фильтров
+const applyFilters = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    fetchResults()
+  }, 300)
+}
+
 // ==================== ВЫЧИСЛЯЕМЫЕ СВОЙСТВА ====================
 const filteredResults = computed(() => {
   let filtered = allResults.value
@@ -284,10 +295,21 @@ const fetchAllNews = async () => {
 
 const fetchResults = async () => {
   try {
+    // Собираем параметры фильтрации
+    const riskLevelParam = selectedRiskLevels.value.length > 0 && selectedRiskLevels.value.length < 3 
+      ? selectedRiskLevels.value[0] // Если выбран один уровень, передаем его
+      : undefined;
+    
+    const riskTypeParam = selectedRiskTypes.value.length > 0 
+      ? selectedRiskTypes.value[0] // Если выбран один тип, передаем его
+      : undefined;
+
     const data = await api.getNews({
       search: query.value || undefined,
       page: 1,
       page_size: 500,
+      risk_level: riskLevelParam,
+      risk_type: riskTypeParam,
     })
     allResults.value = data.items as NewsArticle[]
     displayedCount.value = 20
