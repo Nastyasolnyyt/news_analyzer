@@ -45,6 +45,7 @@ class PostDBGateWay:
         Получить список постов с фильтрацией.
         Возвращает список словарей для удобства в service слое.
         """
+        from src.infrastructure.postgres.models.risk import Risk
         
         # Основной запрос с eager loading
         query = select(Article).options(
@@ -63,6 +64,10 @@ class PostDBGateWay:
                 )
             )
         
+        # Фильтрация по уровню риска
+        if filters.risk_level:
+            query = query.join(Risk).where(Risk.risk_level == filters.risk_level.lower())
+        
         # Подсчет общего количества
         count_query = select(func.count(Article.id)).select_from(Article)
         if filters.search:
@@ -73,6 +78,8 @@ class PostDBGateWay:
                     Article.text.ilike(search_term)
                 )
             )
+        if filters.risk_level:
+            count_query = count_query.select_from(Article).join(Risk).where(Risk.risk_level == filters.risk_level.lower())
         
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0

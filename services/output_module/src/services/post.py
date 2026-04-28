@@ -75,6 +75,10 @@ class PostService:
                 if analysis and analysis.topic_id:
                     topic = await self.topic_gateway.get_topic(analysis.topic_id)
 
+                # 2. Получаем уровень риска из таблицы risks
+                risk = item.get('risk')
+                risk_level = risk.risk_level if risk and risk.risk_level else "low"
+
                 analysis_dto = PostAnalysisWithExternalModelsDTO(
                     topic=topic,
                     id=analysis.id if analysis else None,
@@ -82,6 +86,7 @@ class PostService:
                     emotion=analysis.emotion if analysis and analysis.emotion is not None else None,
                     tonality=analysis.tonality if analysis and analysis.tonality is not None else None,
                     relevance=analysis.relevance if analysis and analysis.relevance is not None else None,
+                    risk_level=risk_level,
                 )
 
                 # 2. ПРАВИЛЬНОЕ РЕШЕНИЕ ДЛЯ СУЩНОСТЕЙ:
