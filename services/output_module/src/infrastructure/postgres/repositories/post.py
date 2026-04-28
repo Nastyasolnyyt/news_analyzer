@@ -68,6 +68,12 @@ class PostDBGateWay:
         if filters.risk_level:
             query = query.join(Risk).where(Risk.risk_level == filters.risk_level.lower())
         
+        # Фильтрация по типу риска
+        if filters.risk_type:
+            if not filters.risk_level:  # Если еще не сделали JOIN
+                query = query.join(Risk)
+            query = query.where(Risk.risk_type == filters.risk_type.lower())
+        
         # Подсчет общего количества
         count_query = select(func.count(Article.id)).select_from(Article)
         if filters.search:
@@ -78,8 +84,12 @@ class PostDBGateWay:
                     Article.text.ilike(search_term)
                 )
             )
-        if filters.risk_level:
-            count_query = count_query.select_from(Article).join(Risk).where(Risk.risk_level == filters.risk_level.lower())
+        if filters.risk_level or filters.risk_type:
+            count_query = count_query.select_from(Article).join(Risk)
+            if filters.risk_level:
+                count_query = count_query.where(Risk.risk_level == filters.risk_level.lower())
+            if filters.risk_type:
+                count_query = count_query.where(Risk.risk_type == filters.risk_type.lower())
         
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
