@@ -247,6 +247,8 @@ services:
     env_file:
       - .env
     environment:
+      KAFKA_GROUP_ID: force-reset-group-v1
+      KAFKA_AUTO_OFFSET_RESET: earliest
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: text_for_risk
       OUTPUT_TOPIC: risk_types_done
