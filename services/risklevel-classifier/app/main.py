@@ -1,9 +1,10 @@
 """
 risklevel-classifier/app/main.py
 ИСПРАВЛЕНО:
-1. UPSERT не перезаписывает risk_type, установленный risk-classifier
-2. Добавлено подробное логирование для диагностики
-3. Добавлена проверка входящих сообщений
+1. UnknownMemberIdError — модель работает ~1 мин/статью, Kafka считает consumer мёртвым.
+   Решение: session_timeout_ms=120s, max_poll_interval_ms=300s, ручной commit.
+2. Дозаполнение при старте — статьи id 6-28 без risk_level заполнятся автоматически.
+3. Защита от повторной обработки — проверяем risk_level в БД перед классификацией.
 """
 import asyncio
 import json
@@ -41,15 +42,90 @@ class Risk(Base):
     risk_confidence = Column(Float, nullable=True)
 
 
+def save_risk_level(session, article_id: int, risk_level: str,
+                    confidence: float, risk_type: str = None):
+    """
+    Сохраняет risk_level. При конфликте обновляет только уровень, не трогает risk_type.
+    """
+    stmt = insert(Risk).values(
+        article_id=article_id,
+        risk_level=risk_level,
+        risk_confidence=confidence,
+        risk_type=risk_type,
+    ).on_conflict_do_update(
+        index_elements=['article_id'],
+        set_={
+            'risk_level': risk_level,
+            'risk_confidence': confidence,
+        }
+    )
+    session.execute(stmt)
+    session.commit()
+
+
+def backfill_missing_risk_levels(engine, classifier: HFRiskClassifier):
+    """
+    При старте дозаполняет risk_level для статей у которых он пустой.
+    Это исправит статьи id 6-28 и любые другие пропущенные.
+    """
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        rows = session.execute(sql_text("""
+            SELECT r.article_id, r.risk_type, a.title, a.text
+            FROM risks r
+            JOIN articles a ON a.id = r.article_id
+            WHERE r.risk_type IS NOT NULL
+              AND r.risk_level IS NULL
+            ORDER BY r.article_id
+        """)).fetchall()
+
+        if not rows:
+            logger.info("Дозаполнение: все статьи уже имеют risk_level")
+            return
+
+        logger.info(f"Дозаполнение: найдено {len(rows)} статей без risk_level")
+
+        for i, row in enumerate(rows):
+            article_id, risk_type, title, text = row
+            full_text = f"{title or ''} {text or ''}".strip()
+
+            if not full_text:
+                logger.warning(f"  Статья {article_id}: пустой текст, пропускаю")
+                continue
+
+            try:
+                result = classifier.classify(full_text)
+                save_risk_level(
+                    session, article_id,
+                    result["risk_level"], result["confidence"],
+                    risk_type=risk_type
+                )
+                logger.info(
+                    f"  [{i+1}/{len(rows)}] Статья {article_id}: "
+                    f"{result['risk_level']} ({result['confidence']:.2f})"
+                )
+            except Exception as e:
+                session.rollback()
+                logger.error(f"  Ошибка для статьи {article_id}: {e}")
+                continue
+
+        logger.info("Дозаполнение завершено")
+
+    except Exception as e:
+        logger.error(f"Ошибка при дозаполнении: {e}", exc_info=True)
+    finally:
+        session.close()
+
+
 async def consume_and_classify():
     logger.info("Инициализирую классификатор Hugging Face...")
     classifier = HFRiskClassifier()
 
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    # Не создаём таблицу через metadata — она уже существует
     Session = sessionmaker(bind=engine)
 
-    # Проверяем подключение к БД
     try:
         with engine.connect() as conn:
             conn.execute(sql_text("SELECT 1"))
@@ -58,11 +134,28 @@ async def consume_and_classify():
         logger.error(f"Ошибка подключения к БД: {e}")
         raise
 
+    # Дозаполняем старые статьи
+    logger.info("Запускаю дозаполнение старых статей без risk_level...")
+    backfill_missing_risk_levels(engine, classifier)
+
     consumer = AIOKafkaConsumer(
         INPUT_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         group_id="risklevel-classifier-group",
         auto_offset_reset="earliest",
+
+        # КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ UnknownMemberIdError:
+        # BART-large занимает ~60 сек/статью.
+        # Kafka по умолчанию: session_timeout=10s, max_poll_interval=300s
+        # Consumer не успевает отправить heartbeat → Kafka выгоняет его из группы
+        # → offset не коммитится → статья обрабатывается снова и снова
+        session_timeout_ms=120_000,    # 2 минуты — время до кика из группы
+        heartbeat_interval_ms=15_000,  # heartbeat каждые 15 сек
+        max_poll_interval_ms=600_000,  # 10 минут — макс пауза между poll()
+
+        # Отключаем авто-коммит — коммитим вручную после успешной обработки
+        enable_auto_commit=False,
+
         value_deserializer=lambda m: json.loads(m.decode('utf-8'))
     )
 
@@ -80,13 +173,31 @@ async def consume_and_classify():
 
     try:
         async for message in consumer:
+            article_id = None
             try:
                 article_data = message.value
 
-                # Получаем ID статьи
                 article_id = article_data.get('article_id') or article_data.get('id')
                 if not article_id:
                     logger.warning("Пропускаю сообщение без article_id")
+                    await consumer.commit()
+                    continue
+
+                # Защита от повторной обработки
+                session = Session()
+                try:
+                    existing_level = session.execute(sql_text(
+                        "SELECT risk_level FROM risks WHERE article_id = :aid"
+                    ), {"aid": article_id}).scalar()
+                finally:
+                    session.close()
+
+                if existing_level is not None:
+                    logger.info(
+                        f"Статья {article_id} уже обработана "
+                        f"(risk_level={existing_level}), пропускаю"
+                    )
+                    await consumer.commit()
                     continue
 
                 title = article_data.get('title', '')
@@ -94,62 +205,40 @@ async def consume_and_classify():
                 full_text = f"{title} {text}".strip()
 
                 if not full_text:
-                    logger.warning(f"Пустой текст для статьи {article_id}, пропускаю")
+                    logger.warning(f"Пустой текст для статьи {article_id}")
+                    await consumer.commit()
                     continue
 
-                # Получаем risk_type из предыдущего классификатора
-                risk_type_from_prev = article_data.get('risk_type', None)
+                risk_type_from_prev = article_data.get('risk_type')
                 logger.info(
-                    f"Обрабатываю статью {article_id} "
-                    f"(risk_type от risk-classifier: {risk_type_from_prev})"
+                    f"Классифицирую статью {article_id} "
+                    f"(risk_type: {risk_type_from_prev})"
                 )
 
-                # Классифицируем УРОВЕНЬ риска
                 result = classifier.classify(full_text)
 
                 session = Session()
                 try:
-                    # ИСПРАВЛЕНО: используем INSERT ... ON CONFLICT DO UPDATE
-                    # Если запись уже есть (создана risk-classifier), обновляем только
-                    # поля risk_level и risk_confidence, НЕ трогая risk_type.
-                    # Если записи нет — создаём новую со всеми полями.
-                    stmt = insert(Risk).values(
-                        article_id=article_id,
-                        risk_level=result["risk_level"],
-                        risk_confidence=result["confidence"],
-                        # risk_type берём из предыдущего сервиса если есть
-                        risk_type=risk_type_from_prev,
-                    ).on_conflict_do_update(
-                        index_elements=['article_id'],
-                        set_={
-                            # Обновляем только уровень риска
-                            'risk_level': result["risk_level"],
-                            'risk_confidence': result["confidence"],
-                            # risk_type НЕ перезаписываем — он уже заполнен
-                            # risk-classifier'ом через отдельный UPSERT
-                        }
+                    save_risk_level(
+                        session, article_id,
+                        result["risk_level"], result["confidence"],
+                        risk_type=risk_type_from_prev
                     )
-                    session.execute(stmt)
-                    session.commit()
-
                     processed_count += 1
                     logger.info(
                         f"Статья {article_id}: "
                         f"risk_level={result['risk_level']}, "
                         f"confidence={result['confidence']:.2f} "
-                        f"(всего обработано: {processed_count})"
+                        f"(всего: {processed_count})"
                     )
                 except Exception as db_err:
                     session.rollback()
-                    logger.error(
-                        f"Ошибка БД для статьи {article_id}: {db_err}",
-                        exc_info=True
-                    )
-                    continue
+                    logger.error(f"Ошибка БД для статьи {article_id}: {db_err}")
+                    raise
                 finally:
                     session.close()
 
-                # Отправляем результат дальше
+                # Отправляем дальше
                 output_message = {
                     **article_data,
                     'risk_level': result["risk_level"],
@@ -157,8 +246,15 @@ async def consume_and_classify():
                 }
                 await producer.send_and_wait(OUTPUT_TOPIC, output_message)
 
+                # Коммитим offset только после успешной обработки
+                await consumer.commit()
+
             except Exception as e:
-                logger.error(f"Ошибка обработки сообщения: {e}", exc_info=True)
+                logger.error(
+                    f"Ошибка обработки статьи {article_id}: {e}",
+                    exc_info=True
+                )
+                # Не коммитим offset — сообщение будет перечитано
                 continue
 
     except KeyboardInterrupt:
@@ -166,7 +262,7 @@ async def consume_and_classify():
     finally:
         await consumer.stop()
         await producer.stop()
-        logger.info(f"Сервис остановлен. Обработано статей: {processed_count}")
+        logger.info(f"Сервис остановлен. Обработано: {processed_count}")
 
 
 if __name__ == "__main__":
