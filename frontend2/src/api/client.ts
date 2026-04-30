@@ -10,9 +10,9 @@ export interface PostAnalysis {
   emotion?: number;
   tonality?: number;
   relevance?: number;
-  // ✅ ИСПРАВЛЕНО: строгая типизация + string для совместимости
+  // ИСПРАВЛЕНО: строгая типизация + string для совместимости
   sentiment_label?: 'positive' | 'negative' | 'neutral' | string;
-  // ✅ ДОБАВЛЕНО: поля из risk-classifier и risklevel-classifier
+  // ДОБАВЛЕНО: поля из risk-classifier и risklevel-classifier
   risk_level?: 'high' | 'medium' | 'low';
   risk_type?: 'политический' | 'экономический' | 'социальный';
   risk_confidence?: number;
@@ -49,7 +49,7 @@ export interface News {
   created_at?: string;
   updated_at?: string;
   
-  // ✅ Риск — основные поля для отображения
+  // Риск — основные поля для отображения
   risk_level?: RiskLevel;
   risk?: RiskLevel; // Для совместимости
   risk_type?: 'политический' | 'экономический' | 'социальный';
@@ -108,7 +108,7 @@ export interface NewsListResponse {
   page_size: number;
 }
 
-// ✅ Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
+// Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
 function enrichNewsWithRisk(news: News, analysis?: PostAnalysis & { topic?: Topic }): News {
   if (!analysis) return news;
   
@@ -119,13 +119,13 @@ function enrichNewsWithRisk(news: News, analysis?: PostAnalysis & { topic?: Topi
     risk_type: news.risk_type || analysis.risk_type,
     risk_confidence: news.risk_confidence || analysis.risk_confidence,
     risk_type_confidence: news.risk_type_confidence || analysis.risk_type_confidence,
-    // ✅ ИСПРАВЛЕНО: берем тональность из анализа
+    // ИСПРАВЛЕНО: берем тональность из анализа
     tonality: news.tonality ?? analysis.tonality ?? 0,
     sentiment_label: (news.sentiment_label || analysis.sentiment_label || 'neutral') as 'positive' | 'negative' | 'neutral',
     emotion: news.emotion ?? analysis.emotion ?? 0,
     relevance: news.relevance ?? analysis.relevance ?? 0,
     // confidence есть только в PostAnalysis, но нет в News - не добавляем его
-    // ✅ ИСПРАВЛЕНО: проверяем, что topic существует
+    // ИСПРАВЛЕНО: проверяем, что topic существует
     topic_name: news.topic_name || (analysis as any).topic?.name,
     topic_id: news.topic_id || analysis.topic_id || (analysis as any).topic?.id,
   };
