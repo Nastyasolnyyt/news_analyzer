@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { api, type Entity, type News } from '../api/client';
  
@@ -8,47 +8,32 @@ const route = useRoute();
 const entityId = Number(route.params.id);
  
 const entity = ref<Entity | null>(null);
-const mentions = ref<News[]>([]);
+const chartData = ref<Array<{ week: string; count: number; note?: string }>>([]);
+const relatedEntities = ref<Array<{ id: number; name: string; type: string; relation: string }>>([]);
+const newsList = ref<News[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
  
 onMounted(async () => {
   try {
     loading.value = true;
-    console.log('📋 Loading entity:', entityId);
+    console.log('📋 Loading entity profile:', entityId);
     
-    // Получаем упоминания сущности (они содержат информацию о сущности)
-    const mentionData = await api.getEntityMentions(entityId);
+    // Получаем полный профиль сущности
+    const profile = await api.getEntityProfile(entityId);
     
-    if (mentionData.length === 0) {
-      throw new Error('Сущность не найдена');
-    }
+    entity.value = profile.entity;
+    chartData.value = profile.chartData;
+    relatedEntities.value = profile.relatedEntities;
+    newsList.value = profile.news;
     
-    // Извлекаем информацию о сущности из первого упоминания
-    const entityInfo = mentionData[0]?.entity;
-    if (entityInfo) {
-      entity.value = {
-        id: entityInfo.id,
-        name: entityInfo.name,
-        type: 'Company', // можно определить по entity_type
-        entity_type: entityInfo.entity_type,
-        linkedEntityIds: [],
-      };
-    }
-    
-    // Преобразуем упоминания в новости
-    mentions.value = mentionData.map((m: any) => ({
-      id: m.post_id,
-      title: `Упоминание #${m.post_id}`,
-      text: `Упомянута сущность: ${entityInfo?.name}`,
-      source: 'система',
-      date: m.mentioned_at,
-      pub_date: m.mentioned_at,
-    }));
-    
-    console.log('✅ Entity loaded:', entity.value?.name, 'with', mentions.value.length, 'mentions');
+    console.log('✅ Entity profile loaded:', entity.value?.name, {
+      chartPoints: chartData.value.length,
+      relatedEntities: relatedEntities.value.length,
+      newsCount: newsList.value.length,
+    });
   } catch (e: any) {
-    error.value = e.message || 'Ошибка загрузки сущности';
+    error.value = e.message || 'Ошибка загрузки профиля сущности';
     console.error('❌ Error:', error.value);
   } finally {
     loading.value = false;
@@ -58,6 +43,18 @@ onMounted(async () => {
 const handleNewsClick = (newsId: number) => {
   router.push(`/news/${newsId}`);
 };
+
+const handleRelatedEntityClick = (entityId: number) => {
+  router.push(`/entity/${entityId}`);
+};
+
+// Вычисляем максимальное значение для графика после загрузки данных
+const maxChartValue = ref(1);
+watch(chartData, (newData) => {
+  if (newData.length > 0) {
+    maxChartValue.value = Math.max(...newData.map(d => d.count), 1);
+  }
+}, { immediate: true });
 </script>
  
 <template>
@@ -78,38 +75,123 @@ const handleNewsClick = (newsId: number) => {
       </section>
  
       <!-- Основная информация -->
-      <section v-if="entity.description" class="info-card card">
-        <h2>Описание</h2>
-        <p>{{ entity.description }}</p>
+      <section class="info-grid">
+        <!-- Описание -->
+        <section v-if="entity.description" class="info-card card">
+          <h2>Описание</h2>
+          <p>{{ entity.description }}</p>
+        </section>
+
+        <!-- Регистрационная информация -->
+        <section v-if="entity.registryInfo" class="info-card card">
+          <h2>Регистрационные данные</h2>
+          <dl class="registry-dl">
+            <dt v-if="entity.registryInfo.address">Адрес</dt>
+            <dd v-if="entity.registryInfo.address">{{ entity.registryInfo.address }}</dd>
+            
+            <dt v-if="entity.registryInfo.registry">Реестр</dt>
+            <dd v-if="entity.registryInfo.registry">{{ entity.registryInfo.registry }}</dd>
+            
+            <dt v-if="entity.registryInfo.founded">Дата основания</dt>
+            <dd v-if="entity.registryInfo.founded">{{ entity.registryInfo.founded }}</dd>
+          </dl>
+        </section>
+
+        <!-- Идентификаторы -->
+        <section v-if="entity.identifiers && entity.identifiers.length > 0" class="info-card card">
+          <h2>Идентификаторы</h2>
+          <dl class="identifiers-dl">
+            <div v-for="(id, idx) in entity.identifiers" :key="idx">
+              <dt>{{ id.label }}</dt>
+              <dd>{{ id.value }}</dd>
+            </div>
+          </dl>
+        </section>
       </section>
- 
-      <!-- Упоминания -->
-      <section v-if="mentions.length > 0" class="mentions-card card">
+
+      <!-- График динамики упоминаний -->
+      <section v-if="chartData.length > 0" class="mentions-card card">
         <header>
           <div>
-            <p class="overline">Упоминания в системе</p>
-            <h2>Новости с упоминанием</h2>
+            <p class="overline">Динамика упоминаний</p>
+            <h2>Упоминания по неделям</h2>
           </div>
-          <span class="count">{{ mentions.length }} упоминаний</span>
+          <span class="count">{{ chartData.reduce((sum, d) => sum + d.count, 0) }} всего</span>
+        </header>
+        
+        <div class="chart-container">
+          <div class="chart">
+            <div 
+              v-for="(item, idx) in chartData" 
+              :key="idx" 
+              class="bar"
+              :title="item.note || `Неделя ${item.week}: ${item.count} упоминаний`"
+            >
+              <div 
+                class="bar-fill" 
+                :style="{ height: `${(item.count / (maxChartValue || 1)) * 100}px` }"
+              >
+                <span v-if="item.note" class="note">{{ item.note }}</span>
+              </div>
+              <span class="week">{{ new Date(item.week).toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' }) }}</span>
+              <span class="bar-value">{{ item.count }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Связанные сущности -->
+      <section v-if="relatedEntities.length > 0" class="related-card card">
+        <header>
+          <div>
+            <p class="overline">Связи</p>
+            <h2>Связанные сущности</h2>
+          </div>
+        </header>
+        
+        <div class="related-list">
+          <div 
+            v-for="(rel, idx) in relatedEntities" 
+            :key="idx" 
+            class="related-item"
+            @click="handleRelatedEntityClick(rel.id)"
+          >
+            <div class="related-info">
+              <span class="related-name">{{ rel.name }}</span>
+              <span class="related-type">{{ rel.type === 'PER' ? 'Персона' : rel.type === 'ORG' ? 'Организация' : rel.type }}</span>
+            </div>
+            <span class="related-relation">{{ rel.relation }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Новости с упоминанием -->
+      <section v-if="newsList.length > 0" class="mentions-card card">
+        <header>
+          <div>
+            <p class="overline">Новости с упоминанием</p>
+            <h2>Последние публикации</h2>
+          </div>
+          <span class="count">{{ newsList.length }} упоминаний</span>
         </header>
         
         <div class="mentions-list">
-          <article v-for="mention in mentions" :key="mention.id" class="mention-card" tabindex="0">
+          <article v-for="news in newsList" :key="news.id" class="mention-card" tabindex="0">
             <div class="card-top">
-              <h4>{{ mention.title }}</h4>
-              <span class="date">{{ new Date(mention.pub_date || mention.date || '').toLocaleDateString('ru-RU') }}</span>
+              <h4>{{ news.title }}</h4>
+              <span class="date">{{ new Date(news.pub_date || news.date || '').toLocaleDateString('ru-RU') }}</span>
             </div>
-            <p class="summary">{{ mention.text }}</p>
-            <button class="inline-link" @click="handleNewsClick(mention.id)">
+            <p class="summary">{{ news.text }}</p>
+            <button class="inline-link" @click="handleNewsClick(news.id)">
               Перейти к новости →
             </button>
           </article>
         </div>
       </section>
- 
+
       <!-- Пустое состояние -->
-      <section v-else class="empty-state">
-        <p>Нет упоминаний в системе</p>
+      <section v-if="newsList.length === 0 && chartData.length === 0" class="empty-state">
+        <p>Нет данных об упоминаниях в системе</p>
       </section>
  
       <!-- Действия -->
@@ -434,6 +516,227 @@ dd {
   padding: 0;
   cursor: pointer;
   align-self: flex-start;
+}
+
+/* Info grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.info-card h2 {
+  font-size: 1.1rem;
+  margin: 0 0 12px;
+  color: white;
+}
+
+.registry-dl,
+.identifiers-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.registry-dl dt,
+.identifiers-dl dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.registry-dl dd,
+.identifiers-dl dd {
+  margin: 0;
+  color: #d2d6e0;
+  font-weight: 500;
+}
+
+/* Chart styles */
+.chart-container {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 10px;
+  min-height: 200px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 50px;
+  position: relative;
+}
+
+.bar-fill {
+  width: 100%;
+  max-width: 60px;
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, var(--accent), rgba(79, 138, 255, 0.2));
+  position: relative;
+  transition: height 0.3s ease;
+  min-height: 4px;
+}
+
+.bar-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+}
+
+.note {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  background: rgba(15, 18, 26, 0.95);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.week {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* Related entities */
+.related-card header {
+  margin-bottom: 16px;
+}
+
+.related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.related-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.related-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent);
+}
+
+.related-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.related-name {
+  font-weight: 600;
+  color: white;
+  font-size: 0.95rem;
+}
+
+.related-type {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.related-relation {
+  font-size: 0.8rem;
+  color: var(--accent);
+  padding: 4px 10px;
+  background: rgba(79, 138, 255, 0.1);
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* Mentions list */
+.mentions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.mention-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.mention-card:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-top h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: white;
+}
+
+.date {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.summary {
+  margin: 0;
+  color: #cfd3dc;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.action-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .actions {
