@@ -263,82 +263,75 @@ export const api = {
     news: News[];
   }> {
     try {
-      // Получаем упоминания
-      const mentions = await this.getEntityMentions(entityId);
+      // Используем новый эндпоинт /details вместо /mentions
+      const url = `${API_BASE}/entities/${entityId}/details`;
+      console.log('🔍 Fetching entity details from:', url);
       
-      if (mentions.length === 0 || !mentions[0].entity) {
-        throw new Error(`Entity ${entityId} not found`);
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Entity ${entityId} not found: ${res.status} ${errorText}`);
       }
       
-      const entityInfo = mentions[0].entity;
+      const data = await res.json();
+      console.log('✅ Entity details response:', data);
       
-      // Формируем базовый объект сущности
+      // Преобразуем ответ бэкенда в формат, ожидаемый фронтендом
       const entity: Entity = {
-        id: entityInfo.id,
-        name: entityInfo.name,
-        type: entityInfo.entity_type === 'PER' ? 'Person' : 'Company',
-        entity_type: entityInfo.entity_type,
-        description: entityInfo.description || undefined,
-        jurisdiction: entityInfo.jurisdiction || undefined,
-        identifiers: entityInfo.identifiers || [],
-        registryInfo: entityInfo.registry_info ? {
-          address: entityInfo.registry_info.address || '',
-          registry: entityInfo.registry_info.registry || '',
-          founded: entityInfo.registry_info.founded || '',
+        id: data.id,
+        name: data.name,
+        type: data.entity_type === 'PER' || data.entity_type?.toLowerCase().includes('person') ? 'Person' : 'Company',
+        entity_type: data.entity_type,
+        description: data.description || undefined,
+        jurisdiction: data.jurisdiction || undefined,
+        identifiers: data.identifiers ? Object.entries(data.identifiers).map(([label, value]) => ({ label, value: String(value) })) : [],
+        registryInfo: data.identifiers?.type ? {
+          address: '',
+          registry: data.identifiers.type,
+          founded: '',
         } : undefined,
-        linkedEntityIds: entityInfo.linked_entity_ids || [],
+        linkedEntityIds: [],
         mentions: [],
       };
       
-      // Формируем данные для графика (группируем по неделям)
-      const chartMap = new Map<string, { count: number; notes: string[] }>();
-      const newsList: News[] = [];
+      // Преобразуем статистику упоминаний из формата бэкенда
+      const chartData = (data.mentions_stats || []).map((stat: any) => ({
+        week: stat.week,
+        count: stat.count,
+        note: stat.note,
+      }));
       
-      mentions.forEach((m: any) => {
-        const date = new Date(m.mentioned_at);
-        const weekStart = new Date(date);
-        weekStart.setDate(date.getDate() - date.getDay());
-        const weekKey = weekStart.toISOString().split('T')[0];
-        
-        const existing = chartMap.get(weekKey) || { count: 0, notes: [] };
-        existing.count += 1;
-        if (m.note) existing.notes.push(m.note);
-        chartMap.set(weekKey, existing);
-        
-        // Добавляем новость
-        newsList.push({
-          id: m.post_id,
-          title: `Упоминание #${m.post_id}`,
-          text: m.text || `Упомянута сущность: ${entityInfo.name}`,
-          source: m.source || 'система',
-          pub_date: m.mentioned_at,
-          date: m.mentioned_at,
-        });
-      });
+      // Преобразуем связанные сущности
+      const relatedEntities = (data.related_entities || []).map((rel: any) => ({
+        id: rel.id,
+        name: rel.name,
+        type: rel.entity_type || rel.type || 'ORG',
+        relation: rel.role || 'Связанная сущность',
+      }));
       
-      const chartData = Array.from(chartMap.entries())
-        .map(([week, data]) => ({
-          week,
-          count: data.count,
-          note: data.notes.length > 0 ? data.notes[0] : undefined,
-        }))
-        .sort((a, b) => a.week.localeCompare(b.week));
-      
-      // Связанные сущности (из первого упоминания или пустой массив)
-      const relatedEntities = entityInfo.related_entities || [];
+      // Преобразуем новости
+      const news = (data.recent_news || []).map((n: any) => ({
+        id: n.id,
+        title: n.title || `Новость #${n.id}`,
+        text: n.summary || n.text || '',
+        source: n.source || 'система',
+        pub_date: n.date,
+        date: n.date,
+        risk_level: n.risk_level,
+      }));
       
       console.log('✅ Loaded entity profile:', entity.name, {
-        mentions: mentions.length,
         chartPoints: chartData.length,
         relatedEntities: relatedEntities.length,
+        newsCount: news.length,
       });
       
       return {
         entity,
-        mentions,
+        mentions: [],
         chartData,
         relatedEntities,
-        news: newsList,
+        news,
       };
     } catch (error) {
       console.error('❌ Error fetching entity profile:', error);
