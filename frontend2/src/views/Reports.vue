@@ -9,6 +9,9 @@ const error = ref<string | null>(null);
 // Фильтры
 const riskFilter = ref<string>('all');
 const sentimentFilter = ref<string>('all');
+const riskTypeFilter = ref<string>('all');
+const selectedNewsIds = ref<Set<number>>(new Set());
+const selectMode = ref<'all' | 'manual'>('all');
  
 const riskLevels: Record<string, { label: string; color: string }> = {
   high: { label: 'Высокий риск', color: '#ff6464' },
@@ -21,14 +24,24 @@ const filteredNews = computed(() => {
   return news.value.filter(item => {
     const riskMatch = riskFilter.value === 'all' || item.risk_level === riskFilter.value;
     const sentimentMatch = sentimentFilter.value === 'all' || item.sentiment_label === sentimentFilter.value;
-    return riskMatch && sentimentMatch;
+    const riskTypeMatch = riskTypeFilter.value === 'all' || item.risk_type === riskTypeFilter.value;
+    return riskMatch && sentimentMatch && riskTypeMatch;
   });
+});
+
+// Новости для отчета (все или выбранные вручную)
+const reportNews = computed<News[]>(() => {
+  if (selectMode.value === 'all') {
+    return filteredNews.value;
+  } else {
+    return filteredNews.value.filter((item: News) => selectedNewsIds.value.has(item.id));
+  }
 });
  
 // Статистика по рискам
 const riskStats = computed(() => {
   const stats = { high: 0, medium: 0, low: 0 };
-  filteredNews.value.forEach(item => {
+  reportNews.value.forEach(item => {
     const risk = (item.risk_level || 'low') as keyof typeof stats;
     if (risk in stats) {
       stats[risk]++;
@@ -40,7 +53,7 @@ const riskStats = computed(() => {
 // Статистика по источникам
 const sourceStats = computed(() => {
   const sources = new Map<string, number>();
-  filteredNews.value.forEach(item => {
+  reportNews.value.forEach(item => {
     if (item.source) {
       sources.set(item.source, (sources.get(item.source) || 0) + 1);
     }
@@ -54,7 +67,7 @@ const sourceStats = computed(() => {
 // Статистика по тональности
 const sentimentStats = computed(() => {
   const stats = { positive: 0, neutral: 0, negative: 0 };
-  filteredNews.value.forEach(item => {
+  reportNews.value.forEach(item => {
     const sentiment = (item.sentiment_label || 'neutral') as keyof typeof stats;
     if (sentiment in stats) {
       stats[sentiment]++;
@@ -66,7 +79,7 @@ const sentimentStats = computed(() => {
 // Статистика по типам риска
 const riskTypeStats = computed(() => {
   const typeMap = new Map<string, number>();
-  filteredNews.value.forEach(item => {
+  reportNews.value.forEach(item => {
     if (item.risk_type) {
       typeMap.set(item.risk_type, (typeMap.get(item.risk_type) || 0) + 1);
     }
@@ -78,14 +91,14 @@ const riskTypeStats = computed(() => {
  
 // Средние значения
 const averageMetrics = computed(() => ({
-  tonality: filteredNews.value.length > 0 
-    ? (filteredNews.value.reduce((sum, n) => sum + (n.tonality || 0), 0) / filteredNews.value.length).toFixed(2)
+  tonality: reportNews.value.length > 0 
+    ? (reportNews.value.reduce((sum, n) => sum + (n.tonality || 0), 0) / reportNews.value.length).toFixed(2)
     : 0,
-  emotion: filteredNews.value.length > 0
-    ? (filteredNews.value.reduce((sum, n) => sum + (n.emotion || 0), 0) / filteredNews.value.length).toFixed(2)
+  emotion: reportNews.value.length > 0
+    ? (reportNews.value.reduce((sum, n) => sum + (n.emotion || 0), 0) / reportNews.value.length).toFixed(2)
     : 0,
-  relevance: filteredNews.value.length > 0
-    ? (filteredNews.value.reduce((sum, n) => sum + (n.relevance || 0), 0) / filteredNews.value.length).toFixed(2)
+  relevance: reportNews.value.length > 0
+    ? (reportNews.value.reduce((sum, n) => sum + (n.relevance || 0), 0) / reportNews.value.length).toFixed(2)
     : 0,
 }));
  
@@ -112,7 +125,7 @@ onMounted(async () => {
 const handleExport = (format: 'json' | 'csv') => {
   const reportData = {
     exportDate: new Date().toISOString(),
-    totalItems: filteredNews.value.length,
+    totalItems: reportNews.value.length,
     filters: {
       risk: riskFilter.value,
       sentiment: sentimentFilter.value,
@@ -124,7 +137,7 @@ const handleExport = (format: 'json' | 'csv') => {
       sources: sourceStats.value,
       averageMetrics: averageMetrics.value,
     },
-    items: filteredNews.value,
+    items: reportNews.value,
   };
   
   if (format === 'json') {
@@ -138,7 +151,7 @@ const handleExport = (format: 'json' | 'csv') => {
   } else if (format === 'csv') {
     // CSV export
     let csv = 'Дата,Заголовок,Источник,Уровень риска,Тональность\n';
-    filteredNews.value.forEach(item => {
+    reportNews.value.forEach(item => {
       const date = new Date(item.pub_date || item.date || '').toLocaleDateString('ru-RU');
       const title = `"${item.title.replace(/"/g, '""')}"`;
       const source = item.source || '';
@@ -159,6 +172,25 @@ const handleExport = (format: 'json' | 'csv') => {
 const resetFilters = () => {
   riskFilter.value = 'all';
   sentimentFilter.value = 'all';
+  riskTypeFilter.value = 'all';
+  selectMode.value = 'all';
+  selectedNewsIds.value.clear();
+};
+
+const toggleNewsSelection = (id: number) => {
+  if (selectedNewsIds.value.has(id)) {
+    selectedNewsIds.value.delete(id);
+  } else {
+    selectedNewsIds.value.add(id);
+  }
+};
+
+const selectAllFiltered = () => {
+  reportNews.value.forEach(item => selectedNewsIds.value.add(item.id));
+};
+
+const clearSelection = () => {
+  selectedNewsIds.value.clear();
 };
 
 const reloadPage = () => {
@@ -220,11 +252,43 @@ const reloadPage = () => {
           </select>
         </div>
 
+        <div class="filter-group">
+          <label>Тип риска:</label>
+          <select v-model="riskTypeFilter" class="filter-select">
+            <option value="all">Все типы</option>
+            <option value="политический">Политический</option>
+            <option value="экономический">Экономический</option>
+            <option value="социальный">Социальный</option>
+          </select>
+        </div>
+
         <button class="btn-reset" @click="resetFilters">↻ Сбросить</button>
 
         <span class="filter-info">
-          Показано <strong>{{ filteredNews.length }}</strong> из <strong>{{ news.length }}</strong> новостей
+          Показано <strong>{{ reportNews.length }}</strong> из <strong>{{ news.length }}</strong> новостей
         </span>
+      </section>
+
+      <!-- Selection Mode -->
+      <section class="selection-section">
+        <div class="selection-controls">
+          <label class="radio-label">
+            <input type="radio" v-model="selectMode" value="all" />
+            Все новости из фильтра
+          </label>
+          <label class="radio-label">
+            <input type="radio" v-model="selectMode" value="manual" />
+            Выбрать вручную
+          </label>
+        </div>
+        
+        <div v-if="selectMode === 'manual'" class="manual-controls">
+          <button class="btn-secondary" @click="selectAllFiltered">Выбрать все</button>
+          <button class="btn-secondary" @click="clearSelection">Снять все</button>
+          <span class="selection-info">
+            Выбрано: <strong>{{ selectedNewsIds.size }}</strong>
+          </span>
+        </div>
       </section>
 
       <!-- Stats Grid -->
@@ -232,7 +296,7 @@ const reloadPage = () => {
         <!-- Total news -->
         <section class="stat-card">
           <p class="stat-label">Всего новостей</p>
-          <p class="stat-value">{{ filteredNews.length }}</p>
+          <p class="stat-value">{{ reportNews.length }}</p>
           <p class="stat-hint">в выборке</p>
         </section>
 
@@ -242,14 +306,32 @@ const reloadPage = () => {
           <div class="risk-bars">
             <div class="risk-bar">
               <span class="risk-badge high"></span>
+              <div class="risk-bar-fill-container">
+                <span 
+                  class="risk-bar-fill" 
+                  :style="{ width: riskStats.high + riskStats.medium + riskStats.low > 0 ? (riskStats.high / (riskStats.high + riskStats.medium + riskStats.low) * 100) + '%' : '0%' }"
+                ></span>
+              </div>
               <span class="risk-count">{{ riskStats.high }}</span>
             </div>
             <div class="risk-bar">
               <span class="risk-badge medium"></span>
+              <div class="risk-bar-fill-container">
+                <span 
+                  class="risk-bar-fill medium" 
+                  :style="{ width: riskStats.high + riskStats.medium + riskStats.low > 0 ? (riskStats.medium / (riskStats.high + riskStats.medium + riskStats.low) * 100) + '%' : '0%' }"
+                ></span>
+              </div>
               <span class="risk-count">{{ riskStats.medium }}</span>
             </div>
             <div class="risk-bar">
               <span class="risk-badge low"></span>
+              <div class="risk-bar-fill-container">
+                <span 
+                  class="risk-bar-fill low" 
+                  :style="{ width: riskStats.high + riskStats.medium + riskStats.low > 0 ? (riskStats.low / (riskStats.high + riskStats.medium + riskStats.low) * 100) + '%' : '0%' }"
+                ></span>
+              </div>
               <span class="risk-count">{{ riskStats.low }}</span>
             </div>
           </div>
@@ -261,14 +343,32 @@ const reloadPage = () => {
           <div class="sentiment-bars">
             <div class="sentiment-bar">
               <span class="sentiment-badge positive"></span>
+              <div class="sentiment-bar-fill-container">
+                <span 
+                  class="sentiment-bar-fill" 
+                  :style="{ width: sentimentStats.positive + sentimentStats.neutral + sentimentStats.negative > 0 ? (sentimentStats.positive / (sentimentStats.positive + sentimentStats.neutral + sentimentStats.negative) * 100) + '%' : '0%' }"
+                ></span>
+              </div>
               <span class="sentiment-count">{{ sentimentStats.positive }}</span>
             </div>
             <div class="sentiment-bar">
               <span class="sentiment-badge neutral"></span>
+              <div class="sentiment-bar-fill-container">
+                <span 
+                  class="sentiment-bar-fill neutral" 
+                  :style="{ width: sentimentStats.positive + sentimentStats.neutral + sentimentStats.negative > 0 ? (sentimentStats.neutral / (sentimentStats.positive + sentimentStats.neutral + sentimentStats.negative) * 100) + '%' : '0%' }"
+                ></span>
+              </div>
               <span class="sentiment-count">{{ sentimentStats.neutral }}</span>
             </div>
             <div class="sentiment-bar">
               <span class="sentiment-badge negative"></span>
+              <div class="sentiment-bar-fill-container">
+                <span 
+                  class="sentiment-bar-fill negative" 
+                  :style="{ width: sentimentStats.positive + sentimentStats.neutral + sentimentStats.negative > 0 ? (sentimentStats.negative / (sentimentStats.positive + sentimentStats.neutral + sentimentStats.negative) * 100) + '%' : '0%' }"
+                ></span>
+              </div>
               <span class="sentiment-count">{{ sentimentStats.negative }}</span>
             </div>
           </div>
@@ -323,10 +423,10 @@ const reloadPage = () => {
       </section>
 
       <!-- Sample News -->
-      <section v-if="filteredNews.length > 0" class="detail-card">
+      <section v-if="reportNews.length > 0" class="detail-card">
         <h2>📰 Примеры новостей (первые 5)</h2>
         <div class="news-samples">
-          <article v-for="(item, idx) in filteredNews.slice(0, 5)" :key="idx" class="sample-news">
+          <article v-for="(item, idx) in reportNews.slice(0, 5)" :key="idx" class="sample-news">
             <div class="sample-header">
               <h4>{{ item.title }}</h4>
               <span :class="['risk-label', `risk-${item.risk_level}`]">
@@ -336,6 +436,39 @@ const reloadPage = () => {
             <div class="sample-meta">
               <span>{{ item.source }}</span>
               <span>{{ new Date(item.pub_date || item.date || '').toLocaleDateString('ru-RU') }}</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- All News List for Manual Selection -->
+      <section v-if="selectMode === 'manual'" class="detail-card">
+        <h2>📋 Все новости для выбора</h2>
+        <div class="news-list-selection">
+          <article 
+            v-for="item in filteredNews" 
+            :key="item.id" 
+            :class="['news-item', { selected: selectedNewsIds.has(item.id) }]"
+            @click="toggleNewsSelection(item.id)"
+          >
+            <div class="news-checkbox">
+              <input type="checkbox" :checked="selectedNewsIds.has(item.id)" />
+            </div>
+            <div class="news-content">
+              <h4>{{ item.title }}</h4>
+              <div class="news-meta">
+                <span class="source">{{ item.source }}</span>
+                <span class="date">{{ new Date(item.pub_date || item.date || '').toLocaleDateString('ru-RU') }}</span>
+                <span :class="['risk-badge', `risk-${item.risk_level}`]">
+                  {{ item.risk_level || 'unknown' }}
+                </span>
+                <span :class="['sentiment-badge', `sentiment-${item.sentiment_label}`]">
+                  {{ item.sentiment_label || 'neutral' }}
+                </span>
+                <span v-if="item.risk_type" class="type-badge">
+                  {{ item.risk_type }}
+                </span>
+              </div>
             </div>
           </article>
         </div>
@@ -666,6 +799,166 @@ const reloadPage = () => {
   font-weight: 600;
   min-width: 40px;
   text-align: right;
+  color: var(--accent);
+}
+
+/* Selection Section */
+.selection-section {
+  background: var(--surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 18px 20px;
+}
+
+.selection-controls {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-base);
+}
+
+.radio-label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.manual-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.selection-info {
+  margin-left: auto;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.selection-info strong {
+  color: var(--accent);
+}
+
+/* News List Selection */
+.news-list-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.news-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.news-item:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.news-item.selected {
+  border-color: var(--accent);
+  background: rgba(79, 138, 255, 0.1);
+}
+
+.news-checkbox {
+  padding-top: 2px;
+}
+
+.news-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.news-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.news-content h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.news-meta .source,
+.news-meta .date {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.risk-badge,
+.sentiment-badge,
+.type-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.risk-badge.risk-high {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--negative);
+}
+
+.risk-badge.risk-medium {
+  background: rgba(247, 201, 72, 0.15);
+  color: var(--warning);
+}
+
+.risk-badge.risk-low {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--positive);
+}
+
+.sentiment-badge.sentiment-positive {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--positive);
+}
+
+.sentiment-badge.sentiment-neutral {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+
+.sentiment-badge.sentiment-negative {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--negative);
+}
+
+.type-badge {
+  background: rgba(79, 138, 255, 0.15);
   color: var(--accent);
 }
 

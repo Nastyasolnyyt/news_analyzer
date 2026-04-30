@@ -105,7 +105,7 @@ else if (__VLS_ctx.error) {
                     return;
                 if (!(__VLS_ctx.error))
                     return;
-                __VLS_ctx.location.reload();
+                __VLS_ctx.reloadPage();
             } },
         ...{ class: "btn-secondary" },
     });
