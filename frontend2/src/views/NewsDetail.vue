@@ -40,13 +40,32 @@ const toggleMode = () => {
 
 <template>
   <div class="news-page">
-    <div v-if="loading" class="loading">Загрузка...</div>
-    <div v-else-if="error" class="error">Ошибка: {{ error }}</div>
-    <div v-else-if="article">
+    <!-- LOADING STATE -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>⏳ Загружаем новость...</p>
+    </div>
+
+    <!-- ERROR STATE -->
+    <div v-else-if="error" class="error-state">
+      <p class="error-title">❌ Ошибка загрузки</p>
+      <p class="error-message">{{ error }}</p>
+      <button class="btn-secondary" @click="$router.back()">← Вернуться назад</button>
+    </div>
+
+    <!-- LOADED STATE -->
+    <div v-else-if="article" class="article-loaded">
+      <!-- Header -->
       <section class="hero">
+        <div class="back-nav">
+          <button @click="$router.back()" class="back-button">← Назад</button>
+        </div>
         <div class="meta">
           <span class="source">{{ article.source }}</span>
           <span class="date">{{ article.pub_date || article.date }}</span>
+          <span v-if="article.risk_level" :class="['risk-badge', `risk-${article.risk_level}`]">
+            {{ article.risk_level }}
+          </span>
         </div>
         <h1>{{ article.title }}</h1>
         <div v-if="article.tags" class="tags">
@@ -54,12 +73,13 @@ const toggleMode = () => {
         </div>
       </section>
 
+      <!-- Content -->
       <section class="body card">
         <header class="body-header">
           <p class="mode-label">Режим чтения</p>
           <div class="switch">
-            <button :class="{ active: showSummary }" @click="showSummary = true">Кратко</button>
-            <button :class="{ active: !showSummary }" @click="showSummary = false">Полный текст</button>
+            <button :class="{ active: showSummary }" @click="showSummary = true">💬 Кратко</button>
+            <button :class="{ active: !showSummary }" @click="showSummary = false">📖 Полный текст</button>
           </div>
         </header>
         <p v-if="showSummary" class="summary">{{ article.summary || article.text?.slice(0, 500) }}...</p>
@@ -68,6 +88,7 @@ const toggleMode = () => {
         </div>
       </section>
 
+      <!-- Related Entities -->
       <section v-if="relatedEntities.length > 0" class="entities card">
         <header>
           <div>
@@ -92,6 +113,160 @@ const toggleMode = () => {
 </template>
 
 <style scoped>
+.news-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ✅ LOADING STATE */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 20px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(79, 138, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* ✅ ERROR STATE */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+  background: rgba(248, 113, 113, 0.05);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 20px;
+  padding: 40px;
+}
+
+.error-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--negative);
+}
+
+.error-message {
+  color: var(--text-dim);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: rgba(79, 138, 255, 0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(79, 138, 255, 0.2);
+}
+
+.article-loaded {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Hero section */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.back-nav {
+  display: flex;
+}
+
+.back-button {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 8px;
+  margin-left: -8px;
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.back-button:hover {
+  transform: translateX(-4px);
+}
+
+.meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.source {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.risk-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.risk-badge.risk-high {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--negative);
+}
+
+.risk-badge.risk-medium {
+  background: rgba(247, 201, 72, 0.1);
+  color: var(--warning);
+}
+
+.risk-badge.risk-low {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--positive);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
 .news-page {
   display: flex;
   flex-direction: column;

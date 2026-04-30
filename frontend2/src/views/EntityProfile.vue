@@ -59,13 +59,25 @@ watch(chartData, (newData) => {
  
 <template>
   <div class="entity-page">
-    <div v-if="loading" class="loading">⏳ Загружаем профиль...</div>
-    <div v-else-if="error" class="error">❌ {{ error }}</div>
-    <div v-else-if="entity">
-      <!-- Заголовок -->
+    <!-- LOADING STATE -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>⏳ Загружаем профиль сущности...</p>
+    </div>
+
+    <!-- ERROR STATE -->
+    <div v-else-if="error" class="error-state">
+      <p class="error-title">❌ Ошибка загрузки</p>
+      <p class="error-message">{{ error }}</p>
+      <button class="btn-secondary" @click="$router.back()">← Вернуться назад</button>
+    </div>
+
+    <!-- LOADED STATE -->
+    <div v-else-if="entity" class="entity-loaded">
+      <!-- Header -->
       <section class="hero">
         <div class="back-nav">
-          <button @click="router.back()" class="back-button">← Назад</button>
+          <button @click="$router.back()" class="back-button">← Назад</button>
         </div>
         <h1>{{ entity.name }}</h1>
         <p class="entity-type">
@@ -74,15 +86,13 @@ watch(chartData, (newData) => {
         <p v-if="entity.entity_type" class="meta">{{ entity.entity_type }}</p>
       </section>
  
-      <!-- Основная информация -->
+      <!-- Info Grid -->
       <section class="info-grid">
-        <!-- Описание -->
         <section v-if="entity.description" class="info-card card">
           <h2>Описание</h2>
           <p>{{ entity.description }}</p>
         </section>
 
-        <!-- Регистрационная информация -->
         <section v-if="entity.registryInfo" class="info-card card">
           <h2>Регистрационные данные</h2>
           <dl class="registry-dl">
@@ -97,7 +107,6 @@ watch(chartData, (newData) => {
           </dl>
         </section>
 
-        <!-- Идентификаторы -->
         <section v-if="entity.identifiers && entity.identifiers.length > 0" class="info-card card">
           <h2>Идентификаторы</h2>
           <dl class="identifiers-dl">
@@ -109,12 +118,12 @@ watch(chartData, (newData) => {
         </section>
       </section>
 
-      <!-- График динамики упоминаний -->
+      <!-- Chart -->
       <section v-if="chartData.length > 0" class="mentions-card card">
         <header>
           <div>
             <p class="overline">Динамика упоминаний</p>
-            <h2>Упоминания по дням (за неделю)</h2>
+            <h2>Упоминания по дням</h2>
           </div>
           <span class="count">{{ chartData.reduce((sum, d) => sum + d.count, 0) }} всего</span>
         </header>
@@ -141,7 +150,7 @@ watch(chartData, (newData) => {
         </div>
       </section>
 
-      <!-- Связанные сущности -->
+      <!-- Related Entities -->
       <section v-if="relatedEntities.length > 0" class="related-card card">
         <header>
           <div>
@@ -166,7 +175,7 @@ watch(chartData, (newData) => {
         </div>
       </section>
 
-      <!-- Новости с упоминанием -->
+      <!-- News -->
       <section v-if="newsList.length > 0" class="mentions-card card">
         <header>
           <div>
@@ -190,21 +199,98 @@ watch(chartData, (newData) => {
         </div>
       </section>
 
-      <!-- Пустое состояние -->
+      <!-- Empty state -->
       <section v-if="newsList.length === 0 && chartData.length === 0" class="empty-state">
         <p>Нет данных об упоминаниях в системе</p>
-      </section>
- 
-      <!-- Действия -->
-      <section class="action-section">
-        <button class="primary" @click="router.push('/search')">
-          ← Вернуться к поиску
-        </button>
       </section>
     </div>
   </div>
 </template>
+
 <style scoped>
+.entity-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ✅ LOADING STATE */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 20px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(79, 138, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* ✅ ERROR STATE */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+  background: rgba(248, 113, 113, 0.05);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 20px;
+  padding: 40px;
+}
+
+.error-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--negative);
+}
+
+.error-message {
+  color: var(--text-dim);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background: rgba(79, 138, 255, 0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(79, 138, 255, 0.2);
+}
+
+.entity-loaded {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 .profile {
   display: flex;
   flex-direction: column;

@@ -5,17 +5,30 @@ import { api, type News } from '../api/client';
 const news = ref<News[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+
+// Фильтры
+const riskFilter = ref<string>('all');
+const sentimentFilter = ref<string>('all');
  
-const riskLevels = {
+const riskLevels: Record<string, { label: string; color: string }> = {
   high: { label: 'Высокий риск', color: '#ff6464' },
   medium: { label: 'Средний риск', color: '#ffa500' },
   low: { label: 'Низкий риск', color: '#4ade80' },
 };
+
+// Отфильтрованные новости
+const filteredNews = computed(() => {
+  return news.value.filter(item => {
+    const riskMatch = riskFilter.value === 'all' || item.risk_level === riskFilter.value;
+    const sentimentMatch = sentimentFilter.value === 'all' || item.sentiment_label === sentimentFilter.value;
+    return riskMatch && sentimentMatch;
+  });
+});
  
 // Статистика по рискам
 const riskStats = computed(() => {
   const stats = { high: 0, medium: 0, low: 0 };
-  news.value.forEach(item => {
+  filteredNews.value.forEach(item => {
     const risk = (item.risk_level || 'low') as keyof typeof stats;
     if (risk in stats) {
       stats[risk]++;
@@ -27,7 +40,7 @@ const riskStats = computed(() => {
 // Статистика по источникам
 const sourceStats = computed(() => {
   const sources = new Map<string, number>();
-  news.value.forEach(item => {
+  filteredNews.value.forEach(item => {
     if (item.source) {
       sources.set(item.source, (sources.get(item.source) || 0) + 1);
     }
@@ -41,7 +54,7 @@ const sourceStats = computed(() => {
 // Статистика по тональности
 const sentimentStats = computed(() => {
   const stats = { positive: 0, neutral: 0, negative: 0 };
-  news.value.forEach(item => {
+  filteredNews.value.forEach(item => {
     const sentiment = (item.sentiment_label || 'neutral') as keyof typeof stats;
     if (sentiment in stats) {
       stats[sentiment]++;
@@ -50,16 +63,29 @@ const sentimentStats = computed(() => {
   return stats;
 });
  
+// Статистика по типам риска
+const riskTypeStats = computed(() => {
+  const typeMap = new Map<string, number>();
+  filteredNews.value.forEach(item => {
+    if (item.risk_type) {
+      typeMap.set(item.risk_type, (typeMap.get(item.risk_type) || 0) + 1);
+    }
+  });
+  return Array.from(typeMap.entries())
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count);
+});
+ 
 // Средние значения
 const averageMetrics = computed(() => ({
-  tonality: news.value.length > 0 
-    ? (news.value.reduce((sum, n) => sum + (n.tonality || 0), 0) / news.value.length).toFixed(2)
+  tonality: filteredNews.value.length > 0 
+    ? (filteredNews.value.reduce((sum, n) => sum + (n.tonality || 0), 0) / filteredNews.value.length).toFixed(2)
     : 0,
-  emotion: news.value.length > 0
-    ? (news.value.reduce((sum, n) => sum + (n.emotion || 0), 0) / news.value.length).toFixed(2)
+  emotion: filteredNews.value.length > 0
+    ? (filteredNews.value.reduce((sum, n) => sum + (n.emotion || 0), 0) / filteredNews.value.length).toFixed(2)
     : 0,
-  relevance: news.value.length > 0
-    ? (news.value.reduce((sum, n) => sum + (n.relevance || 0), 0) / news.value.length).toFixed(2)
+  relevance: filteredNews.value.length > 0
+    ? (filteredNews.value.reduce((sum, n) => sum + (n.relevance || 0), 0) / filteredNews.value.length).toFixed(2)
     : 0,
 }));
  
@@ -70,7 +96,7 @@ onMounted(async () => {
     
     const data = await api.getNews({
       page: 1,
-      page_size: 100, // Берём больше для аналитики
+      page_size: 100,
     });
     
     news.value = data.items;
@@ -84,168 +110,666 @@ onMounted(async () => {
 });
  
 const handleExport = (format: 'json' | 'csv') => {
-  if (format === 'json') {
-    const data = {
-      exportDate: new Date().toISOString(),
-      totalItems: news.value.length,
-      riskStats: riskStats.value,
-      sourceStats: sourceStats.value,
-      sentimentStats: sentimentStats.value,
+  const reportData = {
+    exportDate: new Date().toISOString(),
+    totalItems: filteredNews.value.length,
+    filters: {
+      risk: riskFilter.value,
+      sentiment: sentimentFilter.value,
+    },
+    statistics: {
+      risks: riskStats.value,
+      sentiments: sentimentStats.value,
+      riskTypes: riskTypeStats.value,
+      sources: sourceStats.value,
       averageMetrics: averageMetrics.value,
-      items: news.value,
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    },
+    items: filteredNews.value,
+  };
+  
+  if (format === 'json') {
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `report-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  } else if (format === 'csv') {
+    // CSV export
+    let csv = 'Дата,Заголовок,Источник,Уровень риска,Тональность\n';
+    filteredNews.value.forEach(item => {
+      const date = new Date(item.pub_date || item.date || '').toLocaleDateString('ru-RU');
+      const title = `"${item.title.replace(/"/g, '""')}"`;
+      const source = item.source || '';
+      const risk = item.risk_level || 'unknown';
+      const sentiment = item.sentiment_label || 'unknown';
+      csv += `${date},${title},${source},${risk},${sentiment}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `report-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
+};
+
+const resetFilters = () => {
+  riskFilter.value = 'all';
+  sentimentFilter.value = 'all';
+};
+
+const reloadPage = () => {
+  location.reload();
 };
 </script>
  
 <template>
   <div class="reports-page">
+    <!-- Header -->
     <header class="page-header">
-      <h1>📊 Аналитика и отчёты</h1>
+      <div>
+        <h1>📊 Аналитика и отчёты</h1>
+        <p class="subtitle">Детальная аналитика по обработанным новостям</p>
+      </div>
       <div class="header-actions">
-        <button class="action-btn" @click="handleExport('json')" :disabled="loading">
-          📥 Экспортировать JSON
+        <button class="btn-secondary" @click="handleExport('json')" :disabled="loading">
+          📥 JSON
+        </button>
+        <button class="btn-secondary" @click="handleExport('csv')" :disabled="loading">
+          📊 CSV
         </button>
       </div>
     </header>
- 
+
+    <!-- Loading State -->
     <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
       <p>⏳ Загружаем аналитику...</p>
     </div>
- 
+
+    <!-- Error State -->
     <div v-else-if="error" class="error-state">
       <p>❌ {{ error }}</p>
-      <p style="font-size: 0.9rem; color: var(--text-dim); margin-top: 8px;">
-        Проверьте подключение к API
-      </p>
+      <button class="btn-secondary" @click="reloadPage">Попробовать снова</button>
     </div>
- 
-    <div v-else class="reports-grid">
-      <!-- Общая статистика -->
-      <section class="stat-card card">
-        <h3>Всего новостей</h3>
-        <p class="stat-value">{{ news.length }}</p>
+
+    <!-- Main Content -->
+    <div v-else class="report-content">
+      <!-- Filters -->
+      <section class="filters-section">
+        <div class="filter-group">
+          <label>Фильтр по риску:</label>
+          <select v-model="riskFilter" class="filter-select">
+            <option value="all">Все уровни</option>
+            <option value="high">🔴 Высокий</option>
+            <option value="medium">🟠 Средний</option>
+            <option value="low">🟢 Низкий</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Фильтр по тональности:</label>
+          <select v-model="sentimentFilter" class="filter-select">
+            <option value="all">Все</option>
+            <option value="positive">😊 Позитив</option>
+            <option value="neutral">😐 Нейтраль</option>
+            <option value="negative">😞 Негатив</option>
+          </select>
+        </div>
+
+        <button class="btn-reset" @click="resetFilters">↻ Сбросить</button>
+
+        <span class="filter-info">
+          Показано <strong>{{ filteredNews.length }}</strong> из <strong>{{ news.length }}</strong> новостей
+        </span>
       </section>
- 
-      <!-- Риски -->
-      <section class="stat-card card">
-        <h3>По уровню риска</h3>
-        <div class="risk-distribution">
-          <div class="risk-item">
-            <span class="risk-label">🔴 Высокий:</span>
-            <span class="risk-count">{{ riskStats.high }}</span>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <!-- Total news -->
+        <section class="stat-card">
+          <p class="stat-label">Всего новостей</p>
+          <p class="stat-value">{{ filteredNews.length }}</p>
+          <p class="stat-hint">в выборке</p>
+        </section>
+
+        <!-- Risk distribution -->
+        <section class="stat-card">
+          <p class="stat-label">По уровню риска</p>
+          <div class="risk-bars">
+            <div class="risk-bar">
+              <span class="risk-badge high">🔴</span>
+              <span class="risk-count">{{ riskStats.high }}</span>
+            </div>
+            <div class="risk-bar">
+              <span class="risk-badge medium">🟠</span>
+              <span class="risk-count">{{ riskStats.medium }}</span>
+            </div>
+            <div class="risk-bar">
+              <span class="risk-badge low">🟢</span>
+              <span class="risk-count">{{ riskStats.low }}</span>
+            </div>
           </div>
-          <div class="risk-item">
-            <span class="risk-label">🟠 Средний:</span>
-            <span class="risk-count">{{ riskStats.medium }}</span>
+        </section>
+
+        <!-- Sentiment distribution -->
+        <section class="stat-card">
+          <p class="stat-label">По тональности</p>
+          <div class="sentiment-bars">
+            <div class="sentiment-bar">
+              <span class="sentiment-badge positive">😊</span>
+              <span class="sentiment-count">{{ sentimentStats.positive }}</span>
+            </div>
+            <div class="sentiment-bar">
+              <span class="sentiment-badge neutral">😐</span>
+              <span class="sentiment-count">{{ sentimentStats.neutral }}</span>
+            </div>
+            <div class="sentiment-bar">
+              <span class="sentiment-badge negative">😞</span>
+              <span class="sentiment-count">{{ sentimentStats.negative }}</span>
+            </div>
           </div>
-          <div class="risk-item">
-            <span class="risk-label">🟢 Низкий:</span>
-            <span class="risk-count">{{ riskStats.low }}</span>
+        </section>
+
+        <!-- Average metrics -->
+        <section class="stat-card">
+          <p class="stat-label">Средние метрики</p>
+          <div class="metrics-list">
+            <div class="metric">
+              <span>Тональность:</span>
+              <strong>{{ averageMetrics.tonality }}</strong>
+            </div>
+            <div class="metric">
+              <span>Эмоция:</span>
+              <strong>{{ averageMetrics.emotion }}</strong>
+            </div>
+            <div class="metric">
+              <span>Релевантность:</span>
+              <strong>{{ averageMetrics.relevance }}</strong>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Risk Types -->
+      <section v-if="riskTypeStats.length > 0" class="detail-card">
+        <h2>🚨 Типы рисков</h2>
+        <div class="risk-types-list">
+          <div v-for="(type, idx) in riskTypeStats" :key="idx" class="risk-type-item">
+            <span class="type-name">{{ type.type }}</span>
+            <span class="type-count">{{ type.count }}</span>
           </div>
         </div>
       </section>
- 
-      <!-- Тональность -->
-      <section class="stat-card card">
-        <h3>По тональности</h3>
-        <div class="sentiment-distribution">
-          <div class="sentiment-item">
-            <span class="sentiment-label">😊 Позитив:</span>
-            <span class="sentiment-count">{{ sentimentStats.positive }}</span>
-          </div>
-          <div class="sentiment-item">
-            <span class="sentiment-label">😐 Нейтраль:</span>
-            <span class="sentiment-count">{{ sentimentStats.neutral }}</span>
-          </div>
-          <div class="sentiment-item">
-            <span class="sentiment-label">😞 Негатив:</span>
-            <span class="sentiment-count">{{ sentimentStats.negative }}</span>
-          </div>
-        </div>
-      </section>
- 
-      <!-- Средние метрики -->
-      <section class="stat-card card">
-        <h3>Средние метрики</h3>
-        <div class="metrics">
-          <div class="metric-item">
-            <span class="metric-label">Тональность:</span>
-            <span class="metric-value">{{ averageMetrics.tonality }}</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">Эмоция:</span>
-            <span class="metric-value">{{ averageMetrics.emotion }}</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-label">Релевантность:</span>
-            <span class="metric-value">{{ averageMetrics.relevance }}</span>
-          </div>
-        </div>
-      </section>
- 
-      <!-- Топ источники -->
-      <section class="sources-card card" v-if="sourceStats.length > 0">
-        <h3>Топ источники</h3>
+
+      <!-- Top Sources -->
+      <section v-if="sourceStats.length > 0" class="detail-card">
+        <h2>📰 Топ источники</h2>
         <div class="sources-list">
-          <div v-for="source in sourceStats" :key="source.name" class="source-item">
+          <div v-for="(source, idx) in sourceStats" :key="idx" class="source-item">
             <span class="source-name">{{ source.name }}</span>
+            <span class="source-bar">
+              <span 
+                class="bar-fill" 
+                :style="{ width: sourceStats.length > 0 ? (source.count / sourceStats[0].count * 100) + '%' : '0%' }"
+              ></span>
+            </span>
             <span class="source-count">{{ source.count }}</span>
           </div>
         </div>
       </section>
- 
-      <!-- Список новостей -->
-      <section class="news-list-card card">
-        <h3>Обработанные новости</h3>
-        <div class="news-list">
-          <article v-for="item in news.slice(0, 10)" :key="item.id" class="news-item">
-            <div class="news-meta">
-              <span class="news-title">{{ item.title }}</span>
-              <span 
-                :class="['risk-badge', `risk-${item.risk_level || 'low'}`]"
-              >
-                {{ riskLevels[item.risk_level as keyof typeof riskLevels]?.label || 'Неизвестно' }}
+
+      <!-- Sample News -->
+      <section v-if="filteredNews.length > 0" class="detail-card">
+        <h2>📰 Примеры новостей (первые 5)</h2>
+        <div class="news-samples">
+          <article v-for="(item, idx) in filteredNews.slice(0, 5)" :key="idx" class="sample-news">
+            <div class="sample-header">
+              <h4>{{ item.title }}</h4>
+              <span :class="['risk-label', `risk-${item.risk_level}`]">
+                {{ riskLevels[item.risk_level || 'low']?.label || 'Неизвестно' }}
               </span>
             </div>
-            <div class="news-details">
-              <span class="source">{{ item.source }}</span>
-              <span class="date">{{ new Date(item.pub_date || item.date || '').toLocaleDateString('ru-RU') }}</span>
-              <span v-if="item.sentiment_label" class="sentiment">{{ item.sentiment_label }}</span>
+            <div class="sample-meta">
+              <span>{{ item.source }}</span>
+              <span>{{ new Date(item.pub_date || item.date || '').toLocaleDateString('ru-RU') }}</span>
             </div>
           </article>
         </div>
-        <p v-if="news.length > 10" class="more-items">
-          ... и ещё {{ news.length - 10 }} новостей
-        </p>
       </section>
     </div>
   </div>
 </template>
+
 <style scoped>
-.report-page {
+.reports-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 24px;
-  background: var(--surface-1);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 32px;
+  padding-bottom: 40px;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 20px;
 }
+
+.page-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  font-size: 1rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-secondary {
+  padding: 10px 18px;
+  background: rgba(79, 138, 255, 0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(79, 138, 255, 0.2);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 20px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(79, 138, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* Error state */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+  background: rgba(248, 113, 113, 0.05);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+}
+
+.error-state p {
+  color: var(--negative);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.report-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Filters */
+.filters-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 18px 20px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-group label {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text-base);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-select:hover {
+  border-color: var(--accent);
+}
+
+.btn-reset {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid rgba(79, 138, 255, 0.5);
+  color: var(--accent);
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset:hover {
+  background: rgba(79, 138, 255, 0.1);
+  border-color: var(--accent);
+}
+
+.filter-info {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.filter-info strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: var(--surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stat-label {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), #22c55e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.risk-bars,
+.sentiment-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.risk-bar,
+.sentiment-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-count,
+.sentiment-count {
+  font-weight: 600;
+  min-width: 30px;
+}
+
+.metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.metric strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Detail cards */
+.detail-card {
+  background: var(--surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.detail-card h2 {
+  margin: 0 0 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.risk-types-list,
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.risk-type-item,
+.source-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.type-name,
+.source-name {
+  font-weight: 500;
+}
+
+.type-count {
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+.source-bar {
+  flex: 1;
+  height: 24px;
+  background: rgba(79, 138, 255, 0.1);
+  border-radius: 999px;
+  margin: 0 12px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #22c55e);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.source-count {
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+  color: var(--accent);
+}
+
+.news-samples {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sample-news {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: all 0.2s ease;
+}
+
+.sample-news:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sample-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sample-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.risk-label {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.risk-label.risk-high {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--negative);
+}
+
+.risk-label.risk-medium {
+  background: rgba(247, 201, 72, 0.1);
+  color: var(--warning);
+}
+
+.risk-label.risk-low {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--positive);
+}
+
+.sample-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions button {
+    flex: 1;
+  }
+
+  .filters-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    flex: 1;
+  }
+
+  .filter-info {
+    margin-left: 0;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
 
 .logo {
   display: inline-flex;

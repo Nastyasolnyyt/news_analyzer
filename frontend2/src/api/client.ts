@@ -339,9 +339,41 @@ export const api = {
     }
   },
 
-  // Получить список сущностей
-  async getEntities(): Promise<Entity[]> {
-    return [];
+  // Получить список сущностей с их статистикой
+  async getEntities(params?: { limit?: number }): Promise<Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>> {
+    try {
+      const limit = params?.limit || 10;
+      const url = `${API_BASE}/entities?limit=${limit}`;
+      console.log('🔍 Fetching entities from:', url);
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('⚠️ Entities endpoint not found, returning empty list');
+          return [];
+        }
+        throw new Error(`API error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      const entities = Array.isArray(data) ? data : data.items || [];
+      
+      console.log('✅ Loaded entities:', entities.length);
+      
+      return entities.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
+        entity_type: e.entity_type,
+        description: e.description,
+        recentMentions: e.recent_mentions || 0,
+        previousMentions: e.previous_mentions || 0,
+        topicCount: e.topic_count || 0,
+      }));
+    } catch (error) {
+      console.error('❌ Error fetching entities:', error);
+      return [];
+    }
   },
 
   // Получить сущность по ID

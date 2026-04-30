@@ -15,6 +15,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'entity-click', id: number): void;
+  (e: 'view-all', ): void;
 }>();
 
 const directionIcon: Record<TrendDirection, string> = {
@@ -32,6 +33,10 @@ const directionClass: Record<TrendDirection, string> = {
 const handleClick = (entityId: number) => {
   emit('entity-click', entityId);
 };
+
+const handleViewAll = () => {
+  emit('view-all');
+};
 </script>
 
 <template>
@@ -41,7 +46,7 @@ const handleClick = (entityId: number) => {
         <p class="overline">ТОП сущностей за 24 часа</p>
         <h2>Рост интереса</h2>
       </div>
-      <button class="manage">См. все сущности</button>
+      <button class="btn-secondary" @click="handleViewAll">См. все сущности</button>
     </header>
     <ul>
       <li v-for="entity in props.entities" :key="entity.id" class="entity" @click="handleClick(entity.id)">
@@ -53,7 +58,7 @@ const handleClick = (entityId: number) => {
           <span>{{ directionIcon[entity.direction] }}</span>
           {{ entity.changePercent }}%
         </div>
-        <button class="profile-link" @click.stop="handleClick(entity.id)">Профиль</button>
+        <button class="btn-tertiary" @click.stop="handleClick(entity.id)">Профиль</button>
       </li>
     </ul>
   </section>
@@ -89,12 +94,37 @@ h2 {
   font-size: 1.3rem;
 }
 
-.manage {
-  border: none;
-  background: transparent;
+/* ✅ УНИФИЦИРОВАННЫЕ СТИЛИ КНОПОК */
+.btn-secondary {
+  padding: 8px 16px;
+  background: rgba(var(--accent-rgb), 0.1);
+  border: 1px solid var(--accent);
   color: var(--accent);
+  border-radius: 8px;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.btn-tertiary {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
+  color: var(--accent);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-tertiary:hover {
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: var(--accent);
 }
 
 ul {
@@ -157,22 +187,12 @@ ul {
   background: rgba(148, 163, 184, 0.12);
 }
 
-.profile-link {
-  border: none;
-  background: none;
-  color: inherit;
-  font-size: 0.9rem;
-  opacity: 0.8;
-  cursor: pointer;
-  padding: 0;
-}
-
 @media (max-width: 700px) {
   .entity {
     grid-template-columns: 1fr;
   }
 
-  .profile-link {
+  .btn-tertiary {
     justify-self: flex-start;
   }
 }

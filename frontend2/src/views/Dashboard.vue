@@ -7,12 +7,13 @@ import TopEntities from '../components/TopEntities.vue';
 import EventFeed from '../components/EventFeed.vue';
 import RiskLegend from '../components/RiskLegend.vue';
 import ActionPanel from '../components/ActionPanel.vue';
-import { api, type News, type RiskLevel } from '../api/client';
+import { api, type News, type RiskLevel, type Entity } from '../api/client';
  
 const router = useRouter();
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003';
 // Реальные данные из API
 const newsData = ref<News[]>([]);
+const allEntities = ref<Entity[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
  
@@ -21,38 +22,23 @@ const stats = computed(() => ({
   relevantNews: newsData.value.length,
 }));
  
-// Сущности для отображения (генерируем из новостей для демо)
+// Сущности для отображения (top 5 с расчетом прироста)
 const topEntities = computed(() => {
-  const entities: any[] = [];
-  const seen = new Set<string>();
-  
-  // Парсим названия компаний из источников
-  const sources = new Map<string, number>();
-  newsData.value.forEach(news => {
-    if (news.source) {
-      sources.set(news.source, (sources.get(news.source) || 0) + 1);
-    }
+  return allEntities.value.slice(0, 5).map((entity: any) => {
+    // Считаем прирост сущности на основе recent vs previous mentions
+    const recent = entity.recentMentions || 0;
+    const previous = entity.previousMentions || 1;
+    const changePercent = previous > 0 ? Math.round(((recent - previous) / previous) * 100) : 0;
+    const direction: 'up' | 'down' | 'flat' = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
+    
+    return {
+      id: entity.id,
+      name: entity.name,
+      changePercent: Math.abs(changePercent),
+      direction,
+      category: entity.entity_type || 'Entity',
+    };
   });
-  
-  // Берём топ источники как сущности
-  Array.from(sources.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .forEach((entry, idx) => {
-      const [source, count] = entry;
-      if (!seen.has(source)) {
-        entities.push({
-          id: idx + 1,
-          name: source,
-          changePercent: Math.floor(Math.random() * 20 - 10),
-          direction: Math.random() > 0.5 ? 'up' : 'down',
-          category: 'Источник',
-        });
-        seen.add(source);
-      }
-    });
-  
-  return entities;
 });
  
 // События для ленты (последние новости)
@@ -80,13 +66,21 @@ onMounted(async () => {
     loading.value = true;
     console.log('📊 Loading dashboard data...');
     
-    const data = await api.getNews({
+    // Загружаем новости
+    const newsResponse = await api.getNews({
       page: 1,
       page_size: 20,
     });
+    newsData.value = newsResponse.items;
     
-    newsData.value = data.items;
-    console.log('✅ Dashboard loaded:', data.items.length, 'items');
+    // Загружаем сущности
+    const entities = await api.getEntities({ limit: 10 });
+    allEntities.value = entities;
+    
+    console.log('✅ Dashboard loaded:', {
+      newsItems: newsData.value.length,
+      entities: allEntities.value.length
+    });
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки данных';
     console.error('❌ Dashboard error:', error.value);
@@ -97,6 +91,10 @@ onMounted(async () => {
  
 const handleEntityClick = (entityId: number) => {
   router.push(`/entity/${entityId}`);
+};
+
+const handleViewAllEntities = () => {
+  router.push('/entities');
 };
  
 const handleNewsClick = (newsId: number) => {
@@ -122,7 +120,7 @@ const handleNewsClick = (newsId: number) => {
     <main v-else class="layout">
       <section class="primary">
         <StatsWidget :count="stats.relevantNews" />
-        <TopEntities :entities="topEntities" @entity-click="handleEntityClick" />
+        <TopEntities :entities="topEntities" @entity-click="handleEntityClick" @view-all="handleViewAllEntities" />
         <EventFeed :events="events" @news-click="handleNewsClick" />
       </section>
       <aside class="secondary">
