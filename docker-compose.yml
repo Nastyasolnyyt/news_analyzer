@@ -304,17 +304,31 @@ services:
 
   frontend:
     build:
+      context: ./frontend2
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://${SERVER_IP:-localhost}:8003
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: http://${SERVER_IP:-localhost}:8003
+    depends_on:
+      output_module:
+        condition: service_healthy
+    restart: always
+    networks:
+      - news_network
+
+  frontend_old:
+    build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         - REACT_APP_API_URL=http://${SERVER_IP:-localhost}:8003
     ports:
-      - "80:3000"
+      - "8080:3000"
     environment:
       REACT_APP_API_URL: http://${SERVER_IP:-localhost}:8003
-    # depends_on:
-    #   output_module:
-    #     condition: service_healthy
     restart: always
     networks:
       - news_network

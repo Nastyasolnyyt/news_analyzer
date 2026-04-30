@@ -254,6 +254,98 @@ export const api = {
     }
   },
 
+  // Получить полный профиль сущности с графиками и связями
+  async getEntityProfile(entityId: number): Promise<{
+    entity: Entity;
+    mentions: any[];
+    chartData: Array<{ week: string; count: number; note?: string }>;
+    relatedEntities: Array<{ id: number; name: string; type: string; relation: string }>;
+    news: News[];
+  }> {
+    try {
+      // Получаем упоминания
+      const mentions = await this.getEntityMentions(entityId);
+      
+      if (mentions.length === 0 || !mentions[0].entity) {
+        throw new Error(`Entity ${entityId} not found`);
+      }
+      
+      const entityInfo = mentions[0].entity;
+      
+      // Формируем базовый объект сущности
+      const entity: Entity = {
+        id: entityInfo.id,
+        name: entityInfo.name,
+        type: entityInfo.entity_type === 'PER' ? 'Person' : 'Company',
+        entity_type: entityInfo.entity_type,
+        description: entityInfo.description || undefined,
+        jurisdiction: entityInfo.jurisdiction || undefined,
+        identifiers: entityInfo.identifiers || [],
+        registryInfo: entityInfo.registry_info ? {
+          address: entityInfo.registry_info.address || '',
+          registry: entityInfo.registry_info.registry || '',
+          founded: entityInfo.registry_info.founded || '',
+        } : undefined,
+        linkedEntityIds: entityInfo.linked_entity_ids || [],
+        mentions: [],
+      };
+      
+      // Формируем данные для графика (группируем по неделям)
+      const chartMap = new Map<string, { count: number; notes: string[] }>();
+      const newsList: News[] = [];
+      
+      mentions.forEach((m: any) => {
+        const date = new Date(m.mentioned_at);
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0];
+        
+        const existing = chartMap.get(weekKey) || { count: 0, notes: [] };
+        existing.count += 1;
+        if (m.note) existing.notes.push(m.note);
+        chartMap.set(weekKey, existing);
+        
+        // Добавляем новость
+        newsList.push({
+          id: m.post_id,
+          title: `Упоминание #${m.post_id}`,
+          text: m.text || `Упомянута сущность: ${entityInfo.name}`,
+          source: m.source || 'система',
+          pub_date: m.mentioned_at,
+          date: m.mentioned_at,
+        });
+      });
+      
+      const chartData = Array.from(chartMap.entries())
+        .map(([week, data]) => ({
+          week,
+          count: data.count,
+          note: data.notes.length > 0 ? data.notes[0] : undefined,
+        }))
+        .sort((a, b) => a.week.localeCompare(b.week));
+      
+      // Связанные сущности (из первого упоминания или пустой массив)
+      const relatedEntities = entityInfo.related_entities || [];
+      
+      console.log('✅ Loaded entity profile:', entity.name, {
+        mentions: mentions.length,
+        chartPoints: chartData.length,
+        relatedEntities: relatedEntities.length,
+      });
+      
+      return {
+        entity,
+        mentions,
+        chartData,
+        relatedEntities,
+        news: newsList,
+      };
+    } catch (error) {
+      console.error('❌ Error fetching entity profile:', error);
+      throw error;
+    }
+  },
+
   // Получить список сущностей
   async getEntities(): Promise<Entity[]> {
     return [];
