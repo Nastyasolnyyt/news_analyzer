@@ -3,27 +3,60 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../api'; 
 
+interface EntityRelatedItem {
+  id: number;
+  name: string;
+  role: string;
+  entity_type: string;
+}
+
+interface EntityMentionStats {
+  week: string;
+  count: number;
+  note?: string;
+}
+
+interface EntityDetails {
+  id: number;
+  name: string;
+  entity_type: string;
+  jurisdiction?: string;
+  description?: string;
+  address?: string;
+  founded?: string;
+  registry?: string;
+  identifiers: Record<string, any>;
+  related_entities: EntityRelatedItem[];
+  mentions_stats: EntityMentionStats[];
+  recent_news: Array<{
+    id: number;
+    title: string;
+    date: string;
+    source: string;
+    summary: string;
+    risk_level?: string;
+  }>;
+  total_mentions: number;
+}
+
 const router = useRouter();
 const route = useRoute();
 
-const entity = ref<any>(null);
-const relatedNews = ref<any[]>([]);
+const entity = ref<EntityDetails | null>(null);
 const isLoading = ref(true);
+const error = ref<string | null>(null);
 
 const entityId = computed(() => Number(route.params.id));
 
 const fetchData = async (id: number) => {
   isLoading.value = true;
+  error.value = null;
   try {
-    // Получаем сущность (в базе это колонки id, text, type, details)
-    const data = await api.getEntityById(id);
+    const data = await api.getEntityDetails(id);
     entity.value = data;
-
-    // Загружаем новости, связанные с этой сущностью (через article_id или поиск)
-    const newsData = await api.getPosts({ entity_id: id });
-    relatedNews.value = newsData.items || [];
-  } catch (error) {
-    console.error("Ошибка загрузки профиля:", error);
+  } catch (err: any) {
+    console.error("Ошибка загрузки профиля:", err);
+    error.value = err.response?.data?.detail || 'Не удалось загрузить данные';
   } finally {
     isLoading.value = false;
   }
@@ -32,60 +65,151 @@ const fetchData = async (id: number) => {
 onMounted(() => fetchData(entityId.value));
 watch(entityId, (newId) => fetchData(newId));
 
-// Безопасное получение данных из JSON-поля details
-const details = computed(() => entity.value?.details || {});
+const entityTypeLabel = computed(() => {
+  if (!entity.value) return '';
+  const type = entity.value.entity_type.toLowerCase();
+  if (type.includes('company') || type.includes('organization') || type.includes('организация')) {
+    return 'Организация';
+  }
+  if (type.includes('person') || type.includes('persona') || type.includes('персона')) {
+    return 'Персона';
+  }
+  return entity.value.entity_type;
+});
+
+const maxMentionCount = computed(() => {
+  if (!entity.value?.mentions_stats.length) return 10;
+  return Math.max(...entity.value.mentions_stats.map(s => s.count), 10);
+});
 </script>
 <template>
   <div v-if="isLoading" class="loading">
     Загрузка профиля...
   </div>
 
+  <section v-else-if="error" class="error">
+    <h2>Ошибка загрузки</h2>
+    <p>{{ error }}</p>
+    <button @click="router.push('/')">На главную</button>
+  </section>
+
   <section v-else-if="entity" class="profile">
     <header class="profile-header">
       <button class="logo" @click="router.push('/')">
         <span class="dot" /> Atlas Risk
       </button>
-      </header>
+    </header>
 
     <section class="hero">
       <div>
-        <p class="entity-type">
-          {{ entity.type === 'Company' ? 'Организация' : 'Персона' }}
-        </p>
-        <h1>{{ entity.text }}</h1>
-        <p v-if="details.jurisdiction" class="jurisdiction">
-          {{ details.jurisdiction }}
+        <p class="entity-type">{{ entityTypeLabel }}</p>
+        <h1>{{ entity.name }}</h1>
+        <p v-if="entity.jurisdiction" class="jurisdiction">
+          {{ entity.jurisdiction }}
         </p>
       </div>
       <p class="description">
-        {{ details.description || 'Описание отсутствует' }}
+        {{ entity.description || 'Описание отсутствует' }}
       </p>
     </section>
 
     <section class="grid">
       <article class="card identifiers">
         <h2>Основные данные</h2>
+        <dl>
+          <div>
+            <dt>Тип сущности</dt>
+            <dd>{{ entity.entity_type }}</dd>
+          </div>
+          <div v-if="entity.identifiers.type">
+            <dt>Категория</dt>
+            <dd>{{ entity.identifiers.type }}</dd>
+          </div>
+        </dl>
         <div class="registry">
-          <p v-if="details.address"><strong>Адрес:</strong> {{ details.address }}</p>
-          <p v-if="details.founded"><strong>Основана:</strong> {{ details.founded }}</p>
-          <p><strong>Тип в системе:</strong> {{ entity.type }}</p>
+          <p v-if="entity.address"><strong>Адрес:</strong> {{ entity.address }}</p>
+          <p v-if="entity.founded"><strong>Основана:</strong> {{ entity.founded }}</p>
+          <p v-if="entity.registry"><strong>Реестр:</strong> {{ entity.registry }}</p>
         </div>
       </article>
 
-      <article v-if="relatedNews.length > 0" class="card news">
-        <h2>Последние события</h2>
-        <div class="news-list">
-          <div v-for="item in relatedNews.slice(0, 3)" :key="item.id" class="news-card">
-            <strong>{{ item.title || 'Новость без заголовка' }}</strong>
-            <p>{{ item.content?.slice(0, 80) }}...</p>
+      <article v-if="entity.related_entities.length > 0" class="card related">
+        <header>
+          <div>
+            <p class="overline">Связанные сущности</p>
+            <h2>Ключевые связи</h2>
           </div>
-        </div>
+          <button class="outline">Все связи</button>
+        </header>
+        <ul>
+          <li v-for="item in entity.related_entities" :key="item.id">
+            <div>
+              <strong>{{ item.name }}</strong>
+              <span>{{ item.role }}</span>
+            </div>
+            <button @click="router.push(`/entity/${item.id}`)">Перейти</button>
+          </li>
+        </ul>
       </article>
     </section>
 
-    <div class="actions">
-      <button class="primary" @click="router.push('/')">Вернуться к списку</button>
-    </div>
+    <section v-if="entity.mentions_stats.length > 0" class="mentions card">
+      <header>
+        <div>
+          <p class="overline">Упоминания</p>
+          <h2>Динамика за 8 недель</h2>
+        </div>
+        <button class="outline">Подробнее</button>
+      </header>
+      <div class="chart">
+        <div v-for="point in entity.mentions_stats" :key="point.week" class="bar">
+          <div 
+            class="bar-fill" 
+            :style="{ height: `${(point.count / maxMentionCount) * 100}px` }"
+          >
+            <span v-if="point.note" class="note">{{ point.note }}</span>
+          </div>
+          <span class="count">{{ point.count }}</span>
+          <span class="week">{{ point.week }}</span>
+        </div>
+      </div>
+      <p class="chart-summary">
+        Всего упоминаний: {{ entity.total_mentions }}. 
+        Среднее {{ Math.round(entity.total_mentions / 8) }} упоминаний / неделя.
+      </p>
+    </section>
+
+    <section v-if="entity.recent_news.length > 0" class="news card">
+      <header>
+        <div>
+          <p class="overline">Новости</p>
+          <h2>Связанные события</h2>
+        </div>
+        <button class="outline">Все новости</button>
+      </header>
+      <div class="news-list">
+        <article v-for="news in entity.recent_news" :key="news.id" class="news-card">
+          <div class="news-meta">
+            <span class="date">{{ new Date(news.date).toLocaleDateString('ru-RU') }}</span>
+            <span class="source">{{ news.source }}</span>
+          </div>
+          <h3>{{ news.title }}</h3>
+          <p>{{ news.summary }}</p>
+          <button class="inline-link" @click="router.push(`/news/${news.id}`)">Перейти к новости</button>
+        </article>
+      </div>
+    </section>
+
+    <section class="actions card">
+      <div>
+        <h3>Что дальше?</h3>
+        <p>Просматривайте график в деталях, анализируйте связи и создавайте отчет по рискам.</p>
+      </div>
+      <div class="cta">
+        <button class="primary">Открыть график</button>
+        <button class="secondary">Создать отчёт</button>
+      </div>
+    </section>
   </section>
 
   <section v-else class="error">

@@ -8,14 +8,20 @@ interface EventItem {
   source: string;
   summary: string;
   risk: RiskLevel;
+  entities?: Array<{
+    id: number;
+    name: string;
+    type: string;
+  }>;
 }
 
-defineProps<{
+const props = defineProps<{
   events: EventItem[];
 }>();
 
 const emit = defineEmits<{
   (e: 'news-click', id: number): void;
+  (e: 'entity-click', entityId: number): void;
 }>();
 
 const riskLabel: Record<RiskLevel, string> = {
@@ -28,6 +34,10 @@ const handleClick = (newsId: number) => {
   emit('news-click', newsId);
 };
 
+const handleEntityClick = (event: Event, entityId: number) => {
+  event.stopPropagation();
+  emit('entity-click', entityId);
+};
 </script>
 
 <template>
@@ -51,6 +61,16 @@ const handleClick = (newsId: number) => {
         <p class="summary">
           {{ item.summary }}
         </p>
+        <div v-if="item.entities && item.entities.length > 0" class="entities">
+          <span 
+            v-for="ent in item.entities.slice(0, 3)" 
+            :key="ent.id"
+            class="entity-tag"
+            @click="(e) => handleEntityClick(e, ent.id)"
+          >
+            {{ ent.name }}
+          </span>
+        </div>
         <div class="footer">
             <span class="risk" :data-risk="item.risk">
               {{ riskLabel[item.risk] }}
@@ -139,6 +159,26 @@ h3 {
   margin: 0;
   color: #cfd3dc;
   font-size: 0.95rem;
+}
+
+.entities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.entity-tag {
+  background: rgba(79, 138, 255, 0.15);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.entity-tag:hover {
+  background: rgba(79, 138, 255, 0.25);
 }
 
 .footer {
