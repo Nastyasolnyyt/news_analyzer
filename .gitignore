@@ -1,1 +1,26 @@
-Nothing to output - the file changes contain only a source file (.vue) and no build artifacts, dependencies, or temporary files that need to be ignored.
+```
+# TypeScript build artifacts
+**/*.tsbuildinfo
+
+# Vue.js build artifacts
+**/*.vue.js
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+*.swp
+```

@@ -67,7 +67,7 @@ const handleEntityClick = (entityId: number) => {
     <div v-else-if="error" class="error-state">
       <p class="error-title">❌ Ошибка загрузки</p>
       <p class="error-message">{{ error }}</p>
-      <button class="btn-secondary" @click="window.location.reload()">Попробовать снова</button>
+      <button class="btn-secondary" @click="reloadPage()">Попробовать снова</button>
     </div>
 
     <!-- LOADED STATE -->

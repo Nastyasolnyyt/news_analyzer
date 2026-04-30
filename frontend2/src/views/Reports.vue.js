@@ -178,6 +178,18 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['filter-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-info']} */ ;
 /** @type {__VLS_StyleScopedClasses['stats-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['logo']} */ ;
+/** @type {__VLS_StyleScopedClasses['header-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero']} */ ;
+/** @type {__VLS_StyleScopedClasses['pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['news-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['remove']} */ ;
+/** @type {__VLS_StyleScopedClasses['actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['cta-buttons']} */ ;
+/** @type {__VLS_StyleScopedClasses['cta-buttons']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
