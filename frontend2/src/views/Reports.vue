@@ -769,7 +769,6 @@ const reloadPage = () => {
     grid-template-columns: 1fr;
   }
 }
-</style>
 
 .logo {
   display: inline-flex;
