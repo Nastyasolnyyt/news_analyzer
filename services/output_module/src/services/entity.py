@@ -111,8 +111,8 @@ class EntityService:
             for data in related_entities_map.values()
         ][:10]  # Ограничиваем до 10 связанных сущностей
 
-        # Считаем статистику упоминаний по неделям (за последние 8 недель)
-        mentions_stats = self._calculate_mentions_stats(posts)
+        # Считаем статистику упоминаний по дням за последнюю неделю
+        mentions_stats = self._calculate_mentions_stats(posts, period="week")
 
         # Формируем список последних новостей
         recent_news = []
@@ -164,43 +164,72 @@ class EntityService:
         else:
             return "Связанная сущность"
 
-    def _calculate_mentions_stats(self, posts: List[Any]) -> List[EntityMentionStats]:
+    def _calculate_mentions_stats(self, posts: List[Any], period: str = "week") -> List[EntityMentionStats]:
         """
-        Рассчитывает статистику упоминаний по неделям.
-        Возвращает данные за последние 8 недель.
+        Рассчитывает статистику упоминаний.
+        period: 'week' - по дням за неделю, 'month' - по неделям за 2 месяца
         """
         if not posts:
+            # Возвращаем пустую структуру, если постов нет
+            if period == "week":
+                return [
+                    EntityMentionStats(week=datetime.now().strftime("%d.%m"), count=0, note=None)
+                    for _ in range(7)
+                ]
             return []
 
-        # Группируем посты по неделям
-        week_counts: Dict[str, int] = defaultdict(int)
-        
-        for post in posts:
-            if post.created_at:
-                # Получаем начало недели (понедельник)
-                week_start = post.created_at - timedelta(days=post.created_at.weekday())
-                week_key = week_start.strftime("%d.%m")
-                week_counts[week_key] += 1
-
-        # Формируем список за последние 8 недель
         now = datetime.now()
-        current_week_start = now - timedelta(days=now.weekday())
-        
         stats = []
-        notes_map = {
-            "28.10": "Запрос регулятора",
-            "18.11": "Инцидент в цепочке поставок",
-        }
         
-        for i in range(7, -1, -1):
-            week_start = current_week_start - timedelta(weeks=i)
-            week_key = week_start.strftime("%d.%m")
-            count = week_counts.get(week_key, 0)
+        if period == "week":
+            # Группируем по дням за последнюю неделю
+            day_counts: Dict[str, int] = defaultdict(int)
+            for post in posts:
+                if post.created_at:
+                    day_key = post.created_at.strftime("%d.%m")
+                    day_counts[day_key] += 1
             
-            stats.append(EntityMentionStats(
-                week=week_key,
-                count=count,
-                note=notes_map.get(week_key),
-            ))
+            # Генерируем данные за последние 7 дней
+            for i in range(6, -1, -1):
+                day_date = now - timedelta(days=i)
+                day_key = day_date.strftime("%d.%m")
+                count = day_counts.get(day_key, 0)
+                
+                # Добавляем заметки для демонстрации (можно убрать)
+                note = None
+                if count > 5:
+                    note = "Пик упоминаний"
+                
+                stats.append(EntityMentionStats(
+                    week=day_key,  # Используем поле week для даты
+                    count=count,
+                    note=note,
+                ))
+        else:
+            # Группируем по неделям (старая логика)
+            week_counts: Dict[str, int] = defaultdict(int)
+            for post in posts:
+                if post.created_at:
+                    week_start = post.created_at - timedelta(days=post.created_at.weekday())
+                    week_key = week_start.strftime("%d.%m")
+                    week_counts[week_key] += 1
+
+            current_week_start = now - timedelta(days=now.weekday())
+            
+            for i in range(7, -1, -1):
+                week_start = current_week_start - timedelta(weeks=i)
+                week_key = week_start.strftime("%d.%m")
+                count = week_counts.get(week_key, 0)
+                
+                notes_map = {
+                    "28.10": "Запрос регулятора",
+                    "18.11": "Инцидент в цепочке поставок",
+                }
+                
+                stats.append(EntityMentionStats(
+                    week=week_key,
+                    count=count,
+                    note=notes_map.get(week_key),
+                ))
 
         return stats
