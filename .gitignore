@@ -6,3 +6,59 @@ node_modules/
 # TypeScript build info
 tsconfig.tsbuildinfo
 ```
+```gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.python-version
+.pytest_cache/
+.mypy_cache/
+
+# Build and distribution
+build/
+dist/
+*.egg
+*.egg-info/
+*.so
+*.whl
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+htmlcov/
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+```
+
+Wait, let me reconsider. Looking at the modified files, they are all source code files (.vue, .py) without any build artifacts, dependencies, or temporary files in the changes. According to rule #6, if the changes contain only source or config files and no build artifacts, dependencies, or temp files, I should output an empty .gitignore.
+
+(empty — output nothing)
