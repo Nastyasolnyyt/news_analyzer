@@ -13,17 +13,22 @@ const directionClass = {
 const handleClick = (entityId) => {
     emit('entity-click', entityId);
 };
+const handleViewAll = () => {
+    emit('view-all');
+};
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['btn-secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-tertiary']} */ ;
 /** @type {__VLS_StyleScopedClasses['entity']} */ ;
 /** @type {__VLS_StyleScopedClasses['meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend']} */ ;
 /** @type {__VLS_StyleScopedClasses['entity']} */ ;
-/** @type {__VLS_StyleScopedClasses['profile-link']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-tertiary']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
@@ -36,7 +41,8 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)(
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h2, __VLS_intrinsicElements.h2)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ class: "manage" },
+    ...{ onClick: (__VLS_ctx.handleViewAll) },
+    ...{ class: "btn-secondary" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.ul, __VLS_intrinsicElements.ul)({});
 for (const [entity] of __VLS_getVForSourceType((props.entities))) {
@@ -65,16 +71,16 @@ for (const [entity] of __VLS_getVForSourceType((props.entities))) {
         ...{ onClick: (...[$event]) => {
                 __VLS_ctx.handleClick(entity.id);
             } },
-        ...{ class: "profile-link" },
+        ...{ class: "btn-tertiary" },
     });
 }
 /** @type {__VLS_StyleScopedClasses['panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['overline']} */ ;
-/** @type {__VLS_StyleScopedClasses['manage']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-secondary']} */ ;
 /** @type {__VLS_StyleScopedClasses['entity']} */ ;
 /** @type {__VLS_StyleScopedClasses['meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend']} */ ;
-/** @type {__VLS_StyleScopedClasses['profile-link']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-tertiary']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -82,6 +88,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             directionIcon: directionIcon,
             directionClass: directionClass,
             handleClick: handleClick,
+            handleViewAll: handleViewAll,
         };
     },
     __typeEmits: {},

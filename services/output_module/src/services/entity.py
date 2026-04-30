@@ -27,6 +27,71 @@ class EntityService:
         self.post_entity_gateway = post_entity_gateway
         self.post_gateway = post_gateway
 
+    async def get_all_entities(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Получить список всех сущностей с их статистикой упоминаний.
+        Возвращает сущности с полями recentMentions, previousMentions, topicCount.
+        """
+        from sqlalchemy import select
+        from src.infrastructure.postgres.models.named_entity import NamedEntity
+        
+        # Получаем все сущности из БД
+        query = select(NamedEntity).order_by(NamedEntity.created_at.desc()).limit(limit)
+        result = await self.ner_gateway.session.execute(query)
+        entities = result.scalars().all()
+        
+        if not entities:
+            return []
+        
+        # Для каждой сущности считаем статистику
+        result_list = []
+        for entity in entities:
+            # Получаем посты где упоминается сущность
+            posts_entity = await self.post_entity_gateway.get_posts_by_ner(entity.id)
+            
+            # Считаем упоминания за последнюю неделю и предыдущую
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+            two_weeks_ago = now - timedelta(days=14)
+            
+            recent_mentions = 0
+            previous_mentions = 0
+            
+            for pe in posts_entity:
+                try:
+                    post = await self.post_gateway.get_post_by_id(pe.post_id)
+                    if post and post.created_at:
+                        if post.created_at >= week_ago:
+                            recent_mentions += 1
+                        elif post.created_at >= two_weeks_ago:
+                            previous_mentions += 1
+                except:
+                    continue
+            
+            # Считаем количество уникальных тем
+            topic_ids = set()
+            for pe in posts_entity:
+                try:
+                    post = await self.post_gateway.get_post_by_id(pe.post_id)
+                    if post and post.analyses:
+                        for analysis in post.analyses:
+                            if analysis.topic_id:
+                                topic_ids.add(analysis.topic_id)
+                except:
+                    continue
+            
+            result_list.append({
+                "id": entity.id,
+                "name": entity.name,
+                "entity_type": entity.entity_type,
+                "description": f"{entity.name} — {entity.entity_type}",
+                "recent_mentions": recent_mentions,
+                "previous_mentions": previous_mentions,
+                "topic_count": len(topic_ids),
+            })
+        
+        return result_list
+
     async def get_entity_mentions(
         self, entity_id: int, filters: Optional[EntityMentionsFilterDTO] = None
     ) -> List[EntityInfo]:

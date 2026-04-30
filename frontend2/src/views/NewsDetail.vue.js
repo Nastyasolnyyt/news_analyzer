@@ -36,10 +36,20 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['loading-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['back-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero']} */ ;
+/** @type {__VLS_StyleScopedClasses['news-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['logo']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero']} */ ;
+/** @type {__VLS_StyleScopedClasses['meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['switch']} */ ;
 /** @type {__VLS_StyleScopedClasses['switch']} */ ;
 /** @type {__VLS_StyleScopedClasses['inline-link']} */ ;
@@ -56,19 +66,56 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 if (__VLS_ctx.loading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "loading" },
+        ...{ class: "loading-state" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "spinner" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
 }
 else if (__VLS_ctx.error) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "error" },
+        ...{ class: "error-state" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "error-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "error-message" },
     });
     (__VLS_ctx.error);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.loading))
+                    return;
+                if (!(__VLS_ctx.error))
+                    return;
+                __VLS_ctx.$router.back();
+            } },
+        ...{ class: "btn-secondary" },
+    });
 }
 else if (__VLS_ctx.article) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "article-loaded" },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
         ...{ class: "hero" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "back-nav" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.loading))
+                    return;
+                if (!!(__VLS_ctx.error))
+                    return;
+                if (!(__VLS_ctx.article))
+                    return;
+                __VLS_ctx.$router.back();
+            } },
+        ...{ class: "back-button" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "meta" },
@@ -81,6 +128,12 @@ else if (__VLS_ctx.article) {
         ...{ class: "date" },
     });
     (__VLS_ctx.article.pub_date || __VLS_ctx.article.date);
+    if (__VLS_ctx.article.risk_level) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: (['risk-badge', `risk-${__VLS_ctx.article.risk_level}`]) },
+        });
+        (__VLS_ctx.article.risk_level);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({});
     (__VLS_ctx.article.title);
     if (__VLS_ctx.article.tags) {
@@ -191,9 +244,16 @@ else if (__VLS_ctx.article) {
     }
 }
 /** @type {__VLS_StyleScopedClasses['news-page']} */ ;
-/** @type {__VLS_StyleScopedClasses['loading']} */ ;
-/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['loading-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['spinner']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['article-loaded']} */ ;
 /** @type {__VLS_StyleScopedClasses['hero']} */ ;
+/** @type {__VLS_StyleScopedClasses['back-nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['back-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['source']} */ ;
 /** @type {__VLS_StyleScopedClasses['date']} */ ;

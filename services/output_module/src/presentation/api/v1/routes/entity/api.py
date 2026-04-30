@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
@@ -8,6 +8,22 @@ from src.services.entity import EntityService
 
 
 ROUTER = APIRouter(prefix="/entities", route_class=DishkaRoute)
+
+
+@ROUTER.get(
+    "",
+    response_model=List[Any],
+    summary="Получить список всех сущностей",
+)
+async def get_all_entities(
+    entity_service: FromDishka[EntityService],
+    limit: int = 100,
+) -> List[Any]:
+    """Получение списка всех сущностей с их статистикой упоминаний."""
+    try:
+        return await entity_service.get_all_entities(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 @ROUTER.get(

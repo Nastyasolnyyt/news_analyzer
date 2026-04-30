@@ -11,41 +11,29 @@ const router = useRouter();
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003';
 // Реальные данные из API
 const newsData = ref([]);
+const allEntities = ref([]);
 const loading = ref(true);
 const error = ref(null);
 // Статистика
 const stats = computed(() => ({
     relevantNews: newsData.value.length,
 }));
-// Сущности для отображения (генерируем из новостей для демо)
+// Сущности для отображения (top 5 с расчетом прироста)
 const topEntities = computed(() => {
-    const entities = [];
-    const seen = new Set();
-    // Парсим названия компаний из источников
-    const sources = new Map();
-    newsData.value.forEach(news => {
-        if (news.source) {
-            sources.set(news.source, (sources.get(news.source) || 0) + 1);
-        }
+    return allEntities.value.slice(0, 5).map((entity) => {
+        // Считаем прирост сущности на основе recent vs previous mentions
+        const recent = entity.recentMentions || 0;
+        const previous = entity.previousMentions || 1;
+        const changePercent = previous > 0 ? Math.round(((recent - previous) / previous) * 100) : 0;
+        const direction = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
+        return {
+            id: entity.id,
+            name: entity.name,
+            changePercent: Math.abs(changePercent),
+            direction,
+            category: entity.entity_type || 'Entity',
+        };
     });
-    // Берём топ источники как сущности
-    Array.from(sources.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .forEach((entry, idx) => {
-        const [source, count] = entry;
-        if (!seen.has(source)) {
-            entities.push({
-                id: idx + 1,
-                name: source,
-                changePercent: Math.floor(Math.random() * 20 - 10),
-                direction: Math.random() > 0.5 ? 'up' : 'down',
-                category: 'Источник',
-            });
-            seen.add(source);
-        }
-    });
-    return entities;
 });
 // События для ленты (последние новости)
 const events = computed(() => {
@@ -69,12 +57,19 @@ onMounted(async () => {
     try {
         loading.value = true;
         console.log('📊 Loading dashboard data...');
-        const data = await api.getNews({
+        // Загружаем новости
+        const newsResponse = await api.getNews({
             page: 1,
             page_size: 20,
         });
-        newsData.value = data.items;
-        console.log('✅ Dashboard loaded:', data.items.length, 'items');
+        newsData.value = newsResponse.items;
+        // Загружаем сущности
+        const entities = await api.getEntities({ limit: 10 });
+        allEntities.value = entities;
+        console.log('✅ Dashboard loaded:', {
+            newsItems: newsData.value.length,
+            entities: allEntities.value.length
+        });
     }
     catch (e) {
         error.value = e.message || 'Ошибка загрузки данных';
@@ -86,6 +81,9 @@ onMounted(async () => {
 });
 const handleEntityClick = (entityId) => {
     router.push(`/entity/${entityId}`);
+};
+const handleViewAllEntities = () => {
+    router.push('/entities');
 };
 const handleNewsClick = (newsId) => {
     router.push(`/news/${newsId}`);
@@ -142,10 +140,12 @@ else {
     // @ts-ignore
     const __VLS_6 = __VLS_asFunctionalComponent(TopEntities, new TopEntities({
         ...{ 'onEntityClick': {} },
+        ...{ 'onViewAll': {} },
         entities: (__VLS_ctx.topEntities),
     }));
     const __VLS_7 = __VLS_6({
         ...{ 'onEntityClick': {} },
+        ...{ 'onViewAll': {} },
         entities: (__VLS_ctx.topEntities),
     }, ...__VLS_functionalComponentArgsRest(__VLS_6));
     let __VLS_9;
@@ -154,39 +154,42 @@ else {
     const __VLS_12 = {
         onEntityClick: (__VLS_ctx.handleEntityClick)
     };
+    const __VLS_13 = {
+        onViewAll: (__VLS_ctx.handleViewAllEntities)
+    };
     var __VLS_8;
     /** @type {[typeof EventFeed, ]} */ ;
     // @ts-ignore
-    const __VLS_13 = __VLS_asFunctionalComponent(EventFeed, new EventFeed({
+    const __VLS_14 = __VLS_asFunctionalComponent(EventFeed, new EventFeed({
         ...{ 'onNewsClick': {} },
         events: (__VLS_ctx.events),
     }));
-    const __VLS_14 = __VLS_13({
+    const __VLS_15 = __VLS_14({
         ...{ 'onNewsClick': {} },
         events: (__VLS_ctx.events),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_13));
-    let __VLS_16;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_14));
     let __VLS_17;
     let __VLS_18;
-    const __VLS_19 = {
+    let __VLS_19;
+    const __VLS_20 = {
         onNewsClick: (__VLS_ctx.handleNewsClick)
     };
-    var __VLS_15;
+    var __VLS_16;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
         ...{ class: "secondary" },
     });
     /** @type {[typeof RiskLegend, ]} */ ;
     // @ts-ignore
-    const __VLS_20 = __VLS_asFunctionalComponent(RiskLegend, new RiskLegend({
+    const __VLS_21 = __VLS_asFunctionalComponent(RiskLegend, new RiskLegend({
         levels: (__VLS_ctx.riskLegend),
     }));
-    const __VLS_21 = __VLS_20({
+    const __VLS_22 = __VLS_21({
         levels: (__VLS_ctx.riskLegend),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_20));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_21));
     /** @type {[typeof ActionPanel, ]} */ ;
     // @ts-ignore
-    const __VLS_23 = __VLS_asFunctionalComponent(ActionPanel, new ActionPanel({}));
-    const __VLS_24 = __VLS_23({}, ...__VLS_functionalComponentArgsRest(__VLS_23));
+    const __VLS_24 = __VLS_asFunctionalComponent(ActionPanel, new ActionPanel({}));
+    const __VLS_25 = __VLS_24({}, ...__VLS_functionalComponentArgsRest(__VLS_24));
 }
 /** @type {__VLS_StyleScopedClasses['dashboard']} */ ;
 /** @type {__VLS_StyleScopedClasses['loading-state']} */ ;
@@ -212,6 +215,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             events: events,
             riskLegend: riskLegend,
             handleEntityClick: handleEntityClick,
+            handleViewAllEntities: handleViewAllEntities,
             handleNewsClick: handleNewsClick,
         };
     },
