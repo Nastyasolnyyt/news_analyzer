@@ -129,7 +129,7 @@ watch(chartData, (newData) => {
             >
               <div 
                 class="bar-fill" 
-                :style="{ height: `${(item.count / (maxChartValue || 1)) * 100}px` }"
+                :style="{ height: `${(item.count / maxChartValue) * 100}%` }"
               >
                 <span v-if="item.note" class="note">{{ item.note }}</span>
               </div>
