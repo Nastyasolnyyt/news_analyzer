@@ -30,6 +30,16 @@ const toggleSetValue = (target, value) => {
     }
     target.value = next;
 };
+// Fix for TypeScript errors - explicitly use .value
+const handleTriggerToggle = (value) => {
+    toggleSetValue(selectedTriggers, value);
+};
+const handleSourceToggle = (value) => {
+    toggleSetValue(selectedSources, value);
+};
+const handleChannelToggle = (value) => {
+    toggleSetValue(selectedChannels, value);
+};
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -156,7 +166,7 @@ for (const [trigger] of __VLS_getVForSourceType((__VLS_ctx.triggers))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         ...{ onChange: (...[$event]) => {
-                __VLS_ctx.toggleSetValue(__VLS_ctx.selectedTriggers, trigger.id);
+                __VLS_ctx.handleTriggerToggle(trigger.id);
             } },
         type: "checkbox",
         checked: (__VLS_ctx.selectedTriggers.has(trigger.id)),
@@ -184,7 +194,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 for (const [source] of __VLS_getVForSourceType((__VLS_ctx.sources))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
-                __VLS_ctx.toggleSetValue(__VLS_ctx.selectedSources, source.id);
+                __VLS_ctx.handleSourceToggle(source.id);
             } },
         key: (source.id),
         type: "button",
@@ -210,7 +220,7 @@ for (const [channel] of __VLS_getVForSourceType((__VLS_ctx.channels))) {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         ...{ onChange: (...[$event]) => {
-                __VLS_ctx.toggleSetValue(__VLS_ctx.selectedChannels, channel.id);
+                __VLS_ctx.handleChannelToggle(channel.id);
             } },
         type: "checkbox",
         checked: (__VLS_ctx.selectedChannels.has(channel.id)),
@@ -269,7 +279,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectedTriggers: selectedTriggers,
             selectedSources: selectedSources,
             selectedChannels: selectedChannels,
-            toggleSetValue: toggleSetValue,
+            handleTriggerToggle: handleTriggerToggle,
+            handleSourceToggle: handleSourceToggle,
+            handleChannelToggle: handleChannelToggle,
         };
     },
 });

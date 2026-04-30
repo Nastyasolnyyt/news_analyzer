@@ -1,6 +1,6 @@
 // frontend/src/api/client.ts
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
-// ✅ Вспомогательная функция: извлекает риск из analysis и добавляет в news
+// ✅ Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
 function enrichNewsWithRisk(news, analysis) {
     if (!analysis)
         return news;
@@ -11,11 +11,12 @@ function enrichNewsWithRisk(news, analysis) {
         risk_type: news.risk_type || analysis.risk_type,
         risk_confidence: news.risk_confidence || analysis.risk_confidence,
         risk_type_confidence: news.risk_type_confidence || analysis.risk_type_confidence,
-        tonality: news.tonality || analysis.tonality,
-        // ✅ ИСПРАВЛЕНО: приводим к правильному типу
-        sentiment_label: (news.sentiment_label || analysis.sentiment_label),
-        emotion: news.emotion || analysis.emotion,
-        relevance: news.relevance || analysis.relevance,
+        // ✅ ИСПРАВЛЕНО: берем тональность из анализа
+        tonality: news.tonality ?? analysis.tonality ?? 0,
+        sentiment_label: (news.sentiment_label || analysis.sentiment_label || 'neutral'),
+        emotion: news.emotion ?? analysis.emotion ?? 0,
+        relevance: news.relevance ?? analysis.relevance ?? 0,
+        confidence: news.confidence ?? analysis.confidence ?? 0,
         // ✅ ИСПРАВЛЕНО: проверяем, что topic существует
         topic_name: news.topic_name || analysis.topic?.name,
         topic_id: news.topic_id || analysis.topic_id || analysis.topic?.id,

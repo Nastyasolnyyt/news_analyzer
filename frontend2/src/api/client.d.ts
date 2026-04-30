@@ -47,6 +47,7 @@ export interface News {
     sentiment_label?: 'positive' | 'negative' | 'neutral';
     emotion?: number;
     relevance?: number;
+    confidence?: number;
     topic_name?: string;
     topic_id?: number;
     relatedEntityIds?: number[];

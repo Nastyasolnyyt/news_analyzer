@@ -87,6 +87,8 @@ class PostService:
                     emotion=analysis.emotion if analysis and analysis.emotion is not None else None,
                     tonality=analysis.tonality if analysis and analysis.tonality is not None else None,
                     relevance=analysis.relevance if analysis and analysis.relevance is not None else None,
+                    sentiment_label=analysis.sentiment_label if analysis and analysis.sentiment_label else "neutral",
+                    confidence=analysis.confidence if analysis and analysis.confidence is not None else None,
                     risk_level=risk_level,
                     risk_type=risk_type,
                 )

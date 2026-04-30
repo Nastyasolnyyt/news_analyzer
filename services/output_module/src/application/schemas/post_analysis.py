@@ -17,20 +17,19 @@ class PostAnalysisDTO(BaseModel):
 
 class PostAnalysisWithExternalModelsDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: Optional[int] = None
     post_id: int
     topic: Optional[TopicDTO] = None
     
-   
+    # Поля из таблицы post_analysis
     emotion: Optional[float] = None
     tonality: Optional[float] = None
     relevance: Optional[float] = None
     sentiment_label: Optional[str] = None
     confidence: Optional[float] = None
     
-    
-    # Дополнительные поля
+    # Дополнительные поля (risk_level, risk_type добавляются в сервисе)
     category: Optional[str] = Field(default="General")
     risk_level: Optional[str] = Field(default="low")
     risk_type: Optional[str] = Field(default=None)

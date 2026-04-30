@@ -61,6 +61,7 @@ export interface News {
   sentiment_label?: 'positive' | 'negative' | 'neutral';
   emotion?: number;
   relevance?: number;
+  confidence?: number;
   
   // Темы и сущности
   topic_name?: string;
@@ -107,7 +108,7 @@ export interface NewsListResponse {
   page_size: number;
 }
 
-// ✅ Вспомогательная функция: извлекает риск из analysis и добавляет в news
+// ✅ Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
 function enrichNewsWithRisk(news: News, analysis?: PostAnalysis & { topic?: Topic }): News {
   if (!analysis) return news;
   
@@ -118,11 +119,12 @@ function enrichNewsWithRisk(news: News, analysis?: PostAnalysis & { topic?: Topi
     risk_type: news.risk_type || analysis.risk_type,
     risk_confidence: news.risk_confidence || analysis.risk_confidence,
     risk_type_confidence: news.risk_type_confidence || analysis.risk_type_confidence,
-    tonality: news.tonality || analysis.tonality,
-    // ✅ ИСПРАВЛЕНО: приводим к правильному типу
-    sentiment_label: (news.sentiment_label || analysis.sentiment_label) as 'positive' | 'negative' | 'neutral' | undefined,
-    emotion: news.emotion || analysis.emotion,
-    relevance: news.relevance || analysis.relevance,
+    // ✅ ИСПРАВЛЕНО: берем тональность из анализа
+    tonality: news.tonality ?? analysis.tonality ?? 0,
+    sentiment_label: (news.sentiment_label || analysis.sentiment_label || 'neutral') as 'positive' | 'negative' | 'neutral',
+    emotion: news.emotion ?? analysis.emotion ?? 0,
+    relevance: news.relevance ?? analysis.relevance ?? 0,
+    // confidence есть только в PostAnalysis, но нет в News - не добавляем его
     // ✅ ИСПРАВЛЕНО: проверяем, что topic существует
     topic_name: news.topic_name || (analysis as any).topic?.name,
     topic_id: news.topic_id || analysis.topic_id || (analysis as any).topic?.id,
