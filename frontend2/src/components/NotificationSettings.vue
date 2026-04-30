@@ -48,6 +48,19 @@ const toggleSetValue = (target: Ref<Set<string>>, value: string) => {
   }
   target.value = next;
 };
+
+// Fix for TypeScript errors - explicitly use .value
+const handleTriggerToggle = (value: string) => {
+  toggleSetValue(selectedTriggers, value);
+};
+
+const handleSourceToggle = (value: string) => {
+  toggleSetValue(selectedSources, value);
+};
+
+const handleChannelToggle = (value: string) => {
+  toggleSetValue(selectedChannels, value);
+};
 </script>
 
 <template>
@@ -107,7 +120,7 @@ const toggleSetValue = (target: Ref<Set<string>>, value: string) => {
               <input
                 type="checkbox"
                 :checked="selectedTriggers.has(trigger.id)"
-                @change="toggleSetValue(selectedTriggers, trigger.id)"
+                @change="handleTriggerToggle(trigger.id)"
               />
               <div>
                 <strong>{{ trigger.label }}</strong>
@@ -131,7 +144,7 @@ const toggleSetValue = (target: Ref<Set<string>>, value: string) => {
             :key="source.id"
             type="button"
             :class="{ selected: selectedSources.has(source.id) }"
-            @click="toggleSetValue(selectedSources, source.id)"
+            @click="handleSourceToggle(source.id)"
           >
             {{ source.label }}
           </button>
@@ -150,7 +163,7 @@ const toggleSetValue = (target: Ref<Set<string>>, value: string) => {
             <input
               type="checkbox"
               :checked="selectedChannels.has(channel.id)"
-              @change="toggleSetValue(selectedChannels, channel.id)"
+              @change="handleChannelToggle(channel.id)"
             />
             <span>{{ channel.label }}</span>
           </label>

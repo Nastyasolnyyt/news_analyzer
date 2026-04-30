@@ -51,6 +51,8 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['loading-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-secondary']} */ ;
 /** @type {__VLS_StyleScopedClasses['logo']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-btn']} */ ;
@@ -90,17 +92,39 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 if (__VLS_ctx.loading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "loading" },
+        ...{ class: "loading-state" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "spinner" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
 }
 else if (__VLS_ctx.error) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "error" },
+        ...{ class: "error-state" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "error-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
+        ...{ class: "error-message" },
     });
     (__VLS_ctx.error);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.loading))
+                    return;
+                if (!(__VLS_ctx.error))
+                    return;
+                __VLS_ctx.$router.back();
+            } },
+        ...{ class: "btn-secondary" },
+    });
 }
 else if (__VLS_ctx.entity) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "entity-loaded" },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
         ...{ class: "hero" },
     });
@@ -115,7 +139,7 @@ else if (__VLS_ctx.entity) {
                     return;
                 if (!(__VLS_ctx.entity))
                     return;
-                __VLS_ctx.router.back();
+                __VLS_ctx.$router.back();
             } },
         ...{ class: "back-button" },
     });
@@ -214,11 +238,12 @@ else if (__VLS_ctx.entity) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 key: (idx),
                 ...{ class: "bar" },
-                title: (item.note || `Неделя ${item.week}: ${item.count} упоминаний`),
+                title: (item.note || `${item.week}: ${item.count} упоминаний`),
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "bar-fill" },
-                ...{ style: ({ height: `${(item.count / (__VLS_ctx.maxChartValue || 1)) * 100}px` }) },
+                ...{ style: ({ height: `${__VLS_ctx.maxChartValue > 0 ? (item.count / __VLS_ctx.maxChartValue) * 100 : 0}%` }) },
+                ...{ class: ({ 'has-note': item.note }) },
             });
             if (item.note) {
                 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
@@ -229,7 +254,7 @@ else if (__VLS_ctx.entity) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "week" },
             });
-            (new Date(item.week).toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' }));
+            (item.week);
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "bar-value" },
             });
@@ -340,25 +365,15 @@ else if (__VLS_ctx.entity) {
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({});
     }
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-        ...{ class: "action-section" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                if (!!(__VLS_ctx.loading))
-                    return;
-                if (!!(__VLS_ctx.error))
-                    return;
-                if (!(__VLS_ctx.entity))
-                    return;
-                __VLS_ctx.router.push('/search');
-            } },
-        ...{ class: "primary" },
-    });
 }
 /** @type {__VLS_StyleScopedClasses['entity-page']} */ ;
-/** @type {__VLS_StyleScopedClasses['loading']} */ ;
-/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['loading-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['spinner']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['error-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['entity-loaded']} */ ;
 /** @type {__VLS_StyleScopedClasses['hero']} */ ;
 /** @type {__VLS_StyleScopedClasses['back-nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['back-button']} */ ;
@@ -404,13 +419,10 @@ else if (__VLS_ctx.entity) {
 /** @type {__VLS_StyleScopedClasses['summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['inline-link']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-section']} */ ;
-/** @type {__VLS_StyleScopedClasses['primary']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
-            router: router,
             entity: entity,
             chartData: chartData,
             relatedEntities: relatedEntities,

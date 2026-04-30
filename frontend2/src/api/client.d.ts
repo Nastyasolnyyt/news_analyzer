@@ -130,7 +130,13 @@ export declare const api: {
         }>;
         news: News[];
     }>;
-    getEntities(): Promise<Entity[]>;
+    getEntities(params?: {
+        limit?: number;
+    }): Promise<Array<Entity & {
+        recentMentions: number;
+        previousMentions: number;
+        topicCount: number;
+    }>>;
     getEntityById(id: number): Promise<Entity>;
     getEntitiesByIds(ids: number[]): Promise<Entity[]>;
     getHighRiskNews(params?: {

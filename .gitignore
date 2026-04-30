@@ -1,84 +1,33 @@
-# --- СЕКРЕТЫ И КОНФИГУРАЦИЯ (Самое важное) ---
+```
+# TypeScript/JavaScript build artifacts
+*.d.ts
+*.js
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Editors
+.vscode/
+.idea/
+
+# Environment
 .env
 .env.local
-.env.*.local
-*.env
-config.ini
-settings.json
+*.env.*
 
-# --- СИСТЕМНЫЕ ФАЙЛЫ ---
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# --- PYTHON ---
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-.hypothesis/
-*.manifest
-*.spec
-pip-log.txt
-pip-delete-this-directory.txt
-venv/
-ENV/
-env/
-.venv/
-
-# --- DOCKER ---
-docker-compose.override.yml
-.docker/
-
-# --- FRONTEND (Vue/Node) ---
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-dist/
-dist-ssr/
-*.local
-.eslintcache
-
-# --- LOGS ---
-logs/
+# Logs and temp files
 *.log
-server.log
+*.tmp
+*.swp
 
-# --- TEMP ---
-tmp/
-temp/
-.cache/
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Build outputs
+dist/
+build/
+target/
+```

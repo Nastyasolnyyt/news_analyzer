@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Dashboard from './views/Dashboard.vue';
 import Search from './views/Search.vue';
+import AllEntities from './views/AllEntities.vue';
 import EntityProfile from './views/EntityProfile.vue';
 import NewsDetail from './views/NewsDetail.vue';
 import Notifications from './views/Notifications.vue';
@@ -14,6 +15,11 @@ const router = createRouter({
             component: Dashboard,
         },
         {
+            path: '/entities',
+            name: 'all-entities',
+            component: AllEntities,
+        },
+        {
             path: '/entity/:id',
             name: 'entity',
             component: EntityProfile,
@@ -23,12 +29,6 @@ const router = createRouter({
             path: '/search',
             name: 'search',
             component: Search,
-        },
-        {
-            path: '/entity/:id',
-            name: 'entity',
-            component: EntityProfile,
-            props: true,
         },
         {
             path: '/news/:id',
