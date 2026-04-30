@@ -92,18 +92,18 @@ const averageMetrics = computed(() => ({
 onMounted(async () => {
   try {
     loading.value = true;
-    console.log('📊 Loading reports data...');
+    console.log('Loading reports data...');
     
     const data = await api.getNews({
       page: 1,
-      page_size: 100,
+      page_size: 500,  // Увеличили лимит до 500 новостей
     });
     
     news.value = data.items;
-    console.log('✅ Reports loaded:', data.items.length, 'items');
+    console.log('Reports loaded:', data.items.length, 'items');
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки отчёта';
-    console.error('❌ Reports error:', error.value);
+    console.error('Reports error:', error.value);
   } finally {
     loading.value = false;
   }
@@ -171,15 +171,15 @@ const reloadPage = () => {
     <!-- Header -->
     <header class="page-header">
       <div>
-        <h1>📊 Аналитика и отчёты</h1>
+        <h1>Аналитика и отчёты</h1>
         <p class="subtitle">Детальная аналитика по обработанным новостям</p>
       </div>
       <div class="header-actions">
         <button class="btn-secondary" @click="handleExport('json')" :disabled="loading">
-          📥 JSON
+          Экспорт JSON
         </button>
         <button class="btn-secondary" @click="handleExport('csv')" :disabled="loading">
-          📊 CSV
+          Экспорт CSV
         </button>
       </div>
     </header>
@@ -187,12 +187,12 @@ const reloadPage = () => {
     <!-- Loading State -->
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <p>⏳ Загружаем аналитику...</p>
+      <p>Загружаем аналитику...</p>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="error-state">
-      <p>❌ {{ error }}</p>
+      <p>{{ error }}</p>
       <button class="btn-secondary" @click="reloadPage">Попробовать снова</button>
     </div>
 
@@ -204,9 +204,9 @@ const reloadPage = () => {
           <label>Фильтр по риску:</label>
           <select v-model="riskFilter" class="filter-select">
             <option value="all">Все уровни</option>
-            <option value="high">🔴 Высокий</option>
-            <option value="medium">🟠 Средний</option>
-            <option value="low">🟢 Низкий</option>
+            <option value="high">Высокий</option>
+            <option value="medium">Средний</option>
+            <option value="low">Низкий</option>
           </select>
         </div>
 
@@ -214,9 +214,9 @@ const reloadPage = () => {
           <label>Фильтр по тональности:</label>
           <select v-model="sentimentFilter" class="filter-select">
             <option value="all">Все</option>
-            <option value="positive">😊 Позитив</option>
-            <option value="neutral">😐 Нейтраль</option>
-            <option value="negative">😞 Негатив</option>
+            <option value="positive">Позитив</option>
+            <option value="neutral">Нейтраль</option>
+            <option value="negative">Негатив</option>
           </select>
         </div>
 
@@ -241,15 +241,15 @@ const reloadPage = () => {
           <p class="stat-label">По уровню риска</p>
           <div class="risk-bars">
             <div class="risk-bar">
-              <span class="risk-badge high">🔴</span>
+              <span class="risk-badge high"></span>
               <span class="risk-count">{{ riskStats.high }}</span>
             </div>
             <div class="risk-bar">
-              <span class="risk-badge medium">🟠</span>
+              <span class="risk-badge medium"></span>
               <span class="risk-count">{{ riskStats.medium }}</span>
             </div>
             <div class="risk-bar">
-              <span class="risk-badge low">🟢</span>
+              <span class="risk-badge low"></span>
               <span class="risk-count">{{ riskStats.low }}</span>
             </div>
           </div>
@@ -260,15 +260,15 @@ const reloadPage = () => {
           <p class="stat-label">По тональности</p>
           <div class="sentiment-bars">
             <div class="sentiment-bar">
-              <span class="sentiment-badge positive">😊</span>
+              <span class="sentiment-badge positive"></span>
               <span class="sentiment-count">{{ sentimentStats.positive }}</span>
             </div>
             <div class="sentiment-bar">
-              <span class="sentiment-badge neutral">😐</span>
+              <span class="sentiment-badge neutral"></span>
               <span class="sentiment-count">{{ sentimentStats.neutral }}</span>
             </div>
             <div class="sentiment-bar">
-              <span class="sentiment-badge negative">😞</span>
+              <span class="sentiment-badge negative"></span>
               <span class="sentiment-count">{{ sentimentStats.negative }}</span>
             </div>
           </div>
