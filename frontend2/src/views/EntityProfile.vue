@@ -114,7 +114,7 @@ watch(chartData, (newData) => {
         <header>
           <div>
             <p class="overline">Динамика упоминаний</p>
-            <h2>Упоминания по неделям</h2>
+            <h2>Упоминания по дням (за неделю)</h2>
           </div>
           <span class="count">{{ chartData.reduce((sum, d) => sum + d.count, 0) }} всего</span>
         </header>
@@ -125,15 +125,16 @@ watch(chartData, (newData) => {
               v-for="(item, idx) in chartData" 
               :key="idx" 
               class="bar"
-              :title="item.note || `Неделя ${item.week}: ${item.count} упоминаний`"
+              :title="item.note || `${item.week}: ${item.count} упоминаний`"
             >
               <div 
                 class="bar-fill" 
-                :style="{ height: `${(item.count / maxChartValue) * 100}%` }"
+                :style="{ height: `${maxChartValue > 0 ? (item.count / maxChartValue) * 100 : 0}%` }"
+                :class="{ 'has-note': item.note }"
               >
                 <span v-if="item.note" class="note">{{ item.note }}</span>
               </div>
-              <span class="week">{{ new Date(item.week).toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' }) }}</span>
+              <span class="week">{{ item.week }}</span>
               <span class="bar-value">{{ item.count }}</span>
             </div>
           </div>
