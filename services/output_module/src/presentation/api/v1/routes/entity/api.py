@@ -2,8 +2,8 @@ from typing import List
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, Depends
-from src.application.schemas.named_entity import EntityInfo, EntityMentionsFilterDTO
+from fastapi import APIRouter, Depends, HTTPException
+from src.application.schemas.named_entity import EntityInfo, EntityMentionsFilterDTO, EntityDetailsResponse
 from src.services.entity import EntityService
 
 
@@ -22,3 +22,28 @@ async def get_entity_mentions(
 ) -> List[EntityInfo]:
     """Получение упоминаний сущности с фильтрацией по датам (start, end)."""
     return await entity_service.get_entity_mentions(entity_id, filters)
+
+
+@ROUTER.get(
+    "/{entity_id}/details",
+    response_model=EntityDetailsResponse,
+    summary="Получить детальную информацию о сущности",
+)
+async def get_entity_details(
+    entity_service: FromDishka[EntityService],
+    entity_id: int,
+) -> EntityDetailsResponse:
+    """
+    Получение полной информации о сущности для отображения в профиле.
+    Включает:
+    - Основные данные (название, тип, описание)
+    - Связанные сущности (партнёры, ключевые персоны)
+    - Динамику упоминаний (график по неделям)
+    - Последние новости/события
+    """
+    try:
+        return await entity_service.get_entity_details(entity_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
