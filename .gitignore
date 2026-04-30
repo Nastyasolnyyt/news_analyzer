@@ -1,4 +1,15 @@
+
 ```gitignore
+
+```
+# TypeScript build artifacts
+**/*.tsbuildinfo
+
+# Vue.js build artifacts
+**/*.vue.js
+
+venv_py311
+
 # Dependencies
 node_modules/
 
