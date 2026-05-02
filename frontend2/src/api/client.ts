@@ -377,31 +377,81 @@ export const api = {
 
   // Получить список сущностей с их статистикой
   async getEntities(params?: { limit?: number }): Promise<Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>> {
-    const limit = params?.limit || 10;
-    const url = `${API_BASE}/entities?limit=${limit}`;
-    console.log('🔍 Fetching entities from:', url);
+    const limit = params?.limit || 100;
     
-    const res = await fetch(url);
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => '');
-      throw new Error(`API error ${res.status}: ${res.statusText}. ${errorText.slice(0, 200)}`);
+    // Поскольку эндпоинт /entities может отсутствовать на сервере,
+    // мы получаем сущности через посты и извлекаем уникальные сущности
+    try {
+      const url = `${API_BASE}/posts?page_size=${limit * 3}`;
+      console.log('🔍 Fetching entities via posts from:', url);
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`API error ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      
+      // Собираем все сущности из постов
+      const entityMap = new Map<number, any>();
+      for (const item of items) {
+        const entities = item.entities || [];
+        for (const entity of entities) {
+          if (!entityMap.has(entity.id)) {
+            entityMap.set(entity.id, {
+              id: entity.id,
+              name: entity.name,
+              type: entity.entity_type?.includes('PER') ? 'Person' : 'Company',
+              entity_type: entity.entity_type,
+              description: `${entity.name} — ${entity.entity_type}`,
+              recentMentions: 0,
+              previousMentions: 0,
+              topicCount: 0,
+            });
+          }
+          // Считаем упоминания
+          const e = entityMap.get(entity.id);
+          e.recentMentions = (e.recentMentions || 0) + 1;
+        }
+      }
+      
+      const entities = Array.from(entityMap.values()).slice(0, limit);
+      console.log('✅ Loaded entities:', entities.length);
+      
+      return entities;
+    } catch (error) {
+      console.error('❌ Error fetching entities:', error);
+      // Fallback: пробуем прямой запрос к /entities
+      try {
+        const url = `${API_BASE}/entities?limit=${limit}`;
+        console.log('🔍 Fallback: Fetching entities from:', url);
+        
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`API error ${res.status}: ${res.statusText}`);
+        }
+        
+        const data = await res.json();
+        const entities = Array.isArray(data) ? data : data.items || [];
+        
+        console.log('✅ Loaded entities (fallback):', entities.length);
+        
+        return entities.map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
+          entity_type: e.entity_type,
+          description: e.description,
+          recentMentions: e.recent_mentions || 0,
+          previousMentions: e.previous_mentions || 0,
+          topicCount: e.topic_count || 0,
+        }));
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        throw error;
+      }
     }
-    
-    const data = await res.json();
-    const entities = Array.isArray(data) ? data : data.items || [];
-    
-    console.log('✅ Loaded entities:', entities.length);
-    
-    return entities.map((e: any) => ({
-      id: e.id,
-      name: e.name,
-      type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
-      entity_type: e.entity_type,
-      description: e.description,
-      recentMentions: e.recent_mentions || 0,
-      previousMentions: e.previous_mentions || 0,
-      topicCount: e.topic_count || 0,
-    }));
   },
 
   // Получить сущность по ID
