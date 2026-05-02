@@ -437,6 +437,13 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "risk-badge high" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "risk-bar-fill-container" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "risk-bar-fill" },
+        ...{ style: ({ width: __VLS_ctx.riskStats.high + __VLS_ctx.riskStats.medium + __VLS_ctx.riskStats.low > 0 ? (__VLS_ctx.riskStats.high / (__VLS_ctx.riskStats.high + __VLS_ctx.riskStats.medium + __VLS_ctx.riskStats.low) * 100) + '%' : '0%' }) },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "risk-count" },
     });
@@ -447,6 +454,13 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "risk-badge medium" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "risk-bar-fill-container" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "risk-bar-fill medium" },
+        ...{ style: ({ width: __VLS_ctx.riskStats.high + __VLS_ctx.riskStats.medium + __VLS_ctx.riskStats.low > 0 ? (__VLS_ctx.riskStats.medium / (__VLS_ctx.riskStats.high + __VLS_ctx.riskStats.medium + __VLS_ctx.riskStats.low) * 100) + '%' : '0%' }) },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "risk-count" },
     });
@@ -456,6 +470,13 @@ else {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "risk-badge low" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "risk-bar-fill-container" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "risk-bar-fill low" },
+        ...{ style: ({ width: __VLS_ctx.riskStats.high + __VLS_ctx.riskStats.medium + __VLS_ctx.riskStats.low > 0 ? (__VLS_ctx.riskStats.low / (__VLS_ctx.riskStats.high + __VLS_ctx.riskStats.medium + __VLS_ctx.riskStats.low) * 100) + '%' : '0%' }) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "risk-count" },
@@ -476,6 +497,13 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "sentiment-badge positive" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "sentiment-bar-fill-container" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "sentiment-bar-fill" },
+        ...{ style: ({ width: __VLS_ctx.sentimentStats.positive + __VLS_ctx.sentimentStats.neutral + __VLS_ctx.sentimentStats.negative > 0 ? (__VLS_ctx.sentimentStats.positive / (__VLS_ctx.sentimentStats.positive + __VLS_ctx.sentimentStats.neutral + __VLS_ctx.sentimentStats.negative) * 100) + '%' : '0%' }) },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "sentiment-count" },
     });
@@ -486,6 +514,13 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "sentiment-badge neutral" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "sentiment-bar-fill-container" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "sentiment-bar-fill neutral" },
+        ...{ style: ({ width: __VLS_ctx.sentimentStats.positive + __VLS_ctx.sentimentStats.neutral + __VLS_ctx.sentimentStats.negative > 0 ? (__VLS_ctx.sentimentStats.neutral / (__VLS_ctx.sentimentStats.positive + __VLS_ctx.sentimentStats.neutral + __VLS_ctx.sentimentStats.negative) * 100) + '%' : '0%' }) },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "sentiment-count" },
     });
@@ -495,6 +530,13 @@ else {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "sentiment-badge negative" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "sentiment-bar-fill-container" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "sentiment-bar-fill negative" },
+        ...{ style: ({ width: __VLS_ctx.sentimentStats.positive + __VLS_ctx.sentimentStats.neutral + __VLS_ctx.sentimentStats.negative > 0 ? (__VLS_ctx.sentimentStats.negative / (__VLS_ctx.sentimentStats.positive + __VLS_ctx.sentimentStats.neutral + __VLS_ctx.sentimentStats.negative) * 100) + '%' : '0%' }) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "sentiment-count" },
@@ -712,13 +754,21 @@ else {
 /** @type {__VLS_StyleScopedClasses['risk-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['high']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-bar-fill-container']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-bar-fill']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['medium']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-bar-fill-container']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-bar-fill']} */ ;
+/** @type {__VLS_StyleScopedClasses['medium']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['low']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-bar-fill-container']} */ ;
+/** @type {__VLS_StyleScopedClasses['risk-bar-fill']} */ ;
 /** @type {__VLS_StyleScopedClasses['low']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['stat-card']} */ ;
@@ -727,13 +777,21 @@ else {
 /** @type {__VLS_StyleScopedClasses['sentiment-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['positive']} */ ;
+/** @type {__VLS_StyleScopedClasses['sentiment-bar-fill-container']} */ ;
+/** @type {__VLS_StyleScopedClasses['sentiment-bar-fill']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['neutral']} */ ;
+/** @type {__VLS_StyleScopedClasses['sentiment-bar-fill-container']} */ ;
+/** @type {__VLS_StyleScopedClasses['sentiment-bar-fill']} */ ;
+/** @type {__VLS_StyleScopedClasses['neutral']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['negative']} */ ;
+/** @type {__VLS_StyleScopedClasses['sentiment-bar-fill-container']} */ ;
+/** @type {__VLS_StyleScopedClasses['sentiment-bar-fill']} */ ;
 /** @type {__VLS_StyleScopedClasses['negative']} */ ;
 /** @type {__VLS_StyleScopedClasses['sentiment-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['stat-card']} */ ;

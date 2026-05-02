@@ -341,6 +341,48 @@ export const api = {
     }
   },
 
+  // Получить топ сущностей за 24 часа по росту интереса
+  async getTopEntities24h(params?: { limit?: number }): Promise<Array<{
+    id: number;
+    name: string;
+    entity_type: string;
+    changePercent: number;
+    direction: 'up' | 'down' | 'flat';
+    category: string;
+  }>> {
+    try {
+      const limit = params?.limit || 5;
+      const url = `${API_BASE}/entities/top/24h?limit=${limit}`;
+      console.log('🔍 Fetching top entities 24h from:', url);
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('⚠️ Top entities endpoint not found, returning empty list');
+          return [];
+        }
+        throw new Error(`API error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      const entities = Array.isArray(data) ? data : [];
+      
+      console.log('✅ Loaded top entities 24h:', entities.length);
+      
+      return entities.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        entity_type: e.entity_type,
+        changePercent: e.change_percent,
+        direction: e.direction,
+        category: e.entity_type || 'Сущность',
+      }));
+    } catch (error) {
+      console.error('❌ Error fetching top entities 24h:', error);
+      return [];
+    }
+  },
+
   // Получить список сущностей с их статистикой
   async getEntities(params?: { limit?: number }): Promise<Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>> {
     try {

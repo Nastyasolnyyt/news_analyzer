@@ -14,6 +14,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003';
 // Реальные данные из API
 const newsData = ref<News[]>([]);
 const allEntities = ref<Entity[]>([]);
+const topEntitiesData = ref<Array<{
+  id: number;
+  name: string;
+  changePercent: number;
+  direction: 'up' | 'down' | 'flat';
+  category: string;
+}>>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
  
@@ -22,23 +29,15 @@ const stats = computed(() => ({
   relevantNews: newsData.value.length,
 }));
  
-// Сущности для отображения (top 5 с расчетом прироста)
+// Сущности для отображения (топ за 24 часа из API)
 const topEntities = computed(() => {
-  return allEntities.value.slice(0, 5).map((entity: any) => {
-    // Считаем прирост сущности на основе recent vs previous mentions
-    const recent = entity.recentMentions || 0;
-    const previous = entity.previousMentions || 1;
-    const changePercent = previous > 0 ? Math.round(((recent - previous) / previous) * 100) : 0;
-    const direction: 'up' | 'down' | 'flat' = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
-    
-    return {
-      id: entity.id,
-      name: entity.name,
-      changePercent: Math.abs(changePercent),
-      direction,
-      category: entity.entity_type || 'Entity',
-    };
-  });
+  return topEntitiesData.value.map((entity) => ({
+    id: entity.id,
+    name: entity.name,
+    changePercent: entity.changePercent,
+    direction: entity.direction,
+    category: entity.category,
+  }));
 });
  
 // События для ленты (последние новости)
@@ -73,12 +72,23 @@ onMounted(async () => {
     });
     newsData.value = newsResponse.items;
     
-    // Загружаем сущности
+    // Загружаем топ сущностей за 24 часа (реальные данные из API)
+    const topEntitiesRaw = await api.getTopEntities24h({ limit: 5 });
+    topEntitiesData.value = topEntitiesRaw.map((e: any) => ({
+      id: e.id,
+      name: e.name,
+      changePercent: e.changePercent,
+      direction: e.direction,
+      category: mapEntityTypeToCategory(e.entity_type),
+    }));
+    
+    // Загружаем все сущности (для других целей)
     const entities = await api.getEntities({ limit: 10 });
     allEntities.value = entities;
     
     console.log('✅ Dashboard loaded:', {
       newsItems: newsData.value.length,
+      topEntities: topEntitiesData.value.length,
       entities: allEntities.value.length
     });
   } catch (e: any) {
@@ -88,6 +98,17 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+// Функция для маппинга типа сущности на категорию для отображения
+function mapEntityTypeToCategory(entityType?: string): string {
+  if (!entityType) return 'Сущность';
+  const type = entityType.toLowerCase();
+  if (type.includes('per') || type.includes('person') || type.includes('персона')) return 'Персона';
+  if (type.includes('company') || type.includes('org') || type.includes('организация')) return 'Компания';
+  if (type.includes('event') || type.includes('событие')) return 'Событие';
+  if (type.includes('loc') || type.includes('location') || type.includes('локация')) return 'Локация';
+  return 'Сущность';
+}
  
 const handleEntityClick = (entityId: number) => {
   router.push(`/entity/${entityId}`);

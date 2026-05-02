@@ -131,6 +131,16 @@ export declare const api: {
         }>;
         news: News[];
     }>;
+    getTopEntities24h(params?: {
+        limit?: number;
+    }): Promise<Array<{
+        id: number;
+        name: string;
+        entity_type: string;
+        changePercent: number;
+        direction: "up" | "down" | "flat";
+        category: string;
+    }>>;
     getEntities(params?: {
         limit?: number;
     }): Promise<Array<Entity & {
