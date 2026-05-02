@@ -392,10 +392,6 @@ export const api = {
       
       const res = await fetch(url);
       if (!res.ok) {
-        if (res.status === 404) {
-          console.warn('⚠️ Entities endpoint not found, returning empty list');
-          return [];
-        }
         throw new Error(`API error: ${res.status}`);
       }
       
@@ -416,7 +412,7 @@ export const api = {
       }));
     } catch (error) {
       console.error('❌ Error fetching entities:', error);
-      return [];
+      throw error;
     }
   },
 

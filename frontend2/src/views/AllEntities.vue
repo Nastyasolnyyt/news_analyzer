@@ -42,6 +42,20 @@ const handleSearch = () => {
 const handleEntityClick = (entityId: number) => {
   router.push(`/entity/${entityId}`);
 };
+
+const reloadPage = async () => {
+  loading.value = true;
+  error.value = null;
+  try {
+    const allEntities = await api.getEntities({ limit: 100 });
+    entities.value = allEntities;
+    filteredEntities.value = allEntities;
+  } catch (e: any) {
+    error.value = e.message || 'Ошибка загрузки сущностей';
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>

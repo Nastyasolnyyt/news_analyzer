@@ -77,7 +77,7 @@ const handleClick = (newsId: number) => {
             </span>
             
             <!-- Тип риска (если есть) -->
-            <span v-if="item.riskType" class="type-badge">
+            <span v-if="item.riskType" class="type-badge" :data-risk-type="item.riskType">
               {{ riskTypeLabel(item.riskType) }}
             </span>
           </div>
@@ -210,9 +210,27 @@ h3 {
   font-size: 0.8rem;
   padding: 4px 10px;
   border-radius: 6px;
-  background: rgba(158, 158, 158, 0.15);
-  color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
+  background: rgba(101, 163, 216, 0.15);
+  color: #65a3d8;
+}
+
+/* Политический - синий */
+.type-badge[data-risk-type='политический'] {
+  background: rgba(101, 163, 216, 0.15);
+  color: #65a3d8;
+}
+
+/* Экономический - зеленый */
+.type-badge[data-risk-type='экономический'] {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+/* Социальный - оранжевый */
+.type-badge[data-risk-type='социальный'] {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
 }
 
 .inline-link {
