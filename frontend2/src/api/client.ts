@@ -350,150 +350,58 @@ export const api = {
     direction: 'up' | 'down' | 'flat';
     category: string;
   }>> {
-    try {
-      const limit = params?.limit || 5;
-      const url = `${API_BASE}/entities/top/24h?limit=${limit}`;
-      console.log('🔍 Fetching top entities 24h from:', url);
-      
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (res.status === 404) {
-          console.warn('⚠️ Top entities endpoint not found, using mock data');
-        } else {
-          console.warn(`⚠️ API error ${res.status}, using mock data`);
-        }
-        // ✅ FALLBACK на mock-данные
-        const { entities: mockEntities } = await import('../mockData');
-        return mockEntities.slice(0, limit).map((e) => ({
-          id: e.id,
-          name: e.name,
-          entity_type: e.category || 'Сущность',
-          changePercent: e.changePercent || 10,
-          direction: e.direction || 'flat',
-          category: e.category || 'Сущность',
-        }));
-      }
-      
-      const data = await res.json();
-      const entities = Array.isArray(data) ? data : [];
-      
-      // ✅ Fallback на mock-данные если API вернул пустой список
-      if (entities.length === 0) {
-        console.warn('⚠️ API returned empty top entities list, using mock data');
-        const { entities: mockEntities } = await import('../mockData');
-        return mockEntities.slice(0, limit).map((e) => ({
-          id: e.id,
-          name: e.name,
-          entity_type: e.category || 'Сущность',
-          changePercent: e.changePercent || 10,
-          direction: e.direction || 'flat',
-          category: e.category || 'Сущность',
-        }));
-      }
-      
-      console.log('✅ Loaded top entities 24h:', entities.length);
-      
-      return entities.map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        entity_type: e.entity_type,
-        changePercent: e.change_percent,
-        direction: e.direction,
-        category: e.entity_type || 'Сущность',
-      }));
-    } catch (error) {
-      console.error('❌ Error fetching top entities 24h:', error);
-      // ✅ FINAL FALLBACK на mock-данные
-      console.warn('⚠️ Using mock data as final fallback');
-      const limit = params?.limit || 5;
-      const { entities: mockEntities } = await import('../mockData');
-      return mockEntities.slice(0, limit).map((e) => ({
-        id: e.id,
-        name: e.name,
-        entity_type: e.category || 'Сущность',
-        changePercent: e.changePercent || 10,
-        direction: e.direction || 'flat',
-        category: e.category || 'Сущность',
-      }));
+    const limit = params?.limit || 5;
+    const url = `${API_BASE}/entities/top/24h?limit=${limit}`;
+    console.log('🔍 Fetching top entities 24h from:', url);
+    
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      throw new Error(`API error ${res.status}: ${res.statusText}. ${errorText.slice(0, 200)}`);
     }
+    
+    const data = await res.json();
+    const entities = Array.isArray(data) ? data : [];
+    
+    console.log('✅ Loaded top entities 24h:', entities.length);
+    
+    return entities.map((e: any) => ({
+      id: e.id,
+      name: e.name,
+      entity_type: e.entity_type,
+      changePercent: e.change_percent,
+      direction: e.direction,
+      category: e.entity_type || 'Сущность',
+    }));
   },
 
   // Получить список сущностей с их статистикой
   async getEntities(params?: { limit?: number }): Promise<Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>> {
-    try {
-      const limit = params?.limit || 10;
-      const url = `${API_BASE}/entities?limit=${limit}`;
-      console.log('🔍 Fetching entities from:', url);
-      
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (res.status === 404) {
-          console.warn('⚠️ Entities endpoint not found, using mock data');
-        } else {
-          console.warn(`⚠️ API error ${res.status}, using mock data`);
-        }
-        // ✅ FALLBACK на mock-данные
-        const { entities: mockEntities } = await import('../mockData');
-        return mockEntities.slice(0, limit).map((e) => ({
-          id: e.id,
-          name: e.name,
-          type: e.type,
-          entity_type: e.category,
-          description: e.description,
-          recentMentions: Math.random() * 50 | 0,
-          previousMentions: Math.random() * 30 | 0,
-          topicCount: 3,
-        }));
-      }
-      
-      const data = await res.json();
-      const entities = Array.isArray(data) ? data : data.items || [];
-      
-      // ✅ Fallback на mock-данные если API вернул пустой список
-      if (entities.length === 0) {
-        console.warn('⚠️ API returned empty entities list, using mock data');
-        const { entities: mockEntities } = await import('../mockData');
-        return mockEntities.slice(0, limit).map((e) => ({
-          id: e.id,
-          name: e.name,
-          type: e.type,
-          entity_type: e.category,
-          description: e.description,
-          recentMentions: Math.random() * 50 | 0,
-          previousMentions: Math.random() * 30 | 0,
-          topicCount: 3,
-        }));
-      }
-      
-      console.log('✅ Loaded entities:', entities.length);
-      
-      return entities.map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
-        entity_type: e.entity_type,
-        description: e.description,
-        recentMentions: e.recent_mentions || 0,
-        previousMentions: e.previous_mentions || 0,
-        topicCount: e.topic_count || 0,
-      }));
-    } catch (error) {
-      console.error('❌ Error fetching entities:', error);
-      // ✅ FINAL FALLBACK на mock-данные
-      console.warn('⚠️ Using mock data as final fallback');
-      const limit = params?.limit || 10;
-      const { entities: mockEntities } = await import('../mockData');
-      return mockEntities.slice(0, limit).map((e) => ({
-        id: e.id,
-        name: e.name,
-        type: e.type,
-        entity_type: e.category,
-        description: e.description,
-        recentMentions: e.changePercent ? 50 : 20,
-        previousMentions: 30,
-        topicCount: 3,
-      }));
+    const limit = params?.limit || 10;
+    const url = `${API_BASE}/entities?limit=${limit}`;
+    console.log('🔍 Fetching entities from:', url);
+    
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      throw new Error(`API error ${res.status}: ${res.statusText}. ${errorText.slice(0, 200)}`);
     }
+    
+    const data = await res.json();
+    const entities = Array.isArray(data) ? data : data.items || [];
+    
+    console.log('✅ Loaded entities:', entities.length);
+    
+    return entities.map((e: any) => ({
+      id: e.id,
+      name: e.name,
+      type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
+      entity_type: e.entity_type,
+      description: e.description,
+      recentMentions: e.recent_mentions || 0,
+      previousMentions: e.previous_mentions || 0,
+      topicCount: e.topic_count || 0,
+    }));
   },
 
   // Получить сущность по ID

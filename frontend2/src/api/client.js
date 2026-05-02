@@ -1,7 +1,5 @@
 // frontend/src/api/client.ts
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
-// ✅ MOCK DATA FALLBACK
-import { entities as mockEntities, news as mockNews } from '../mockData';
 // Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
 function enrichNewsWithRisk(news, analysis) {
     if (!analysis)
@@ -46,25 +44,6 @@ export const api = {
             console.log('🔍 Fetching posts from:', url);
             const res = await fetch(url);
             if (!res.ok) {
-                if (res.status === 404) {
-                    console.warn('⚠️ Posts endpoint not found, using mock data');
-                    // ✅ FALLBACK на mock-данные
-                    const pageSize = params?.page_size || 20;
-                    return {
-                        items: mockNews.slice(0, pageSize).map(n => ({
-                            id: n.id,
-                            title: n.title,
-                            text: n.fullText?.join('\n') || '',
-                            source: n.source,
-                            pub_date: n.date,
-                            date: n.date,
-                            risk_level: n.riskLevel,
-                            risk_type: ['политический', 'экономический', 'социальный'][Math.floor(Math.random() * 3)],
-                            summary: n.summary,
-                        })),
-                        total: mockNews.length,
-                    };
-                }
                 throw new Error(`API error: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
@@ -82,25 +61,6 @@ export const api = {
                     return enrichNewsWithRisk(newsItem, item.analysis);
                 })
                 : [];
-            // ✅ FALLBACK на mock-данные если пустой результат
-            if (items.length === 0) {
-                console.warn('⚠️ API returned empty news list, using mock data');
-                const pageSize = params?.page_size || 20;
-                return {
-                    items: mockNews.slice(0, pageSize).map(n => ({
-                        id: n.id,
-                        title: n.title,
-                        text: n.fullText?.join('\n') || '',
-                        source: n.source,
-                        pub_date: n.date,
-                        date: n.date,
-                        risk_level: n.riskLevel,
-                        risk_type: ['политический', 'экономический', 'социальный'][Math.floor(Math.random() * 3)],
-                        summary: n.summary,
-                    })),
-                    total: mockNews.length,
-                };
-            }
             console.log('✅ Loaded news:', items.length, 'items');
             if (items.length > 0) {
                 console.log('📊 First item risk:', {
@@ -112,23 +72,7 @@ export const api = {
         }
         catch (error) {
             console.error('❌ Error fetching news:', error);
-            // ✅ FINAL FALLBACK
-            console.warn('⚠️ Using mock data as final fallback');
-            const pageSize = params?.page_size || 20;
-            return {
-                items: mockNews.slice(0, pageSize).map(n => ({
-                    id: n.id,
-                    title: n.title,
-                    text: n.fullText?.join('\n') || '',
-                    source: n.source,
-                    pub_date: n.date,
-                    date: n.date,
-                    risk_level: n.riskLevel,
-                    risk_type: ['политический', 'экономический', 'социальный'][Math.floor(Math.random() * 3)],
-                    summary: n.summary,
-                })),
-                total: mockNews.length,
-            };
+            throw error;
         }
     },
     // Получить одну новость по ID
@@ -256,132 +200,49 @@ export const api = {
     },
     // Получить топ сущностей за 24 часа по росту интереса
     async getTopEntities24h(params) {
-        try {
-            const limit = params?.limit || 5;
-            const url = `${API_BASE}/entities/top/24h?limit=${limit}`;
-            console.log('🔍 Fetching top entities 24h from:', url);
-            const res = await fetch(url);
-            if (!res.ok) {
-                if (res.status === 404) {
-                    console.warn('⚠️ Top entities endpoint not found, using mock data');
-                } else {
-                    console.warn(`⚠️ API error ${res.status}, using mock data`);
-                }
-                // ✅ FALLBACK на mock-данные
-                return mockEntities.slice(0, limit).map((e) => ({
-                    id: e.id,
-                    name: e.name,
-                    entity_type: e.category,
-                    changePercent: e.changePercent || 10,
-                    direction: e.direction || 'flat',
-                    category: e.category || 'Сущность',
-                }));
-            }
-            const data = await res.json();
-            const entities = Array.isArray(data) ? data : [];
-            // ✅ Fallback на mock-данные если API вернул пустой список
-            if (entities.length === 0) {
-                console.warn('⚠️ API returned empty top entities list, using mock data');
-                return mockEntities.slice(0, limit).map((e) => ({
-                    id: e.id,
-                    name: e.name,
-                    entity_type: e.category,
-                    changePercent: e.changePercent || 10,
-                    direction: e.direction || 'flat',
-                    category: e.category || 'Сущность',
-                }));
-            }
-            console.log('✅ Loaded top entities 24h:', entities.length);
-            return entities.map((e) => ({
-                id: e.id,
-                name: e.name,
-                entity_type: e.entity_type,
-                changePercent: e.change_percent,
-                direction: e.direction,
-                category: e.entity_type || 'Сущность',
-            }));
+        const limit = params?.limit || 5;
+        const url = `${API_BASE}/entities/top/24h?limit=${limit}`;
+        console.log('🔍 Fetching top entities 24h from:', url);
+        const res = await fetch(url);
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => '');
+            throw new Error(`API error ${res.status}: ${res.statusText}. ${errorText.slice(0, 200)}`);
         }
-        catch (error) {
-            console.error('❌ Error fetching top entities 24h:', error);
-            // ✅ FINAL FALLBACK на mock-данные
-            console.warn('⚠️ Using mock data as final fallback');
-            const limit = params?.limit || 5;
-            return mockEntities.slice(0, limit).map((e) => ({
-                id: e.id,
-                name: e.name,
-                entity_type: e.category,
-                changePercent: e.changePercent || 10,
-                direction: e.direction || 'flat',
-                category: e.category || 'Сущность',
-            }));
-        }
+        const data = await res.json();
+        const entities = Array.isArray(data) ? data : [];
+        console.log('✅ Loaded top entities 24h:', entities.length);
+        return entities.map((e) => ({
+            id: e.id,
+            name: e.name,
+            entity_type: e.entity_type,
+            changePercent: e.change_percent,
+            direction: e.direction,
+            category: e.entity_type || 'Сущность',
+        }));
     },
     // Получить список сущностей с их статистикой
     async getEntities(params) {
-        try {
-            const limit = params?.limit || 10;
-            const url = `${API_BASE}/entities?limit=${limit}`;
-            console.log('🔍 Fetching entities from:', url);
-            const res = await fetch(url);
-            if (!res.ok) {
-                if (res.status === 404) {
-                    console.warn('⚠️ Entities endpoint not found, using mock data');
-                    return mockEntities.slice(0, limit).map((e) => ({
-                        id: e.id,
-                        name: e.name,
-                        type: e.type,
-                        entity_type: e.category,
-                        description: e.description,
-                        recentMentions: Math.random() * 50 | 0, // Случайное кол-во недавних упоминаний
-                        previousMentions: Math.random() * 30 | 0,
-                        topicCount: 3,
-                    }));
-                }
-                throw new Error(`API error: ${res.status}`);
-            }
-            const data = await res.json();
-            const entities = Array.isArray(data) ? data : data.items || [];
-            // ✅ Fallback на mock-данные если API вернул пустой список
-            if (entities.length === 0) {
-                console.warn('⚠️ API returned empty entities list, using mock data');
-                return mockEntities.slice(0, limit).map((e) => ({
-                    id: e.id,
-                    name: e.name,
-                    type: e.type,
-                    entity_type: e.category,
-                    description: e.description,
-                    recentMentions: Math.random() * 50 | 0,
-                    previousMentions: Math.random() * 30 | 0,
-                    topicCount: 3,
-                }));
-            }
-            console.log('✅ Loaded entities:', entities.length);
-            return entities.map((e) => ({
-                id: e.id,
-                name: e.name,
-                type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
-                entity_type: e.entity_type,
-                description: e.description,
-                recentMentions: e.recent_mentions || 0,
-                previousMentions: e.previous_mentions || 0,
-                topicCount: e.topic_count || 0,
-            }));
+        const limit = params?.limit || 10;
+        const url = `${API_BASE}/entities?limit=${limit}`;
+        console.log('🔍 Fetching entities from:', url);
+        const res = await fetch(url);
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => '');
+            throw new Error(`API error ${res.status}: ${res.statusText}. ${errorText.slice(0, 200)}`);
         }
-        catch (error) {
-            console.error('❌ Error fetching entities:', error);
-            // ✅ Final fallback на mock-данные
-            console.warn('⚠️ Using mock data as final fallback');
-            return mockEntities.slice(0, params?.limit || 10).map((e) => ({
-                id: e.id,
-                name: e.name,
-                type: e.type,
-                entity_type: e.category,
-                description: e.description,
-                recentMentions: e.changePercent ? 50 : 20,
-                previousMentions: 30,
-                topicCount: 3,
-            }));
-        }
+        const data = await res.json();
+        const entities = Array.isArray(data) ? data : data.items || [];
+        console.log('✅ Loaded entities:', entities.length);
+        return entities.map((e) => ({
+            id: e.id,
+            name: e.name,
+            type: e.entity_type?.includes('PER') ? 'Person' : 'Company',
+            entity_type: e.entity_type,
+            description: e.description,
+            recentMentions: e.recent_mentions || 0,
+            previousMentions: e.previous_mentions || 0,
+            topicCount: e.topic_count || 0,
+        }));
     },
     // Получить сущность по ID
     async getEntityById(id) {
