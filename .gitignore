@@ -1,64 +1,57 @@
-```
-# Build artifacts
-frontend2/dist/
-# Dependency directories
-node_modules/
-# TypeScript build info
-tsconfig.tsbuildinfo
-```
 ```gitignore
-# Python
-__pycache__/
+# Compiled Python files
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
+__pycache__/
+
+# Virtual environments
 venv/
 .venv/
-.ENV
-.python-version
-.pytest_cache/
-.mypy_cache/
+.env
+.env.local
+*.env.*
 
-# Build and distribution
-build/
+# Build artifacts
 dist/
-*.egg
-*.egg-info/
-*.so
-*.whl
+build/
+target/
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Logs
 *.log
 
-# Environment variables
-.env
-.env.local
-.env.*
-!.env.example
+# Temporary files
+*.tmp
+*.swp
+*~
 
-# IDE
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# IDE specific
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# OS
+# OS generated files
 .DS_Store
 Thumbs.db
 
-# Coverage
-.coverage
-htmlcov/
-coverage/
+# MyPy cache
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Temporary files
-*.tmp
-*.temp
+# Pytest cache
+.pytest_cache/
+
+# Git
+.git/
 ```
-
-Wait, let me reconsider. Looking at the modified files, they are all source code files (.vue, .py) without any build artifacts, dependencies, or temporary files in the changes. According to rule #6, if the changes contain only source or config files and no build artifacts, dependencies, or temp files, I should output an empty .gitignore.
-
-(empty — output nothing)
