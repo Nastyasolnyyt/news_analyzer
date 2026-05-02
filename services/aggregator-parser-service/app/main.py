@@ -29,6 +29,8 @@ RSS_URLS = ["https://www.vedomosti.ru/rss/news.xml"]
 async def run_parsing_logic(urls: List[str]):
     """
     Основная логика парсинга — вызывается и из планировщика, и из API.
+    Kafka-отправка ограничена таймаутом на уровне producer,
+    чтобы зависание одного сообщения не блокировало весь цикл.
     """
     all_articles = []
     db = SessionLocal()
@@ -43,18 +45,21 @@ async def run_parsing_logic(urls: List[str]):
                     content=art_data.text,
                     link=art_data.link,
                     source=art_data.source,
-                    pub_date=art_data.pub_date
+                    pub_date=art_data.pub_date,
                 )
-                stmt = stmt.on_conflict_do_nothing(index_elements=['link'])
+                stmt = stmt.on_conflict_do_nothing(index_elements=["link"])
                 db.execute(stmt)
                 db.commit()
 
-                existing = db.query(ArticleORM).filter(
-                    ArticleORM.link == art_data.link
-                ).first()
+                existing = (
+                    db.query(ArticleORM)
+                    .filter(ArticleORM.link == art_data.link)
+                    .first()
+                )
 
                 if existing:
                     art_data.id = existing.id
+                    # Каждая отправка имеет собственный таймаут внутри producer
                     await send_article_to_kafka(art_data)
                     all_articles.append(art_data)
 
@@ -72,12 +77,14 @@ async def run_parsing_logic(urls: List[str]):
 def scheduled_parse_job():
     """
     Обёртка для APScheduler.
-    ИСПРАВЛЕНО: используем asyncio.run() вместо get_event_loop(),
-    потому что APScheduler запускает задачу в отдельном потоке,
-    где нет работающего event loop FastAPI.
+    APScheduler запускает задачу в отдельном потоке без event loop,
+    поэтому используем asyncio.run() — он создаёт свежий loop и
+    гарантированно завершает его, не оставляя висящих корутин.
     """
     logger.info(f"[{datetime.now()}] Запуск автоматического сбора новостей...")
     try:
+        # asyncio.run() создаёт новый event loop для каждого вызова —
+        # именно это нужно, чтобы предыдущий зависший цикл не мешал следующему.
         asyncio.run(run_parsing_logic(RSS_URLS))
     except Exception as e:
         logger.error(f"Ошибка в scheduled_parse_job: {e}", exc_info=True)
@@ -87,15 +94,17 @@ def scheduled_parse_job():
 async def start_scheduler():
     """
     Запускается при старте сервера.
-    ИСПРАВЛЕНО: next_run_time=datetime.now() — первый парсинг сразу при старте,
-    затем каждые 30 минут.
+    max_instances=1 оставляем — дублирование не нужно.
+    misfire_grace_time=None означает «запустить, даже если опоздал».
     """
     scheduler.add_job(
         scheduled_parse_job,
-        'interval',
+        "interval",
         minutes=30,
-        id='rss_parse_task',
-        next_run_time=datetime.now()  # сразу запускаем при старте
+        id="rss_parse_task",
+        max_instances=1,
+        misfire_grace_time=None,      # не пропускать пропущенные запуски
+        next_run_time=datetime.now(),  # первый запуск сразу при старте
     )
     scheduler.start()
     jobs = scheduler.get_jobs()
@@ -112,14 +121,12 @@ async def shutdown_scheduler():
 
 @app.post("/parse", response_model=List[Article])
 async def parse_endpoint(urls: List[str]):
-    """
-    Ручной запуск парсинга через API.
-    """
+    """Ручной запуск парсинга через API."""
     articles = await run_parsing_logic(urls)
     if not articles and urls:
         raise HTTPException(
             status_code=500,
-            detail="Ошибка при парсинге или нет новых данных"
+            detail="Ошибка при парсинге или нет новых данных",
         )
     return articles
 
@@ -131,5 +138,5 @@ async def health():
     return {
         "status": "ok",
         "scheduler_running": scheduler.running,
-        "next_parse": str(next_run)
+        "next_parse": str(next_run),
     }
