@@ -229,6 +229,84 @@ class EntityService:
         else:
             return "Связанная сущность"
 
+    async def get_top_entities_24h(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Получить топ сущностей за 24 часа по росту интереса.
+        Сравнивает количество упоминаний за последние 24 часа с предыдущими 24 часами.
+        Возвращает сущности с percent_change и направлением тренда.
+        """
+        from sqlalchemy import select, func
+        from src.infrastructure.postgres.models.named_entity import NamedEntity
+        from src.infrastructure.postgres.models.post_entity import PostEntity
+        from src.infrastructure.postgres.models.post import Article
+        
+        now = datetime.now()
+        last_24h = now - timedelta(hours=24)
+        previous_24h = now - timedelta(hours=48)
+        
+        # Получаем все сущности
+        query = select(NamedEntity).order_by(NamedEntity.created_at.desc())
+        result = await self.ner_gateway.session.execute(query)
+        entities = result.scalars().all()
+        
+        if not entities:
+            return []
+        
+        result_list = []
+        for entity in entities:
+            # Получаем посты где упоминается сущность
+            posts_entity = await self.post_entity_gateway.get_posts_by_ner(entity.id)
+            
+            recent_mentions = 0
+            previous_mentions = 0
+            
+            for pe in posts_entity:
+                try:
+                    post = await self.post_gateway.get_post_by_id(pe.post_id)
+                    if post and post.created_at:
+                        if post.created_at >= last_24h:
+                            recent_mentions += 1
+                        elif post.created_at >= previous_24h:
+                            previous_mentions += 1
+                except:
+                    continue
+            
+            # Вычисляем процент изменения
+            if previous_mentions > 0:
+                change_percent = round(((recent_mentions - previous_mentions) / previous_mentions) * 100)
+            elif recent_mentions > 0:
+                # Если раньше не упоминалась, а теперь упоминается - большой рост
+                change_percent = recent_mentions * 100
+            else:
+                change_percent = 0
+            
+            # Определяем направление тренда
+            if change_percent > 0:
+                direction = 'up'
+            elif change_percent < 0:
+                direction = 'down'
+            else:
+                direction = 'flat'
+            
+            # Пропускаем сущности без упоминаний за последние 48 часов
+            if recent_mentions == 0 and previous_mentions == 0:
+                continue
+            
+            result_list.append({
+                "id": entity.id,
+                "name": entity.name,
+                "entity_type": entity.entity_type,
+                "change_percent": abs(change_percent),
+                "direction": direction,
+                "recent_mentions": recent_mentions,
+                "previous_mentions": previous_mentions,
+            })
+        
+        # Сортируем по абсолютному значению изменения и берем топ
+        result_list.sort(key=lambda x: (-x['change_percent'] if x['direction'] == 'up' else x['change_percent'], -x['recent_mentions']))
+        
+        return result_list[:limit]
+
     def _calculate_mentions_stats(self, posts: List[Any], period: str = "week") -> List[EntityMentionStats]:
         """
         Рассчитывает статистику упоминаний.

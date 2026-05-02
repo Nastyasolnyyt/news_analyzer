@@ -63,3 +63,23 @@ async def get_entity_details(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+
+@ROUTER.get(
+    "/top/24h",
+    response_model=List[Any],
+    summary="Получить топ сущностей за 24 часа по росту интереса",
+)
+async def get_top_entities_24h(
+    entity_service: FromDishka[EntityService],
+    limit: int = 5,
+) -> List[Any]:
+    """
+    Получение топ-5 сущностей с наибольшим ростом упоминаний за последние 24 часа.
+    Сравнивает период последних 24 часов с предыдущими 24 часами.
+    Возвращает сущности с процентом изменения и направлением тренда (up/down/flat).
+    """
+    try:
+        return await entity_service.get_top_entities_24h(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
