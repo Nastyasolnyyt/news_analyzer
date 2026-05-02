@@ -27,6 +27,9 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['risk']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk']} */ ;
 /** @type {__VLS_StyleScopedClasses['risk']} */ ;
+/** @type {__VLS_StyleScopedClasses['type-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['type-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['type-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['card-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['footer']} */ ;
 // CSS variable injection 
@@ -84,6 +87,7 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.events))) {
     if (item.riskType) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "type-badge" },
+            'data-risk-type': (item.riskType),
         });
         (__VLS_ctx.riskTypeLabel(item.riskType));
     }

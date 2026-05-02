@@ -36,6 +36,21 @@ const handleSearch = () => {
 const handleEntityClick = (entityId) => {
     router.push(`/entity/${entityId}`);
 };
+const reloadPage = async () => {
+    loading.value = true;
+    error.value = null;
+    try {
+        const allEntities = await api.getEntities({ limit: 100 });
+        entities.value = allEntities;
+        filteredEntities.value = allEntities;
+    }
+    catch (e) {
+        error.value = e.message || 'Ошибка загрузки сущностей';
+    }
+    finally {
+        loading.value = false;
+    }
+};
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -262,6 +277,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             filteredEntities: filteredEntities,
             handleSearch: handleSearch,
             handleEntityClick: handleEntityClick,
+            reloadPage: reloadPage,
         };
     },
 });
