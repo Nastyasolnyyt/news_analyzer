@@ -1,12 +1,42 @@
 ```
-# TypeScript/Vue build artifacts
-*.d.ts
-*.js
-*.tsbuildinfo
+# Compiled Python files
+*.pyc
+__pycache__/
 
-# Dependencies
+# Virtual environments
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# IDE files
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Dependencies cache
+.mypy_cache/
+.pytest_cache/
 node_modules/
 
-# Editors
-.vscode/
+# OS generated files
+.DS_Store
+Thumbs.db
 ```

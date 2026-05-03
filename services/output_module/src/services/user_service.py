@@ -18,7 +18,6 @@ class UserService:
         password_hash = self.auth_service.hash_password(user_data.password)
         return await self.user_gateway.create_user(
             login=user_data.login,
-            username=user_data.username,
             password_hash=password_hash,
             name=user_data.name,
             role=user_data.role,
