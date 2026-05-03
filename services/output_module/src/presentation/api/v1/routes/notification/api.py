@@ -1,7 +1,7 @@
 from typing import List
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 
 from src.services.notification import NotificationService
 from src.application.schemas.notification import (
@@ -23,6 +23,13 @@ from src.application.schemas.notification import (
 ROUTER = APIRouter(prefix="/notifications", route_class=DishkaRoute)
 
 
+def get_current_user_id() -> int:
+    """Получает ID текущего пользователя из токена"""
+    # TODO: реализовать декодирование JWT токена
+    # Пока возвращаем 1 для тестирования
+    return 1
+
+
 # ===== SETTINGS ENDPOINTS =====
 
 @ROUTER.get(
@@ -32,12 +39,15 @@ ROUTER = APIRouter(prefix="/notifications", route_class=DishkaRoute)
 )
 async def get_notification_settings(
     notification_service: FromDishka[NotificationService],
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationSettingsDTO:
     """Получить настройки уведомлений текущего пользователя"""
     settings = await notification_service.get_user_settings(user_id)
     if not settings:
-        raise HTTPException(status_code=404, detail="Settings not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id={user_id} not found or settings not initialized"
+        )
     return settings
 
 
@@ -49,10 +59,16 @@ async def get_notification_settings(
 async def update_notification_settings(
     notification_service: FromDishka[NotificationService],
     data: NotificationSettingsUpdateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationSettingsDTO:
     """Обновить настройки уведомлений"""
-    return await notification_service.update_user_settings(user_id, data)
+    settings = await notification_service.update_user_settings(user_id, data)
+    if not settings:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with id={user_id} not found"
+        )
+    return settings
 
 
 # ===== TRIGGERS ENDPOINTS =====
@@ -64,7 +80,7 @@ async def update_notification_settings(
 )
 async def get_triggers(
     notification_service: FromDishka[NotificationService],
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> List[NotificationTriggerDTO]:
     """Получить список всех триггеров пользователя"""
     return await notification_service.get_user_triggers(user_id)
@@ -78,7 +94,7 @@ async def get_triggers(
 async def create_trigger(
     notification_service: FromDishka[NotificationService],
     data: NotificationTriggerCreateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationTriggerDTO:
     """Создать новый триггер для уведомлений"""
     return await notification_service.create_trigger(user_id, data)
@@ -92,7 +108,7 @@ async def create_trigger(
 async def get_trigger(
     notification_service: FromDishka[NotificationService],
     trigger_id: int,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationTriggerDTO:
     """Получить триггер по ID"""
     trigger = await notification_service.get_trigger(trigger_id, user_id)
@@ -110,7 +126,7 @@ async def update_trigger(
     notification_service: FromDishka[NotificationService],
     trigger_id: int,
     data: NotificationTriggerUpdateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationTriggerDTO:
     """Обновить триггер"""
     trigger = await notification_service.update_trigger(trigger_id, user_id, data)
@@ -126,7 +142,7 @@ async def update_trigger(
 async def delete_trigger(
     notification_service: FromDishka[NotificationService],
     trigger_id: int,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> dict:
     """Удалить триггер"""
     success = await notification_service.delete_trigger(trigger_id, user_id)
@@ -144,7 +160,7 @@ async def delete_trigger(
 )
 async def get_channels(
     notification_service: FromDishka[NotificationService],
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> List[NotificationChannelDTO]:
     """Получить список всех каналов пользователя"""
     return await notification_service.get_user_channels(user_id)
@@ -158,7 +174,7 @@ async def get_channels(
 async def create_channel(
     notification_service: FromDishka[NotificationService],
     data: NotificationChannelCreateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationChannelDTO:
     """Создать новый канал доставки"""
     return await notification_service.create_channel(user_id, data)
@@ -172,7 +188,7 @@ async def create_channel(
 async def get_channel(
     notification_service: FromDishka[NotificationService],
     channel_id: int,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationChannelDTO:
     """Получить канал по ID"""
     channel = await notification_service.get_channel(channel_id, user_id)
@@ -190,7 +206,7 @@ async def update_channel(
     notification_service: FromDishka[NotificationService],
     channel_id: int,
     data: NotificationChannelUpdateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationChannelDTO:
     """Обновить канал"""
     channel = await notification_service.update_channel(channel_id, user_id, data)
@@ -206,7 +222,7 @@ async def update_channel(
 async def delete_channel(
     notification_service: FromDishka[NotificationService],
     channel_id: int,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> dict:
     """Удалить канал"""
     success = await notification_service.delete_channel(channel_id, user_id)
@@ -224,7 +240,7 @@ async def delete_channel(
 )
 async def get_sources(
     notification_service: FromDishka[NotificationService],
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> List[NotificationSourceDTO]:
     """Получить список всех источников пользователя"""
     return await notification_service.get_user_sources(user_id)
@@ -238,7 +254,7 @@ async def get_sources(
 async def create_source(
     notification_service: FromDishka[NotificationService],
     data: NotificationSourceCreateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationSourceDTO:
     """Создать новый источник"""
     return await notification_service.create_source(user_id, data)
@@ -253,7 +269,7 @@ async def update_source(
     notification_service: FromDishka[NotificationService],
     source_id: int,
     data: NotificationSourceUpdateDTO,
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationSourceDTO:
     """Обновить источник"""
     source = await notification_service.update_source(source_id, user_id, data)
@@ -271,7 +287,7 @@ async def update_source(
 )
 async def get_notification_config(
     notification_service: FromDishka[NotificationService],
-    user_id: int = 1,  # TODO: получить из authentication
+    user_id: int = Depends(get_current_user_id),
 ) -> NotificationConfigDTO:
     """Получить полную конфигурацию (настройки, триггеры, каналы, источники)"""
     return await notification_service.get_user_config(user_id)
