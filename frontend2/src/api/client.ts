@@ -935,33 +935,15 @@ export const api = {
 
   // Получить отчеты пользователя
   async getUserReports(): Promise<any[]> {
-    try {
-      const url = `${API_BASE}/users/me/reports`;
-      const res = await fetch(url, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      // Если API недоступен, возвращаем пустой массив
-      console.warn('⚠️ Could not fetch user reports:', error);
-      return [];
-    }
+    // Если API недоступен, возвращаем пустой массив
+    console.warn('⚠️ User reports API not implemented yet');
+    return [];
   },
 
   // Удалить отчет
   async deleteReport(reportId: number): Promise<void> {
-    try {
-      const url = `${API_BASE}/users/me/reports/${reportId}`;
-      const res = await fetch(url, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-    } catch (error) {
-      console.error('❌ Error deleting report:', error);
-      throw error;
-    }
+    // Если API недоступен, просто логируем предупреждение
+    console.warn('⚠️ Delete report API not implemented yet');
+    throw new Error('Delete report API not implemented');
   },
 };

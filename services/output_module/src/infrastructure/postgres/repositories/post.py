@@ -60,7 +60,7 @@ class PostDBGateWay:
         query = select(Article).options(
             joinedload(Article.analyses).joinedload(PostAnalysis.topic),
             joinedload(Article.risks),
-            selectinload(Article.entities).joinedload(PostEntity.entity).joinedload(NamedEntity.category),
+            selectinload(Article.entities).joinedload(PostEntity.entity),
         )
         # Поиск по заголовку или контенту
         if filters.search:
