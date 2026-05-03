@@ -40,9 +40,9 @@ class UserService:
         if user_data.password is not None:
             password_hash = self.auth_service.hash_password(user_data.password)
 
-        return await self.user_gateway.update_user(
-            user_id=user_id,
+        return await self.user_gateway.create_user(
+            username=user_data.login,  
+            password=user_data.password,
             name=user_data.name,
             role=user_data.role,
-            password_hash=password_hash,
         )
