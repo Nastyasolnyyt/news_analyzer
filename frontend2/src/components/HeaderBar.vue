@@ -70,8 +70,11 @@ const toggleMenu = () => {
             <p class="user-login">{{ user?.login }}</p>
           </div>
           <div class="menu-divider"></div>
+          <button class="menu-item" @click="router.push('/profile')">
+            👤 Мой профиль
+          </button>
           <button class="menu-item" @click="router.push('/notifications')">
-            ⚙️ Настройки
+            🔔 Уведомления
           </button>
           <button class="menu-item logout" @click="handleLogout">
             🚪 Выход

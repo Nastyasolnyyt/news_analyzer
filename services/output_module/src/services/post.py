@@ -67,15 +67,15 @@ class PostService:
         posts_with_external = []
         for item in items:
             try:
-                post_obj = item['post'] 
-                
-                # 1. Получаем анализ
-                analysis = post_obj.analyses[0] if post_obj.analyses else None
-                topic = None
-                if analysis and analysis.topic_id:
-                    topic = await self.topic_gateway.get_topic(analysis.topic_id)
+                post_obj = item['post']
 
-                # 2. Получаем уровень риска и тип риска из таблицы risks
+                # 1. Получаем анализ (уже загружен через eager loading)
+                analysis = post_obj.analyses[0] if post_obj.analyses else None
+
+                # Тема уже загружена через joinedload(Article.analyses).joinedload(PostAnalysis.topic)
+                topic = analysis.topic if analysis and analysis.topic else None
+
+                # 2. Получаем уровень риска и тип риска из таблицы risks (уже загружено)
                 risk = item.get('risk')
                 risk_level = risk.risk_level if risk and risk.risk_level else "low"
                 risk_type = risk.risk_type if risk and risk.risk_type else None
@@ -93,24 +93,20 @@ class PostService:
                     risk_type=risk_type,
                 )
 
-                # 2. ПРАВИЛЬНОЕ РЕШЕНИЕ ДЛЯ СУЩНОСТЕЙ:
-                # Вместо post_obj.entities (который отдает ерунду), мы идем в БД 
-                # и честно берем сущности по ID поста через репозиторий
-                post_entities = await self.post_entity_gateway.get_ners_by_post(post_obj.id)
-                
+                # 3. Работаем с сущностями (уже загружены через selectinload)
+                # post_obj.entities теперь содержит все связанные сущности с данными
                 entities = []
-                for pe in post_entities:
-                    ner_obj = await self.ner_gateway.get_named_entity(pe.entity_id)
-                    if ner_obj:
-                        # Валидируем в строгую схему EntityDTO
-                        entities.append(EntityDTO.model_validate(ner_obj))
+                for pe in post_obj.entities:
+                    # pe.entity уже загружен через joinedload(PostEntity.entity)
+                    if pe.entity:
+                        entities.append(EntityDTO.model_validate(pe.entity))
 
-                # 3. Собираем итоговый DTO
+                # 4. Собираем итоговый DTO
                 posts_with_external.append(
                     PostWithExternalModelsDTO(
                         post=PostBaseDTO.model_validate(post_obj),
-                        analysis=analysis_dto, 
-                        entities=entities  # Теперь здесь лежат правильные EntityDTO!
+                        analysis=analysis_dto,
+                        entities=entities
                     )
                 )
             except Exception as e:
