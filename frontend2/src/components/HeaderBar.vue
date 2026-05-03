@@ -71,13 +71,13 @@ const toggleMenu = () => {
           </div>
           <div class="menu-divider"></div>
           <button class="menu-item" @click="router.push('/profile')">
-            👤 Мой профиль
+            Мой профиль
           </button>
           <button class="menu-item" @click="router.push('/notifications')">
-            🔔 Уведомления
+            Уведомления
           </button>
           <button class="menu-item logout" @click="handleLogout">
-            🚪 Выход
+            Выход
           </button>
         </div>
       </div>

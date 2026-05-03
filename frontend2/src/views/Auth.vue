@@ -36,11 +36,11 @@ const handleLogin = async () => {
     localStorage.setItem('accessToken', response.access_token);
     localStorage.setItem('refreshToken', response.refresh_token);
 
-    console.log('✅ Успешный вход');
+    console.log('Успешный вход');
     router.push('/');
   } catch (e: any) {
     error.value = e.message || 'Ошибка входа';
-    console.error('❌ Login error:', e);
+    console.error('Login error:', e);
   } finally {
     loading.value = false;
   }
@@ -68,13 +68,13 @@ const handleRegister = async () => {
       name: registerForm.value.name,
     });
 
-    console.log('✅ Успешная регистрация');
+    console.log('Успешная регистрация');
     // Переходим на вход
     isLogin.value = true;
     registerForm.value = { login: '', password: '', name: '', passwordConfirm: '' };
   } catch (e: any) {
     error.value = e.message || 'Ошибка регистрации';
-    console.error('❌ Register error:', e);
+    console.error('Register error:', e);
   } finally {
     loading.value = false;
   }
