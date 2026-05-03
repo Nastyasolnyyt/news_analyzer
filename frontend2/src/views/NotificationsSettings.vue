@@ -73,10 +73,10 @@ onMounted(async () => {
       email.value = config.channels[0].channel_address || '';
     }
 
-    console.log('✅ Loaded settings and entities');
+    console.log('Loaded settings and entities');
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки';
-    console.error('❌ Error:', e);
+    console.error('Error:', e);
   } finally {
     loading.value = false;
   }
@@ -147,14 +147,14 @@ const handleSaveSettings = async () => {
     }
 
     saveSuccess.value = true;
-    console.log('✅ Settings saved');
+    console.log('Settings saved');
 
     setTimeout(() => {
       saveSuccess.value = false;
     }, 3000);
   } catch (e: any) {
     error.value = e.message || 'Ошибка сохранения';
-    console.error('❌ Error saving:', e);
+    console.error('Error saving:', e);
   } finally {
     loading.value = false;
   }
@@ -210,12 +210,12 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
     </div>
 
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка</p>
+      <p class="error-title">Ошибка</p>
       <p class="error-message">{{ error }}</p>
     </div>
 
     <div v-if="saveSuccess" class="success-banner">
-      ✅ Настройки успешно сохранены!
+      Настройки успешно сохранены!
     </div>
 
     <section v-if="!loading && !error" class="settings-grid">

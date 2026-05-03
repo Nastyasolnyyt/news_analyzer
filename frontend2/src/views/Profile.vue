@@ -19,9 +19,9 @@ const getUserInitials = (name: string) => {
 
 const getRoleLabel = (role: string) => {
   const roles: Record<string, string> = {
-    'admin': '👑 Администратор',
-    'user': '👤 Пользователь',
-    'analyst': '📊 Аналитик',
+    'admin': 'Администратор',
+    'user': 'Пользователь',
+    'analyst': 'Аналитик',
   };
   return roles[role] || role;
 };

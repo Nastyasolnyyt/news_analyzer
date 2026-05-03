@@ -8,7 +8,7 @@ interface EventItem {
   source: string;
   summary: string;
   risk: RiskLevel;
-  riskType?: string | null;  // ✅ Добавили тип риска (политический/экономический/социальный)
+  riskType?: string | null;  // Добавили тип риска (политический/экономический/социальный)
 }
 
 defineProps<{
@@ -25,7 +25,7 @@ const riskLabel: Record<RiskLevel, string> = {
   low: 'Низкий риск',
 };
 
-// ✅ Форматируем тип риска для отображения
+// Форматируем тип риска для отображения
 const riskTypeLabel = (type?: string | null): string => {
   if (!type) return '';
   const map: Record<string, string> = {

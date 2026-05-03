@@ -396,7 +396,7 @@ const reloadPage = () => {
 
       <!-- Risk Types -->
       <section v-if="riskTypeStats.length > 0" class="detail-card">
-        <h2>🚨 Типы рисков</h2>
+        <h2>Типы рисков</h2>
         <div class="risk-types-list">
           <div v-for="(type, idx) in riskTypeStats" :key="idx" class="risk-type-item">
             <span class="type-name">{{ type.type }}</span>
@@ -407,7 +407,7 @@ const reloadPage = () => {
 
       <!-- Top Sources -->
       <section v-if="sourceStats.length > 0" class="detail-card">
-        <h2>📰 Топ источники</h2>
+        <h2>Топ источники</h2>
         <div class="sources-list">
           <div v-for="(source, idx) in sourceStats" :key="idx" class="source-item">
             <span class="source-name">{{ source.name }}</span>
@@ -424,7 +424,7 @@ const reloadPage = () => {
 
       <!-- Sample News -->
       <section v-if="reportNews.length > 0" class="detail-card">
-        <h2>📰 Примеры новостей (первые 5)</h2>
+        <h2>Примеры новостей (первые 5)</h2>
         <div class="news-samples">
           <article v-for="(item, idx) in reportNews.slice(0, 5)" :key="idx" class="sample-news">
             <div class="sample-header">
@@ -443,7 +443,7 @@ const reloadPage = () => {
 
       <!-- All News List for Manual Selection -->
       <section v-if="selectMode === 'manual'" class="detail-card">
-        <h2>📋 Все новости для выбора</h2>
+        <h2>Все новости для выбора</h2>
         <div class="news-list-selection">
           <article 
             v-for="item in filteredNews" 

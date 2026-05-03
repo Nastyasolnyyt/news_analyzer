@@ -48,7 +48,7 @@ const toggleMode = () => {
 
     <!-- ERROR STATE -->
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка загрузки</p>
+      <p class="error-title">Ошибка загрузки</p>
       <p class="error-message">{{ error }}</p>
       <button class="btn-secondary" @click="$router.back()">← Вернуться назад</button>
     </div>
@@ -78,8 +78,8 @@ const toggleMode = () => {
         <header class="body-header">
           <p class="mode-label">Режим чтения</p>
           <div class="switch">
-            <button :class="{ active: showSummary }" @click="showSummary = true">💬 Кратко</button>
-            <button :class="{ active: !showSummary }" @click="showSummary = false">📖 Полный текст</button>
+            <button :class="{ active: showSummary }" @click="showSummary = true">Кратко</button>
+            <button :class="{ active: !showSummary }" @click="showSummary = false">Полный текст</button>
           </div>
         </header>
         <p v-if="showSummary" class="summary">{{ article.summary || article.text?.slice(0, 500) }}...</p>
@@ -119,7 +119,7 @@ const toggleMode = () => {
   gap: 24px;
 }
 
-/* ✅ LOADING STATE */
+/* LOADING STATE */
 .loading-state {
   display: flex;
   flex-direction: column;

@@ -62,10 +62,10 @@ onMounted(async () => {
     // Загружаем статус
     statusEnabled.value = config.settings.enabled;
     
-    console.log('✅ Notification config loaded');
+    console.log('Notification config loaded');
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки настроек уведомлений';
-    console.error('❌ Error:', error.value);
+    console.error('Error:', error.value);
   } finally {
     loading.value = false;
   }
@@ -127,12 +127,12 @@ const handleSaveSettings = async () => {
       } as any);
     }
     
-    console.log('✅ Settings saved successfully');
+    console.log('Settings saved successfully');
     error.value = null;
     alert('Настройки успешно сохранены!');
   } catch (e: any) {
     error.value = e.message || 'Ошибка сохранения настроек';
-    console.error('❌ Error saving settings:', error.value);
+    console.error('Error saving settings:', error.value);
   } finally {
     loading.value = false;
   }
@@ -185,7 +185,7 @@ const handleSaveSettings = async () => {
     </div>
 
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка</p>
+      <p class="error-title">Ошибка</p>
       <p class="error-message">{{ error }}</p>
       <button class="outline" @click="reloadPage()">Попробовать снова</button>
     </div>

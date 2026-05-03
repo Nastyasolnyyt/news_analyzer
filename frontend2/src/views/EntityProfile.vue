@@ -17,7 +17,7 @@ const error = ref<string | null>(null);
 onMounted(async () => {
   try {
     loading.value = true;
-    console.log('📋 Loading entity profile:', entityId);
+    console.log('Loading entity profile:', entityId);
     
     // Получаем полный профиль сущности
     const profile = await api.getEntityProfile(entityId);
@@ -27,14 +27,14 @@ onMounted(async () => {
     relatedEntities.value = profile.relatedEntities;
     newsList.value = profile.news;
     
-    console.log('✅ Entity profile loaded:', entity.value?.name, {
+    console.log('Entity profile loaded:', entity.value?.name, {
       chartPoints: chartData.value.length,
       relatedEntities: relatedEntities.value.length,
       newsCount: newsList.value.length,
     });
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки профиля сущности';
-    console.error('❌ Error:', error.value);
+    console.error('Error:', error.value);
   } finally {
     loading.value = false;
   }
@@ -67,7 +67,7 @@ watch(chartData, (newData) => {
 
     <!-- ERROR STATE -->
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка загрузки</p>
+      <p class="error-title">Ошибка загрузки</p>
       <p class="error-message">{{ error }}</p>
       <button class="btn-secondary" @click="$router.back()">← Вернуться назад</button>
     </div>
@@ -81,7 +81,7 @@ watch(chartData, (newData) => {
         </div>
         <h1>{{ entity.name }}</h1>
         <p class="entity-type">
-          {{ entity.type === 'Company' ? '🏢 Компания' : entity.type === 'Person' ? '👤 Персона' : '📅 Событие' }}
+          {{ entity.type === 'Company' ? 'Компания' : entity.type === 'Person' ? 'Персона' : 'Событие' }}
         </p>
         <p v-if="entity.entity_type" class="meta">{{ entity.entity_type }}</p>
       </section>
