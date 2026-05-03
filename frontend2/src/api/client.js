@@ -322,7 +322,7 @@ export const api = {
         })));
         return results.filter((e) => e !== null);
     },
-    // Получить  высокорисковые новости
+    // Получить высокорисковые новости
     async getHighRiskNews(params) {
         return this.getNews({
             ...params,
@@ -336,20 +336,16 @@ export const api = {
             search: query,
         });
     },
-
     // ===== NOTIFICATION METHODS =====
-
     // Получить полную конфигурацию уведомлений
     async getNotificationConfig() {
         try {
             const url = `${API_BASE}/notifications/config`;
             console.log('🔍 Fetching notification config from:', url);
-            
             const res = await fetch(url);
             if (!res.ok) {
                 throw new Error(`API error: ${res.status}`);
             }
-            
             const data = await res.json();
             console.log('✅ Loaded notification config');
             return data;
@@ -359,13 +355,13 @@ export const api = {
             throw error;
         }
     },
-
     // Получить настройки уведомлений
     async getNotificationSettings() {
         try {
             const url = `${API_BASE}/notifications/settings`;
             const res = await fetch(url);
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
             return await res.json();
         }
         catch (error) {
@@ -373,7 +369,6 @@ export const api = {
             throw error;
         }
     },
-
     // Обновить настройки уведомлений
     async updateNotificationSettings(data) {
         try {
@@ -383,7 +378,8 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
             return await res.json();
         }
         catch (error) {
@@ -391,7 +387,38 @@ export const api = {
             throw error;
         }
     },
-
+    // Получить триггеры уведомлений
+    async getNotificationTriggers() {
+        try {
+            const url = `${API_BASE}/notifications/triggers`;
+            const res = await fetch(url);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error fetching notification triggers:', error);
+            throw error;
+        }
+    },
+    // Создать триггер
+    async createNotificationTrigger(data) {
+        try {
+            const url = `${API_BASE}/notifications/triggers`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error creating notification trigger:', error);
+            throw error;
+        }
+    },
     // Обновить триггер
     async updateNotificationTrigger(id, data) {
         try {
@@ -401,7 +428,8 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
             return await res.json();
         }
         catch (error) {
@@ -409,7 +437,51 @@ export const api = {
             throw error;
         }
     },
-
+    // Удалить триггер
+    async deleteNotificationTrigger(id) {
+        try {
+            const url = `${API_BASE}/notifications/triggers/${id}`;
+            const res = await fetch(url, { method: 'DELETE' });
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+        }
+        catch (error) {
+            console.error('❌ Error deleting notification trigger:', error);
+            throw error;
+        }
+    },
+    // Получить каналы уведомлений
+    async getNotificationChannels() {
+        try {
+            const url = `${API_BASE}/notifications/channels`;
+            const res = await fetch(url);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error fetching notification channels:', error);
+            throw error;
+        }
+    },
+    // Создать канал
+    async createNotificationChannel(data) {
+        try {
+            const url = `${API_BASE}/notifications/channels`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error creating notification channel:', error);
+            throw error;
+        }
+    },
     // Обновить канал
     async updateNotificationChannel(id, data) {
         try {
@@ -419,7 +491,8 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
             return await res.json();
         }
         catch (error) {
@@ -427,7 +500,51 @@ export const api = {
             throw error;
         }
     },
-
+    // Удалить канал
+    async deleteNotificationChannel(id) {
+        try {
+            const url = `${API_BASE}/notifications/channels/${id}`;
+            const res = await fetch(url, { method: 'DELETE' });
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+        }
+        catch (error) {
+            console.error('❌ Error deleting notification channel:', error);
+            throw error;
+        }
+    },
+    // Получить источники уведомлений
+    async getNotificationSources() {
+        try {
+            const url = `${API_BASE}/notifications/sources`;
+            const res = await fetch(url);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error fetching notification sources:', error);
+            throw error;
+        }
+    },
+    // Создать источник
+    async createNotificationSource(data) {
+        try {
+            const url = `${API_BASE}/notifications/sources`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error creating notification source:', error);
+            throw error;
+        }
+    },
     // Обновить источник
     async updateNotificationSource(id, data) {
         try {
@@ -437,7 +554,8 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
             return await res.json();
         }
         catch (error) {
