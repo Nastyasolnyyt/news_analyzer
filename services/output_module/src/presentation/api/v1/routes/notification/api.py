@@ -18,16 +18,16 @@ from src.application.schemas.notification import (
     NotificationSourceUpdateDTO,
     NotificationSettingsUpdateDTO,
 )
+from src.presentation.api.v1.routes.auth_dependencies import get_current_user
+from src.application.schemas.user import UserDTO
 
 
 ROUTER = APIRouter(prefix="/notifications", route_class=DishkaRoute)
 
 
-def get_current_user_id() -> int:
-    """Получает ID текущего пользователя из токена"""
-    # TODO: реализовать декодирование JWT токена
-    # Пока возвращаем 1 для тестирования
-    return 1
+def get_current_user_id(current_user: UserDTO = Depends(get_current_user)) -> int:
+    """Получает ID текущего пользователя из JWT токена"""
+    return current_user.id
 
 
 # ===== SETTINGS ENDPOINTS =====

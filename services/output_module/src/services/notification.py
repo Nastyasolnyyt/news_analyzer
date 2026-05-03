@@ -56,7 +56,7 @@ class NotificationService:
             # Создаем дефолтные настройки если их нет
             settings = NotificationSettings(user_id=user_id)
             self.session.add(settings)
-            await self.session.flush()
+            await self.session.commit()  # Коммитим сразу, чтобы избежать проблем с FK
         
         return NotificationSettingsDTO.from_orm(settings)
     
@@ -80,7 +80,7 @@ class NotificationService:
             if value is not None:
                 setattr(settings, key, value)
         
-        await self.session.flush()
+        await self.session.commit()
         return NotificationSettingsDTO.from_orm(settings)
     
     # ===== TRIGGERS =====
@@ -113,7 +113,7 @@ class NotificationService:
             **data.dict()
         )
         self.session.add(trigger)
-        await self.session.flush()
+        await self.session.commit()
         return NotificationTriggerDTO.from_orm(trigger)
     
     async def update_trigger(self, trigger_id: int, user_id: int, data: NotificationTriggerUpdateDTO) -> Optional[NotificationTriggerDTO]:
@@ -135,7 +135,7 @@ class NotificationService:
             if value is not None:
                 setattr(trigger, key, value)
         
-        await self.session.flush()
+        await self.session.commit()
         return NotificationTriggerDTO.from_orm(trigger)
     
     async def delete_trigger(self, trigger_id: int, user_id: int) -> bool:
@@ -151,7 +151,7 @@ class NotificationService:
         
         if trigger:
             await self.session.delete(trigger)
-            await self.session.flush()
+            await self.session.commit()
             return True
         return False
     
@@ -185,7 +185,7 @@ class NotificationService:
             **data.dict()
         )
         self.session.add(channel)
-        await self.session.flush()
+        await self.session.commit()
         return NotificationChannelDTO.from_orm(channel)
     
     async def update_channel(self, channel_id: int, user_id: int, data: NotificationChannelUpdateDTO) -> Optional[NotificationChannelDTO]:
@@ -207,7 +207,7 @@ class NotificationService:
             if value is not None:
                 setattr(channel, key, value)
         
-        await self.session.flush()
+        await self.session.commit()
         return NotificationChannelDTO.from_orm(channel)
     
     async def delete_channel(self, channel_id: int, user_id: int) -> bool:
@@ -223,7 +223,7 @@ class NotificationService:
         
         if channel:
             await self.session.delete(channel)
-            await self.session.flush()
+            await self.session.commit()
             return True
         return False
     
@@ -245,7 +245,7 @@ class NotificationService:
             **data.dict()
         )
         self.session.add(source)
-        await self.session.flush()
+        await self.session.commit()
         return NotificationSourceDTO.from_orm(source)
     
     async def update_source(self, source_id: int, user_id: int, data: NotificationSourceUpdateDTO) -> Optional[NotificationSourceDTO]:
@@ -267,7 +267,7 @@ class NotificationService:
             if value is not None:
                 setattr(source, key, value)
         
-        await self.session.flush()
+        await self.session.commit()
         return NotificationSourceDTO.from_orm(source)
     
     # ===== CONFIG =====
