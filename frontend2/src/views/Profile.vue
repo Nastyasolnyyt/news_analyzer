@@ -5,7 +5,6 @@ import { api, type UserDTO } from '../api/client';
 
 const router = useRouter();
 const user = ref<UserDTO | null>(null);
-const reports = ref<any[]>([]);
 const loading = ref(true);
 const error = ref('');
 
@@ -43,14 +42,6 @@ onMounted(async () => {
     loading.value = true;
     // Получаем текущего пользователя
     user.value = await api.getCurrentUser();
-    
-    // Получаем отчеты пользователя (если есть API метод)
-    try {
-      reports.value = await api.getUserReports?.() || [];
-    } catch (e) {
-      // Если метода нет, просто оставляем пустой массив
-      reports.value = [];
-    }
   } catch (e) {
     error.value = 'Ошибка загрузки профиля';
     console.error('Error loading profile:', e);
@@ -58,24 +49,6 @@ onMounted(async () => {
     loading.value = false;
   }
 });
-
-const handleDeleteReport = async (reportId: number) => {
-  if (!confirm('Вы уверены, что хотите удалить этот отчет?')) return;
-  
-  try {
-    if (api.deleteReport) {
-      await api.deleteReport(reportId);
-      reports.value = reports.value.filter(r => r.id !== reportId);
-    }
-  } catch (e) {
-    error.value = 'Ошибка при удалении отчета';
-    console.error('Error deleting report:', e);
-  }
-};
-
-const handleViewReport = (reportId: number) => {
-  router.push(`/reports/${reportId}`);
-};
 </script>
 
 <template>
@@ -130,61 +103,6 @@ const handleViewReport = (reportId: number) => {
           <button class="btn-primary" @click="router.push('/notifications')">
             ⚙️ Настройки уведомлений
           </button>
-        </div>
-
-        <!-- Секция отчетов -->
-        <div class="reports-section card">
-          <div class="section-header">
-            <h3>Мои отчеты</h3>
-            <button class="btn-secondary" @click="router.push('/reports')">
-              + Создать отчет
-            </button>
-          </div>
-
-          <!-- Список отчетов -->
-          <div v-if="reports.length === 0" class="empty-state">
-            <div class="empty-icon">📄</div>
-            <p class="empty-title">Нет отчетов</p>
-            <p class="empty-text">Создавайте отчеты, и они будут сохраняться здесь</p>
-            <button class="btn-primary" @click="router.push('/reports')">
-              Создать первый отчет
-            </button>
-          </div>
-
-          <div v-else class="reports-list">
-            <div
-              v-for="report in reports"
-              :key="report.id"
-              class="report-item"
-            >
-              <div class="report-header">
-                <h4 class="report-title">{{ report.title || `Отчет #${report.id}` }}</h4>
-                <span class="report-date">{{ formatDate(report.created_at) }}</span>
-              </div>
-
-              <p v-if="report.description" class="report-description">
-                {{ report.description }}
-              </p>
-
-              <div class="report-stats">
-                <span v-if="report.entities_count" class="stat-badge">
-                  📊 {{ report.entities_count }} сущностей
-                </span>
-                <span v-if="report.articles_count" class="stat-badge">
-                  📰 {{ report.articles_count }} статей
-                </span>
-              </div>
-
-              <div class="report-actions">
-                <button class="action-btn view" @click="handleViewReport(report.id)">
-                  👁️ Просмотр
-                </button>
-                <button class="action-btn delete" @click="handleDeleteReport(report.id)">
-                  🗑️ Удалить
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -382,164 +300,6 @@ const handleViewReport = (reportId: number) => {
   box-shadow: 0 12px 24px rgba(79, 138, 255, 0.3);
 }
 
-/* ===== ОТЧЕТЫ ===== */
-.reports-section {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.section-header h3 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.btn-secondary {
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-  color: #9ca3af;
-}
-
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 12px;
-}
-
-.empty-title {
-  margin: 0 0 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #d1d5db;
-}
-
-.empty-text {
-  margin: 0 0 24px;
-  font-size: 0.95rem;
-  color: #6b7280;
-}
-
-.reports-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.report-item {
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.report-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.report-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.report-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #fff;
-  flex: 1;
-}
-
-.report-date {
-  font-size: 0.85rem;
-  color: #6b7280;
-  white-space: nowrap;
-}
-
-.report-description {
-  margin: 0 0 12px;
-  font-size: 0.9rem;
-  color: #d1d5db;
-  line-height: 1.5;
-}
-
-.report-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.stat-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  color: #9ca3af;
-}
-
-.report-actions {
-  display: flex;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.action-btn {
-  flex: 1;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: #d1d5db;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.action-btn.delete:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
-}
-
 @media (max-width: 768px) {
   .profile-header {
     flex-wrap: wrap;
@@ -547,25 +307,6 @@ const handleViewReport = (reportId: number) => {
 
   .profile-stats {
     grid-template-columns: 1fr;
-  }
-
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .btn-secondary {
-    width: 100%;
-  }
-
-  .report-header {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .action-btn {
-    padding: 10px 8px;
   }
 }
 </style>
