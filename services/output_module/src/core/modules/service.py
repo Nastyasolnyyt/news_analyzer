@@ -7,11 +7,16 @@ from src.infrastructure.postgres.repositories.topic import TopicDBGateWay
 from src.infrastructure.postgres.repositories.user import UserDBGateWay
 from src.services.auth import AuthService
 from src.services.entity import EntityService
+from src.services.notification import NotificationService
 from src.services.post import PostService
 from src.services.user_service import UserService
 
 
 class ServiceProvider(Provider):
+    @provide(scope=Scope.REQUEST)
+    def notification_service(self, session) -> NotificationService:
+        return NotificationService(session)
+
     @provide(scope=Scope.REQUEST)
     def post_service(
         self,

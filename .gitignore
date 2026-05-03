@@ -1,6 +1,10 @@
-# ===========================
+```
+# Build artifacts
+frontend2/dist/
+frontend2/src/**/*.js
+frontend2/src/**/*.css
+frontend2/tsconfig.tsbuildinfo
 # Python
-# ===========================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -109,6 +113,12 @@ celerybeat.pid
 # Node.js / Frontend
 # ===========================
 node_modules/
+frontend2/node_modules/
+
+# Environment
+.env
+.env.local
+.env.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -281,6 +291,37 @@ $RECYCLE.BIN/
 
 # JetBrains (PyCharm, IntelliJ, WebStorm, etc.)
 .idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
 *.iml
 *.ipr
 *.iws
