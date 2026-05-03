@@ -336,4 +336,113 @@ export const api = {
             search: query,
         });
     },
+
+    // ===== NOTIFICATION METHODS =====
+
+    // Получить полную конфигурацию уведомлений
+    async getNotificationConfig() {
+        try {
+            const url = `${API_BASE}/notifications/config`;
+            console.log('🔍 Fetching notification config from:', url);
+            
+            const res = await fetch(url);
+            if (!res.ok) {
+                throw new Error(`API error: ${res.status}`);
+            }
+            
+            const data = await res.json();
+            console.log('✅ Loaded notification config');
+            return data;
+        }
+        catch (error) {
+            console.error('❌ Error fetching notification config:', error);
+            throw error;
+        }
+    },
+
+    // Получить настройки уведомлений
+    async getNotificationSettings() {
+        try {
+            const url = `${API_BASE}/notifications/settings`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error fetching notification settings:', error);
+            throw error;
+        }
+    },
+
+    // Обновить настройки уведомлений
+    async updateNotificationSettings(data) {
+        try {
+            const url = `${API_BASE}/notifications/settings`;
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error updating notification settings:', error);
+            throw error;
+        }
+    },
+
+    // Обновить триггер
+    async updateNotificationTrigger(id, data) {
+        try {
+            const url = `${API_BASE}/notifications/triggers/${id}`;
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error updating notification trigger:', error);
+            throw error;
+        }
+    },
+
+    // Обновить канал
+    async updateNotificationChannel(id, data) {
+        try {
+            const url = `${API_BASE}/notifications/channels/${id}`;
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error updating notification channel:', error);
+            throw error;
+        }
+    },
+
+    // Обновить источник
+    async updateNotificationSource(id, data) {
+        try {
+            const url = `${API_BASE}/notifications/sources/${id}`;
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error updating notification source:', error);
+            throw error;
+        }
+    },
 };

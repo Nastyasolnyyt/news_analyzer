@@ -1,17 +1,16 @@
 ```
 # Build artifacts
-frontend2/dist/
-frontend2/tsconfig.tsbuildinfo
+dist/
+build/
 
 # Dependencies
 node_modules/
 
+# Logs and temp files
+*.log
+*.tmp
+
 # Editors
 .vscode/
 .idea/
-
-# Environment
-.env
-.env.local
-*.env.*
 ```
