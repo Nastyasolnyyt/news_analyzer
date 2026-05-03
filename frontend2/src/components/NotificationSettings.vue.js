@@ -50,23 +50,23 @@ onMounted(async () => {
     }
 });
 const toggleSetValue = (target, value) => {
-    const next = new Set(target.value);
+    const next = new Set(target);
     if (next.has(value)) {
         next.delete(value);
     }
     else {
         next.add(value);
     }
-    target.value = next;
+    return next;
 };
 const handleTriggerToggle = (value) => {
-    toggleSetValue(selectedTriggers, value);
+    selectedTriggers.value = toggleSetValue(selectedTriggers.value, value);
 };
 const handleSourceToggle = (value) => {
-    toggleSetValue(selectedSources, value);
+    selectedSources.value = toggleSetValue(selectedSources.value, value);
 };
 const handleChannelToggle = (value) => {
-    toggleSetValue(selectedChannels, value);
+    selectedChannels.value = toggleSetValue(selectedChannels.value, value);
 };
 const handleSaveSettings = async () => {
     try {
@@ -238,7 +238,7 @@ else if (__VLS_ctx.error) {
                     return;
                 if (!(__VLS_ctx.error))
                     return;
-                __VLS_ctx.location.reload();
+                __VLS_ctx.window.location.reload();
             } },
         ...{ class: "outline" },
     });

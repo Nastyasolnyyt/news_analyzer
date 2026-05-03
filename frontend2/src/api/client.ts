@@ -906,11 +906,11 @@ export const api = {
   // Получить список всех организаций
   async getOrganizations(limit = 100): Promise<Entity[]> {
     try {
-      const url = `${API_BASE}/entities?entity_type=Company&limit=${limit}`;
+      const url = `${API_BASE}/entities?entity_type=ORG&limit=${limit}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
-      return Array.isArray(data.items) ? data.items : [];
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('❌ Error fetching organizations:', error);
       throw error;
@@ -920,11 +920,11 @@ export const api = {
   // Получить список всех персон
   async getPersons(limit = 100): Promise<Entity[]> {
     try {
-      const url = `${API_BASE}/entities?entity_type=Person&limit=${limit}`;
+      const url = `${API_BASE}/entities?entity_type=PER&limit=${limit}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
-      return Array.isArray(data.items) ? data.items : [];
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('❌ Error fetching persons:', error);
       throw error;

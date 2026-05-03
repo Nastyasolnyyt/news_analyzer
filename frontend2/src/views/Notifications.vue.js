@@ -1,11 +1,11 @@
-import NotificationSettings from '../components/NotificationSettings.vue';
+import NotificationsSettings from './NotificationsSettings.vue';
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {[typeof NotificationSettings, ]} */ ;
+/** @type {[typeof NotificationsSettings, ]} */ ;
 // @ts-ignore
-const __VLS_0 = __VLS_asFunctionalComponent(NotificationSettings, new NotificationSettings({}));
+const __VLS_0 = __VLS_asFunctionalComponent(NotificationsSettings, new NotificationsSettings({}));
 const __VLS_1 = __VLS_0({}, ...__VLS_functionalComponentArgsRest(__VLS_0));
 var __VLS_3 = {};
 var __VLS_2;
@@ -13,7 +13,7 @@ var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
-            NotificationSettings: NotificationSettings,
+            NotificationsSettings: NotificationsSettings,
         };
     },
 });

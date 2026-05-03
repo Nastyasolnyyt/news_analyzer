@@ -25,9 +25,9 @@ const triggers = ref<TriggerItem[]>([]);
 const sources = ref<SourceItem[]>([]);
 const channels = ref<SourceItem[]>([]);
 
-const selectedTriggers = ref(new Set<number>());
-const selectedSources = ref(new Set<number>());
-const selectedChannels = ref(new Set<number>());
+const selectedTriggers = ref<Set<number>>(new Set());
+const selectedSources = ref<Set<number>>(new Set());
+const selectedChannels = ref<Set<number>>(new Set());
 
 // Загрузить данные при монтировании
 onMounted(async () => {
@@ -71,26 +71,30 @@ onMounted(async () => {
   }
 });
 
-const toggleSetValue = (target: ref<Set<number>>, value: number) => {
-  const next = new Set(target.value);
+const toggleSetValue = (target: Set<number>, value: number): Set<number> => {
+  const next = new Set(target);
   if (next.has(value)) {
     next.delete(value);
   } else {
     next.add(value);
   }
-  target.value = next;
+  return next;
 };
 
 const handleTriggerToggle = (value: number) => {
-  toggleSetValue(selectedTriggers as any, value);
+  selectedTriggers.value = toggleSetValue(selectedTriggers.value, value);
 };
 
 const handleSourceToggle = (value: number) => {
-  toggleSetValue(selectedSources as any, value);
+  selectedSources.value = toggleSetValue(selectedSources.value, value);
 };
 
 const handleChannelToggle = (value: number) => {
-  toggleSetValue(selectedChannels as any, value);
+  selectedChannels.value = toggleSetValue(selectedChannels.value, value);
+};
+
+const reloadPage = () => {
+  window.location.reload();
 };
 
 const handleSaveSettings = async () => {
@@ -183,7 +187,7 @@ const handleSaveSettings = async () => {
     <div v-else-if="error" class="error-state">
       <p class="error-title">❌ Ошибка</p>
       <p class="error-message">{{ error }}</p>
-      <button class="outline" @click="location.reload()">Попробовать снова</button>
+      <button class="outline" @click="window.location.reload()">Попробовать снова</button>
     </div>
 
     <section v-else class="settings-grid">
