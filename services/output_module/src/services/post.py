@@ -73,7 +73,10 @@ class PostService:
                 analysis = post_obj.analyses[0] if post_obj.analyses else None
 
                 # Тема уже загружена через joinedload(Article.analyses).joinedload(PostAnalysis.topic)
-                topic = analysis.topic if analysis and analysis.topic else None
+                topic = None
+                if analysis and analysis.topic:
+                    from src.application.schemas.topic import TopicDTO
+                    topic = TopicDTO.model_validate(analysis.topic)
 
                 # 2. Получаем уровень риска и тип риска из таблицы risks (уже загружено)
                 risk = item.get('risk')
