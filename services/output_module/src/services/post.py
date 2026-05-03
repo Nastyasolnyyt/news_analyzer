@@ -35,7 +35,8 @@ class PostService:
         
         topic = None
         if analysis and analysis.topic_id:
-            topic = await self.topic_gateway.get_topic(analysis.topic_id)
+            topic_obj = await self.topic_gateway.get_topic(analysis.topic_id)
+            topic = topic_obj  # TopicDTO уже возвращается из гетвея
 
         analysis_with_external = PostAnalysisWithExternalModelsDTO(
             topic=topic,
@@ -76,7 +77,7 @@ class PostService:
                 topic = None
                 if analysis and analysis.topic:
                     from src.application.schemas.topic import TopicDTO
-                    topic = TopicDTO.model_validate(analysis.topic)
+                    topic = TopicDTO.model_validate(analysis.topic.as_dict())
 
                 # 2. Получаем уровень риска и тип риска из таблицы risks (уже загружено)
                 risk = item.get('risk')

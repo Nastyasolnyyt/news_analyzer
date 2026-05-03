@@ -123,6 +123,14 @@ if (__VLS_ctx.showMenu) {
         ...{ onClick: (...[$event]) => {
                 if (!(__VLS_ctx.showMenu))
                     return;
+                __VLS_ctx.router.push('/profile');
+            } },
+        ...{ class: "menu-item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showMenu))
+                    return;
                 __VLS_ctx.router.push('/notifications');
             } },
         ...{ class: "menu-item" },
@@ -147,6 +155,7 @@ if (__VLS_ctx.showMenu) {
 /** @type {__VLS_StyleScopedClasses['user-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-login']} */ ;
 /** @type {__VLS_StyleScopedClasses['menu-divider']} */ ;
+/** @type {__VLS_StyleScopedClasses['menu-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['menu-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['menu-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['logout']} */ ;

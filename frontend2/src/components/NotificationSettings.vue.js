@@ -68,6 +68,9 @@ const handleSourceToggle = (value) => {
 const handleChannelToggle = (value) => {
     selectedChannels.value = toggleSetValue(selectedChannels.value, value);
 };
+const reloadPage = () => {
+    window.location.reload();
+};
 const handleSaveSettings = async () => {
     try {
         loading.value = true;
@@ -238,7 +241,7 @@ else if (__VLS_ctx.error) {
                     return;
                 if (!(__VLS_ctx.error))
                     return;
-                __VLS_ctx.window.location.reload();
+                __VLS_ctx.reloadPage();
             } },
         ...{ class: "outline" },
     });
@@ -405,6 +408,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleTriggerToggle: handleTriggerToggle,
             handleSourceToggle: handleSourceToggle,
             handleChannelToggle: handleChannelToggle,
+            reloadPage: reloadPage,
             handleSaveSettings: handleSaveSettings,
         };
     },

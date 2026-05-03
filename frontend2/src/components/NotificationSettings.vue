@@ -187,7 +187,7 @@ const handleSaveSettings = async () => {
     <div v-else-if="error" class="error-state">
       <p class="error-title">❌ Ошибка</p>
       <p class="error-message">{{ error }}</p>
-      <button class="outline" @click="window.location.reload()">Попробовать снова</button>
+      <button class="outline" @click="reloadPage()">Попробовать снова</button>
     </div>
 
     <section v-else class="settings-grid">
