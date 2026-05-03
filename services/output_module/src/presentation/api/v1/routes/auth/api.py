@@ -49,3 +49,14 @@ async def init_superadmin(
     # Принудительно устанавливаем роль SUPERADMIN
     user_data.role = UserRole.SUPERADMIN
     return await user_service.create_user(user_data)
+
+
+@ROUTER.post("/register", response_model=UserDTO, summary="Регистрация пользователя")
+async def register(
+    user_data: UserCreateDTO,
+    user_service: FromDishka[UserService],
+) -> UserDTO:
+    """Регистрация нового пользователя. Доступна для всех."""
+    # Устанавливаем роль USER (обычный пользователь)
+    user_data.role = UserRole.USER
+    return await user_service.create_user(user_data)

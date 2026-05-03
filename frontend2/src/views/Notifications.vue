@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import NotificationSettings from '../components/NotificationSettings.vue';
+import NotificationsSettings from './NotificationsSettings.vue';
 </script>
 
 <template>
-  <NotificationSettings />
+  <NotificationsSettings />
 </template>
-

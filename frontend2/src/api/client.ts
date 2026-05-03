@@ -1,6 +1,42 @@
 // frontend/src/api/client.ts
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
+// Helper для получения заголовков с токеном
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('accessToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+  };
+}
+
+// ===== AUTH TYPES =====
+
+export interface LoginRequest {
+  login: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  login: string;
+  password: string;
+  name: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface UserDTO {
+  id: number;
+  login: string;
+  name: string;
+  role: string;
+  created_at: string;
+}
+
 export type RiskLevel = 'high' | 'medium' | 'low';
 
 export interface PostAnalysis {
@@ -572,7 +608,9 @@ export const api = {
       const url = `${API_BASE}/notifications/config`;
       console.log('🔍 Fetching notification config from:', url);
       
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
       }
@@ -590,7 +628,9 @@ export const api = {
   async getNotificationSettings(): Promise<NotificationSettings> {
     try {
       const url = `${API_BASE}/notifications/settings`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       return await res.json();
     } catch (error) {
@@ -605,7 +645,7 @@ export const api = {
       const url = `${API_BASE}/notifications/settings`;
       const res = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -620,7 +660,9 @@ export const api = {
   async getNotificationTriggers(): Promise<NotificationTrigger[]> {
     try {
       const url = `${API_BASE}/notifications/triggers`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       return await res.json();
     } catch (error) {
@@ -635,7 +677,7 @@ export const api = {
       const url = `${API_BASE}/notifications/triggers`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -652,7 +694,7 @@ export const api = {
       const url = `${API_BASE}/notifications/triggers/${id}`;
       const res = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -667,7 +709,10 @@ export const api = {
   async deleteNotificationTrigger(id: number): Promise<void> {
     try {
       const url = `${API_BASE}/notifications/triggers/${id}`;
-      const res = await fetch(url, { method: 'DELETE' });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
     } catch (error) {
       console.error('❌ Error deleting notification trigger:', error);
@@ -679,7 +724,9 @@ export const api = {
   async getNotificationChannels(): Promise<NotificationChannel[]> {
     try {
       const url = `${API_BASE}/notifications/channels`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       return await res.json();
     } catch (error) {
@@ -694,7 +741,7 @@ export const api = {
       const url = `${API_BASE}/notifications/channels`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -711,7 +758,7 @@ export const api = {
       const url = `${API_BASE}/notifications/channels/${id}`;
       const res = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -726,7 +773,10 @@ export const api = {
   async deleteNotificationChannel(id: number): Promise<void> {
     try {
       const url = `${API_BASE}/notifications/channels/${id}`;
-      const res = await fetch(url, { method: 'DELETE' });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
     } catch (error) {
       console.error('❌ Error deleting notification channel:', error);
@@ -738,7 +788,9 @@ export const api = {
   async getNotificationSources(): Promise<NotificationSource[]> {
     try {
       const url = `${API_BASE}/notifications/sources`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       return await res.json();
     } catch (error) {
@@ -753,7 +805,7 @@ export const api = {
       const url = `${API_BASE}/notifications/sources`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -770,13 +822,111 @@ export const api = {
       const url = `${API_BASE}/notifications/sources/${id}`;
       const res = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       return await res.json();
     } catch (error) {
       console.error('❌ Error updating notification source:', error);
+      throw error;
+    }
+  },
+
+  // ===== AUTH METHODS =====
+
+  // Вход
+  async login(credentials: LoginRequest): Promise<TokenResponse> {
+    try {
+      const url = `${API_BASE}/auth/login`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || `API error: ${res.status}`);
+      }
+      const data = await res.json();
+      console.log('✅ Login successful');
+      return data;
+    } catch (error) {
+      console.error('❌ Login error:', error);
+      throw error;
+    }
+  },
+
+  // Регистрация
+  async register(data: RegisterRequest): Promise<UserDTO> {
+    try {
+      const url = `${API_BASE}/auth/register`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || `API error: ${res.status}`);
+      }
+      const user = await res.json();
+      console.log('✅ Registration successful');
+      return user;
+    } catch (error) {
+      console.error('❌ Registration error:', error);
+      throw error;
+    }
+  },
+
+  // Получить текущего пользователя
+  async getCurrentUser(): Promise<UserDTO> {
+    try {
+      const url = `${API_BASE}/users/me`;
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error fetching current user:', error);
+      throw error;
+    }
+  },
+
+  // Выход из системы
+  logout(): void {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    console.log('✅ Logout successful');
+  },
+
+  // ===== ORGANIZATIONS AND PERSONS =====
+
+  // Получить список всех организаций
+  async getOrganizations(limit = 100): Promise<Entity[]> {
+    try {
+      const url = `${API_BASE}/entities?entity_type=Company&limit=${limit}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data.items) ? data.items : [];
+    } catch (error) {
+      console.error('❌ Error fetching organizations:', error);
+      throw error;
+    }
+  },
+
+  // Получить список всех персон
+  async getPersons(limit = 100): Promise<Entity[]> {
+    try {
+      const url = `${API_BASE}/entities?entity_type=Person&limit=${limit}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data.items) ? data.items : [];
+    } catch (error) {
+      console.error('❌ Error fetching persons:', error);
       throw error;
     }
   },

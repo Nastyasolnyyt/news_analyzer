@@ -40,6 +40,14 @@ async def get_users(
     return await user_service.get_users(filters)
 
 
+@ROUTER.get("/me", response_model=UserDTO, summary="Текущий пользователь")
+async def get_current_user_info(
+    user: UserDTO = Depends(get_current_user),
+) -> UserDTO:
+    """Получение информации о текущем авторизованном пользователе."""
+    return user
+
+
 @ROUTER.get("/{user_id}", response_model=UserDTO, summary="Получить пользователя")
 async def get_user(
     user_service: FromDishka[UserService],
