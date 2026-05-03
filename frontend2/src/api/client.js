@@ -685,4 +685,17 @@ export const api = {
             throw error;
         }
     },
+    // ===== USER REPORTS =====
+    // Получить отчеты пользователя
+    async getUserReports() {
+        // Если API недоступен, возвращаем пустой массив
+        console.warn('⚠️ User reports API not implemented yet');
+        return [];
+    },
+    // Удалить отчет
+    async deleteReport(reportId) {
+        // Если API недоступен, просто логируем предупреждение
+        console.warn('⚠️ Delete report API not implemented yet');
+        throw new Error('Delete report API not implemented');
+    },
 };

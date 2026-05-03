@@ -1,34 +1,16 @@
 ```
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
-*.so
-*.dll
-*.exe
-*.class
-*.out
-*.a
-*.lib
+# Build directories
+frontend2/dist/
+frontend2/src/**/*.js
+frontend2/src/**/*.d.ts
+frontend2/tsconfig.tsbuildinfo
 
 # Dependencies
-.venv/
-venv/
 node_modules/
-target/
-.gradle/
-.mypy_cache/
-.pytest_cache/
-coverage/
-htmlcov/
-.coverage
 
 # Logs and temp files
 *.log
 *.tmp
-*.swp
-*.swo
 
 # Environment
 .env
@@ -38,14 +20,4 @@ htmlcov/
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build/dist folders
-dist/
-build/
 ```

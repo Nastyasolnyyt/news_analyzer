@@ -247,4 +247,6 @@ export declare const api: {
     logout(): void;
     getOrganizations(limit?: number): Promise<Entity[]>;
     getPersons(limit?: number): Promise<Entity[]>;
+    getUserReports(): Promise<any[]>;
+    deleteReport(reportId: number): Promise<void>;
 };
