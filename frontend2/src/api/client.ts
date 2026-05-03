@@ -108,6 +108,55 @@ export interface NewsListResponse {
   page_size: number;
 }
 
+// ===== NOTIFICATION TYPES =====
+
+export interface NotificationTrigger {
+  id: number;
+  name: string;
+  trigger_type: string;
+  trigger_value: string;
+  description?: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationChannel {
+  id: number;
+  channel_type: string;
+  channel_address?: string;
+  enabled: boolean;
+  verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationSource {
+  id: number;
+  source_type: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationSettings {
+  id: number;
+  enabled: boolean;
+  digest_frequency: string;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start?: string;
+  quiet_hours_end?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationConfig {
+  settings: NotificationSettings;
+  triggers: NotificationTrigger[];
+  channels: NotificationChannel[];
+  sources: NotificationSource[];
+}
+
 // Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
 function enrichNewsWithRisk(news: News, analysis?: PostAnalysis & { topic?: Topic }): News {
   if (!analysis) return news;
@@ -513,5 +562,222 @@ export const api = {
       ...params,
       search: query,
     });
+  },
+
+  // ===== NOTIFICATION METHODS =====
+
+  // Получить полную конфигурацию уведомлений
+  async getNotificationConfig(): Promise<NotificationConfig> {
+    try {
+      const url = `${API_BASE}/notifications/config`;
+      console.log('🔍 Fetching notification config from:', url);
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('✅ Loaded notification config');
+      return data;
+    } catch (error) {
+      console.error('❌ Error fetching notification config:', error);
+      throw error;
+    }
+  },
+
+  // Получить настройки уведомлений
+  async getNotificationSettings(): Promise<NotificationSettings> {
+    try {
+      const url = `${API_BASE}/notifications/settings`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error fetching notification settings:', error);
+      throw error;
+    }
+  },
+
+  // Обновить настройки уведомлений
+  async updateNotificationSettings(data: Partial<NotificationSettings>): Promise<NotificationSettings> {
+    try {
+      const url = `${API_BASE}/notifications/settings`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error updating notification settings:', error);
+      throw error;
+    }
+  },
+
+  // Получить триггеры уведомлений
+  async getNotificationTriggers(): Promise<NotificationTrigger[]> {
+    try {
+      const url = `${API_BASE}/notifications/triggers`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error fetching notification triggers:', error);
+      throw error;
+    }
+  },
+
+  // Создать триггер
+  async createNotificationTrigger(data: Omit<NotificationTrigger, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationTrigger> {
+    try {
+      const url = `${API_BASE}/notifications/triggers`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error creating notification trigger:', error);
+      throw error;
+    }
+  },
+
+  // Обновить триггер
+  async updateNotificationTrigger(id: number, data: Partial<NotificationTrigger>): Promise<NotificationTrigger> {
+    try {
+      const url = `${API_BASE}/notifications/triggers/${id}`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error updating notification trigger:', error);
+      throw error;
+    }
+  },
+
+  // Удалить триггер
+  async deleteNotificationTrigger(id: number): Promise<void> {
+    try {
+      const url = `${API_BASE}/notifications/triggers/${id}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+    } catch (error) {
+      console.error('❌ Error deleting notification trigger:', error);
+      throw error;
+    }
+  },
+
+  // Получить каналы уведомлений
+  async getNotificationChannels(): Promise<NotificationChannel[]> {
+    try {
+      const url = `${API_BASE}/notifications/channels`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error fetching notification channels:', error);
+      throw error;
+    }
+  },
+
+  // Создать канал
+  async createNotificationChannel(data: Omit<NotificationChannel, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationChannel> {
+    try {
+      const url = `${API_BASE}/notifications/channels`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error creating notification channel:', error);
+      throw error;
+    }
+  },
+
+  // Обновить канал
+  async updateNotificationChannel(id: number, data: Partial<NotificationChannel>): Promise<NotificationChannel> {
+    try {
+      const url = `${API_BASE}/notifications/channels/${id}`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error updating notification channel:', error);
+      throw error;
+    }
+  },
+
+  // Удалить канал
+  async deleteNotificationChannel(id: number): Promise<void> {
+    try {
+      const url = `${API_BASE}/notifications/channels/${id}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+    } catch (error) {
+      console.error('❌ Error deleting notification channel:', error);
+      throw error;
+    }
+  },
+
+  // Получить источники уведомлений
+  async getNotificationSources(): Promise<NotificationSource[]> {
+    try {
+      const url = `${API_BASE}/notifications/sources`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error fetching notification sources:', error);
+      throw error;
+    }
+  },
+
+  // Создать источник
+  async createNotificationSource(data: Omit<NotificationSource, 'id' | 'created_at' | 'updated_at'>): Promise<NotificationSource> {
+    try {
+      const url = `${API_BASE}/notifications/sources`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error creating notification source:', error);
+      throw error;
+    }
+  },
+
+  // Обновить источник
+  async updateNotificationSource(id: number, data: Partial<NotificationSource>): Promise<NotificationSource> {
+    try {
+      const url = `${API_BASE}/notifications/sources/${id}`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return await res.json();
+    } catch (error) {
+      console.error('❌ Error updating notification source:', error);
+      throw error;
+    }
   },
 };
