@@ -1,6 +1,7 @@
 from dishka import Provider, Scope, provide
 from src.infrastructure.postgres.repositories.named_entity import NamedEntityDBGateWay
 from src.infrastructure.postgres.repositories.post import PostDBGateWay
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.postgres.repositories.post_analysis import PostAnalysisDBGateWay
 from src.infrastructure.postgres.repositories.post_entity import PostEntityDBGateWay
 from src.infrastructure.postgres.repositories.topic import TopicDBGateWay
@@ -12,9 +13,10 @@ from src.services.post import PostService
 from src.services.user_service import UserService
 
 
+
 class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
-    def notification_service(self, session) -> NotificationService:
+    def notification_service(self, session: AsyncSession) -> NotificationService:
         return NotificationService(session)
 
     @provide(scope=Scope.REQUEST)
