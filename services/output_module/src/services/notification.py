@@ -34,10 +34,20 @@ class NotificationService:
     def __init__(self, session: AsyncSession):
         self.session = session
     
+    async def _ensure_user_exists(self, user_id: int) -> bool:
+        """Проверяет существование пользователя"""
+        stmt = select(User).where(User.id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first() is not None
+    
     # ===== SETTINGS =====
     
     async def get_user_settings(self, user_id: int) -> Optional[NotificationSettingsDTO]:
         """Получить настройки уведомлений пользователя"""
+        # Проверяем существование пользователя
+        if not await self._ensure_user_exists(user_id):
+            return None
+            
         stmt = select(NotificationSettings).where(NotificationSettings.user_id == user_id)
         result = await self.session.execute(stmt)
         settings = result.scalars().first()
@@ -50,8 +60,12 @@ class NotificationService:
         
         return NotificationSettingsDTO.from_orm(settings)
     
-    async def update_user_settings(self, user_id: int, data: NotificationSettingsUpdateDTO) -> NotificationSettingsDTO:
+    async def update_user_settings(self, user_id: int, data: NotificationSettingsUpdateDTO) -> Optional[NotificationSettingsDTO]:
         """Обновить настройки уведомлений"""
+        # Проверяем существование пользователя
+        if not await self._ensure_user_exists(user_id):
+            return None
+            
         stmt = select(NotificationSettings).where(NotificationSettings.user_id == user_id)
         result = await self.session.execute(stmt)
         settings = result.scalars().first()
