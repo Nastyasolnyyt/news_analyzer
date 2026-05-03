@@ -26,31 +26,31 @@ async def get_current_user(
         )
 
     try:
-        # Получаем контейнер Dishka из request state
-        from dishka.integrations.fastapi import get_container
+        from dishka.integrations.fastapi import FromDishka
+        from dishka import AsyncContainer
 
-        container = get_container(request)
+        # Получаем контейнер из request.state (совместимо с разными версиями dishka)
+        container: AsyncContainer = request.state.dishka_container
+
         auth_service = await container.get(AuthService)
         user_service = await container.get(UserService)
 
         payload = auth_service.decode_token(token, token_type="access")
         user_id = int(payload["sub"])
-        logger.info("Токен верифицирован", {"user_id": user_id})
+        logger.info(f"Токен верифицирован, user_id={user_id}")
 
         user = await user_service.get_user(user_id)
-        logger.info(
-            "Пользователь получен из БД для аутентификации",
-            {"user_id": user.id, "login": user.login},
-        )
+        logger.info(f"Пользователь получен из БД: user_id={user.id}, login={user.login}")
         return user
+
     except (HTTPException, UserNotFoundException, UnauthorizedException) as e:
-        logger.error("Ошибка аутентификации", {"error": str(e)})
+        logger.error(f"Ошибка аутентификации: {e}")
         raise e
     except Exception as e:
-        logger.error("Внутренняя ошибка аутентификации", {"error": str(e)})
+        logger.error(f"Внутренняя ошибка аутентификации: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal authentication error: {str(e)}",
+            detail=f"Internal authentication error: {type(e).__name__}: {str(e)}",
         )
 
 
