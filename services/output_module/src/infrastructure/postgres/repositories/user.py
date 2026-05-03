@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.enums import UserRole
 from src.application.errors.user import UserAlreadyExistsException, UserNotFoundException
 from src.application.schemas.user import UserDTO, UserFilterDTO
-# Импортируем напрямую из файла в папке models
 from src.infrastructure.postgres.models.user import User
 
 
@@ -33,12 +32,12 @@ class UserDBGateWay:
         user = result.scalars().first()
         if user is None:
             return None
-        
+
         user_dto = UserDTO.model_validate(user, from_attributes=True)
         return user_dto, user.password_hash
 
     async def create_user(
-        self, login: str, password_hash: str, name: str, role: UserRole, username: str
+        self, login: str, password_hash: str, name: str, role: UserRole
     ) -> UserDTO:
         # Проверяем существование
         existing_user = await self.get_user_by_login(login)
@@ -46,11 +45,10 @@ class UserDBGateWay:
             raise UserAlreadyExistsException(login=login)
 
         new_user = User(
-            login=login, 
-            username=username,
-            password_hash=password_hash, 
-            name=name, 
-            role=role.value
+            login=login,
+            password_hash=password_hash,
+            name=name,
+            role=role.value,
         )
         self.session.add(new_user)
         await self.session.flush()
@@ -60,6 +58,7 @@ class UserDBGateWay:
     async def update_user(
         self,
         user_id: int,
+        login: Optional[str] = None,
         name: Optional[str] = None,
         role: Optional[UserRole] = None,
         password_hash: Optional[str] = None,
@@ -69,6 +68,8 @@ class UserDBGateWay:
         if user is None:
             raise UserNotFoundException(user_id=user_id)
 
+        if login is not None:
+            user.login = login
         if name is not None:
             user.name = name
         if role is not None:
@@ -89,7 +90,7 @@ class UserDBGateWay:
         if filters.login is not None:
             query = query.where(User.login.ilike(f"%{filters.login}%"))
 
-        # Подсчет общего количества через subquery (надежнее для асинхронности)
+        # Подсчет общего количества
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await self.session.execute(count_query)
         total = total_result.scalar_one()
@@ -100,5 +101,5 @@ class UserDBGateWay:
 
         result = await self.session.execute(query)
         users = result.scalars().all()
-        
+
         return [UserDTO.model_validate(u, from_attributes=True) for u in users], total

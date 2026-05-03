@@ -16,8 +16,6 @@ class UserService:
 
     async def create_user(self, user_data: UserCreateDTO) -> UserDTO:
         password_hash = self.auth_service.hash_password(user_data.password)
-        # Исправлено: передаем login и password_hash. 
-        # Убедитесь, что в UserDBGateWay.create_user первый аргумент называется 'login'
         return await self.user_gateway.create_user(
             login=user_data.login,
             password_hash=password_hash,
@@ -42,12 +40,9 @@ class UserService:
         if user_data.password is not None:
             password_hash = self.auth_service.hash_password(user_data.password)
 
-        # 1. Вызываем update_user, а не create_user
-        # 2. Передаем password_hash вместо пароля
-        # 3. Используем login вместо username (если в DTO поле login)
         return await self.user_gateway.update_user(
             user_id=user_id,
-            login=user_data.login,
+            login=user_data.login if hasattr(user_data, "login") else None,
             password_hash=password_hash,
             name=user_data.name,
             role=user_data.role,
