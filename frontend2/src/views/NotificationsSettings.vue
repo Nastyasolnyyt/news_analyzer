@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { api, type Entity } from '../api/client';
+import { api as apiClient, type Entity } from '../api/client';
 
 const router = useRouter();
 
@@ -9,6 +9,7 @@ const statusEnabled = ref(true);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const saveSuccess = ref(false);
+const isAuthenticated = ref(false);
 
 // Данные
 const organizations = ref<Entity[]>([]);
@@ -21,17 +22,32 @@ const email = ref('');
 const mentionThreshold = ref(1);
 const digestFrequency = ref('instant'); // instant, daily, weekly
 
+// Проверка аутентификации
+const checkAuth = () => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    router.push('/auth');
+    return false;
+  }
+  isAuthenticated.value = true;
+  return true;
+};
+
 // Загрузить данные
 onMounted(async () => {
+  if (!checkAuth()) {
+    return;
+  }
+
   try {
     loading.value = true;
     error.value = null;
 
     // Загружаем конфиг, организации и персон параллельно
     const [config, orgs, persons_list] = await Promise.all([
-      api.getNotificationConfig(),
-      api.getOrganizations(100),
-      api.getPersons(100),
+      apiClient.getNotificationConfig(),
+      apiClient.getOrganizations(100),
+      apiClient.getPersons(100),
     ]);
 
     // Сохраняем организации и персон
@@ -97,17 +113,17 @@ const handleSaveSettings = async () => {
     error.value = null;
 
     // Обновляем основные настройки
-    await api.updateNotificationSettings({
+    await apiClient.updateNotificationSettings({
       enabled: statusEnabled.value,
       digest_frequency: digestFrequency.value,
     });
 
     // Обновляем триггеры для организаций
-    const config = await api.getNotificationConfig();
+    const config = await apiClient.getNotificationConfig();
     const orgTriggers = config.triggers.filter(t => t.trigger_type === 'organization');
     for (const trigger of orgTriggers) {
       const orgId = parseInt(trigger.trigger_value);
-      await api.updateNotificationTrigger(trigger.id, {
+      await apiClient.updateNotificationTrigger(trigger.id, {
         enabled: selectedOrganizations.value.has(orgId),
       } as any);
     }
@@ -116,7 +132,7 @@ const handleSaveSettings = async () => {
     const personTriggers = config.triggers.filter(t => t.trigger_type === 'person');
     for (const trigger of personTriggers) {
       const personId = parseInt(trigger.trigger_value);
-      await api.updateNotificationTrigger(trigger.id, {
+      await apiClient.updateNotificationTrigger(trigger.id, {
         enabled: selectedPersons.value.has(personId),
       } as any);
     }
@@ -124,7 +140,7 @@ const handleSaveSettings = async () => {
     // Обновляем email канал
     const emailChannel = config.channels.find(c => c.channel_type === 'email');
     if (emailChannel) {
-      await api.updateNotificationChannel(emailChannel.id, {
+      await apiClient.updateNotificationChannel(emailChannel.id, {
         channel_address: email.value,
         enabled: true,
       } as any);
