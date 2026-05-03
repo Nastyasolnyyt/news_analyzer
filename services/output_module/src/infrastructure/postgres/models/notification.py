@@ -1,7 +1,16 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func, Table
 from sqlalchemy.orm import relationship
-from src.infrastructure.postgres.models.base import Base
+from src.infrastructure.postgres.connection import Base
+
+
+# Association table для связи trigger и channel
+trigger_channel_association = Table(
+    'trigger_channel_association',
+    Base.metadata,
+    Column('trigger_id', Integer, ForeignKey('notification_triggers.id', ondelete='CASCADE'), primary_key=True),
+    Column('channel_id', Integer, ForeignKey('notification_channels.id', ondelete='CASCADE'), primary_key=True),
+)
 
 
 class NotificationTrigger(Base):
@@ -94,14 +103,3 @@ class NotificationLog(Base):
     trigger = relationship("NotificationTrigger", back_populates="logs")
     channel = relationship("NotificationChannel", back_populates="logs")
     article = relationship("Article")
-
-
-# Association table для связи trigger и channel
-from sqlalchemy import Table
-
-trigger_channel_association = Table(
-    'trigger_channel_association',
-    Base.metadata,
-    Column('trigger_id', Integer, ForeignKey('notification_triggers.id', ondelete='CASCADE'), primary_key=True),
-    Column('channel_id', Integer, ForeignKey('notification_channels.id', ondelete='CASCADE'), primary_key=True),
-)
