@@ -1,3 +1,24 @@
+export interface LoginRequest {
+    login: string;
+    password: string;
+}
+export interface RegisterRequest {
+    login: string;
+    password: string;
+    name: string;
+}
+export interface TokenResponse {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+}
+export interface UserDTO {
+    id: number;
+    login: string;
+    name: string;
+    role: string;
+    created_at: string;
+}
 export type RiskLevel = 'high' | 'medium' | 'low';
 export interface PostAnalysis {
     id?: number;
@@ -220,4 +241,10 @@ export declare const api: {
     getNotificationSources(): Promise<NotificationSource[]>;
     createNotificationSource(data: Omit<NotificationSource, "id" | "created_at" | "updated_at">): Promise<NotificationSource>;
     updateNotificationSource(id: number, data: Partial<NotificationSource>): Promise<NotificationSource>;
+    login(credentials: LoginRequest): Promise<TokenResponse>;
+    register(data: RegisterRequest): Promise<UserDTO>;
+    getCurrentUser(): Promise<UserDTO>;
+    logout(): void;
+    getOrganizations(limit?: number): Promise<Entity[]>;
+    getPersons(limit?: number): Promise<Entity[]>;
 };

@@ -1,5 +1,13 @@
 // frontend/src/api/client.ts
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+// Helper для получения заголовков с токеном
+function getAuthHeaders() {
+    const token = localStorage.getItem('accessToken');
+    return {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+    };
+}
 // Вспомогательная функция: извлекает риск и тональность из analysis и добавляет в news
 function enrichNewsWithRisk(news, analysis) {
     if (!analysis)
@@ -342,7 +350,9 @@ export const api = {
         try {
             const url = `${API_BASE}/notifications/config`;
             console.log('🔍 Fetching notification config from:', url);
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: getAuthHeaders(),
+            });
             if (!res.ok) {
                 throw new Error(`API error: ${res.status}`);
             }
@@ -359,7 +369,9 @@ export const api = {
     async getNotificationSettings() {
         try {
             const url = `${API_BASE}/notifications/settings`;
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: getAuthHeaders(),
+            });
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
             return await res.json();
@@ -375,7 +387,7 @@ export const api = {
             const url = `${API_BASE}/notifications/settings`;
             const res = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -391,7 +403,9 @@ export const api = {
     async getNotificationTriggers() {
         try {
             const url = `${API_BASE}/notifications/triggers`;
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: getAuthHeaders(),
+            });
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
             return await res.json();
@@ -407,7 +421,7 @@ export const api = {
             const url = `${API_BASE}/notifications/triggers`;
             const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -425,7 +439,7 @@ export const api = {
             const url = `${API_BASE}/notifications/triggers/${id}`;
             const res = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -441,7 +455,10 @@ export const api = {
     async deleteNotificationTrigger(id) {
         try {
             const url = `${API_BASE}/notifications/triggers/${id}`;
-            const res = await fetch(url, { method: 'DELETE' });
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            });
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
         }
@@ -454,7 +471,9 @@ export const api = {
     async getNotificationChannels() {
         try {
             const url = `${API_BASE}/notifications/channels`;
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: getAuthHeaders(),
+            });
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
             return await res.json();
@@ -470,7 +489,7 @@ export const api = {
             const url = `${API_BASE}/notifications/channels`;
             const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -488,7 +507,7 @@ export const api = {
             const url = `${API_BASE}/notifications/channels/${id}`;
             const res = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -504,7 +523,10 @@ export const api = {
     async deleteNotificationChannel(id) {
         try {
             const url = `${API_BASE}/notifications/channels/${id}`;
-            const res = await fetch(url, { method: 'DELETE' });
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            });
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
         }
@@ -517,7 +539,9 @@ export const api = {
     async getNotificationSources() {
         try {
             const url = `${API_BASE}/notifications/sources`;
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: getAuthHeaders(),
+            });
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
             return await res.json();
@@ -533,7 +557,7 @@ export const api = {
             const url = `${API_BASE}/notifications/sources`;
             const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -551,7 +575,7 @@ export const api = {
             const url = `${API_BASE}/notifications/sources/${id}`;
             const res = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(data),
             });
             if (!res.ok)
@@ -560,6 +584,104 @@ export const api = {
         }
         catch (error) {
             console.error('❌ Error updating notification source:', error);
+            throw error;
+        }
+    },
+    // ===== AUTH METHODS =====
+    // Вход
+    async login(credentials) {
+        try {
+            const url = `${API_BASE}/auth/login`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(credentials),
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.detail || `API error: ${res.status}`);
+            }
+            const data = await res.json();
+            console.log('✅ Login successful');
+            return data;
+        }
+        catch (error) {
+            console.error('❌ Login error:', error);
+            throw error;
+        }
+    },
+    // Регистрация
+    async register(data) {
+        try {
+            const url = `${API_BASE}/auth/register`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.detail || `API error: ${res.status}`);
+            }
+            const user = await res.json();
+            console.log('✅ Registration successful');
+            return user;
+        }
+        catch (error) {
+            console.error('❌ Registration error:', error);
+            throw error;
+        }
+    },
+    // Получить текущего пользователя
+    async getCurrentUser() {
+        try {
+            const url = `${API_BASE}/users/me`;
+            const res = await fetch(url, {
+                headers: getAuthHeaders(),
+            });
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            return await res.json();
+        }
+        catch (error) {
+            console.error('❌ Error fetching current user:', error);
+            throw error;
+        }
+    },
+    // Выход из системы
+    logout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        console.log('✅ Logout successful');
+    },
+    // ===== ORGANIZATIONS AND PERSONS =====
+    // Получить список всех организаций
+    async getOrganizations(limit = 100) {
+        try {
+            const url = `${API_BASE}/entities?entity_type=ORG&limit=${limit}`;
+            const res = await fetch(url);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            const data = await res.json();
+            return Array.isArray(data) ? data : [];
+        }
+        catch (error) {
+            console.error('❌ Error fetching organizations:', error);
+            throw error;
+        }
+    },
+    // Получить список всех персон
+    async getPersons(limit = 100) {
+        try {
+            const url = `${API_BASE}/entities?entity_type=PER&limit=${limit}`;
+            const res = await fetch(url);
+            if (!res.ok)
+                throw new Error(`API error: ${res.status}`);
+            const data = await res.json();
+            return Array.isArray(data) ? data : [];
+        }
+        catch (error) {
+            console.error('❌ Error fetching persons:', error);
             throw error;
         }
     },
