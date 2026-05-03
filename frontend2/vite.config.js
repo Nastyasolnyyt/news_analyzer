@@ -5,6 +5,11 @@ export default defineConfig({
     plugins: [vue()],
     server: {
         port: 5173,
-        // proxy: { ... }  // ← закомментируй или удали блок proxy
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8003',
+                changeOrigin: true,
+            },
+        },
     },
 });
