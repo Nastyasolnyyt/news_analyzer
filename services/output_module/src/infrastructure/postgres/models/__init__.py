@@ -8,6 +8,13 @@ from .post_entity import PostEntity
 from .named_entity import NamedEntity
 from .topic import Topic
 from .risk import Risk
+from .notification import (
+    NotificationTrigger,
+    NotificationChannel,
+    NotificationSource,
+    NotificationSettings,
+    NotificationLog,
+)
 
 __all__ = [
     "User",
@@ -17,4 +24,9 @@ __all__ = [
     "NamedEntity",
     "Topic",
     "Risk",
+    "NotificationTrigger",
+    "NotificationChannel",
+    "NotificationSource",
+    "NotificationSettings",
+    "NotificationLog",
 ]

@@ -322,7 +322,7 @@ export const api = {
         })));
         return results.filter((e) => e !== null);
     },
-    // Получить высокорисковые новости
+    // Получить  высокорисковые новости
     async getHighRiskNews(params) {
         return this.getNews({
             ...params,

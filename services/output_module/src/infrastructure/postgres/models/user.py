@@ -1,4 +1,5 @@
 from sqlalchemy import Column, DateTime, Integer, String, func
+from sqlalchemy.orm import relationship
 from src.application.enums import UserRole
 from src.infrastructure.postgres.connection import Base
 
@@ -12,3 +13,9 @@ class User(Base):
     name = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default=UserRole.USER.value)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    # Relationships
+    notification_settings = relationship("NotificationSettings", back_populates="user", uselist=False)
+    notification_triggers = relationship("NotificationTrigger", back_populates="user")
+    notification_channels = relationship("NotificationChannel", back_populates="user")
+    notification_sources = relationship("NotificationSource", back_populates="user")
