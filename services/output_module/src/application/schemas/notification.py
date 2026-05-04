@@ -1,10 +1,12 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
 
 class NotificationTriggerDTO(BaseModel):
     """Триггер для отправки уведомлений"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     trigger_type: str  # "entity", "tag", "category"
@@ -13,13 +15,12 @@ class NotificationTriggerDTO(BaseModel):
     enabled: bool = True
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class NotificationChannelDTO(BaseModel):
     """Канал доставки уведомлений"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     channel_type: str  # "app", "email", "telegram"
     channel_address: Optional[str] = None
@@ -27,25 +28,23 @@ class NotificationChannelDTO(BaseModel):
     verified: bool = False
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class NotificationSourceDTO(BaseModel):
     """Источник данных для мониторинга"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     source_type: str  # "telegram", "vk", "email"
     enabled: bool = True
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class NotificationSettingsDTO(BaseModel):
     """Общие настройки уведомлений"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     enabled: bool = True
     digest_frequency: str = "daily"  # "instant", "daily", "weekly"
@@ -54,13 +53,20 @@ class NotificationSettingsDTO(BaseModel):
     quiet_hours_end: Optional[str] = None  # HH:MM
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+
+class UserNotificationPreferencesUpdateDTO(BaseModel):
+    """
+    DTO для обновления основных предпочтений пользователя с фронтенда.
+    Используется в ручке сохранения настроек на странице /notifications.
+    """
+    email: Optional[EmailStr] = None
+    digest_frequency: Optional[str] = None  # "instant", "daily", "weekly"
+    enabled: Optional[bool] = None
 
 
 class NotificationSettingsUpdateDTO(BaseModel):
-    """Обновление настроек уведомлений"""
+    """Обновление внутренних настроек уведомлений (расширенное)"""
     enabled: Optional[bool] = None
     digest_frequency: Optional[str] = None
     quiet_hours_enabled: Optional[bool] = None
@@ -87,7 +93,7 @@ class NotificationTriggerUpdateDTO(BaseModel):
 class NotificationChannelCreateDTO(BaseModel):
     """Создание нового канала"""
     channel_type: str  # "app", "email", "telegram"
-    channel_address: Optional[str] = None
+    channel_address: Optional[EmailStr] = None
     enabled: bool = True
 
 
@@ -110,6 +116,8 @@ class NotificationSourceUpdateDTO(BaseModel):
 
 class NotificationLogDTO(BaseModel):
     """Логи отправленных уведомлений"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     trigger_id: Optional[int] = None
     channel_id: Optional[int] = None
@@ -117,9 +125,6 @@ class NotificationLogDTO(BaseModel):
     status: str  # "sent", "failed", "read"
     error_message: Optional[str] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class NotificationConfigDTO(BaseModel):
