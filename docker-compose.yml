@@ -81,6 +81,9 @@ services:
     build:
       context: ./services/output_module
       dockerfile: Dockerfile
+    container_name: notification-consumer
+    env_file:
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -95,11 +98,13 @@ services:
       SMTP_ENABLED: "true"
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      db:
+        condition: service_started
+    restart: always
     networks:
       - news_network
-    restart: unless-stopped
 
   # НОВЫЙ СЕРВИС: Анализ тональности
   sentiment_analysis:
