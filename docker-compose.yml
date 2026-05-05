@@ -76,12 +76,13 @@ services:
     restart: always
     networks:
        - news_network
+
   notification-consumer:
     build:
       context: ./services/output_module
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD}@postgres:5432/news_analyzer
+      DATABASE_URL: ${DATABASE_URL}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_INPUT_TOPIC: articles_analyzed
       KAFKA_NOTIFICATION_GROUP_ID: notifications-sender-group
@@ -97,7 +98,7 @@ services:
       - kafka
       - postgres
     networks:
-      - app-network
+      - news_network
     restart: unless-stopped
 
   # НОВЫЙ СЕРВИС: Анализ тональности
