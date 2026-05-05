@@ -61,3 +61,4 @@ uvicorn==0.38.0
 virtualenv==20.35.4
 bcrypt==4.2.0
 python-jose[cryptography]==3.3.0
+aiokafka==0.10.0

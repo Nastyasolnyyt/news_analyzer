@@ -302,6 +302,39 @@ const handleSaveSettings = async () => {
 
 const selectedOrgsCount = computed(() => selectedOrganizations.value.size);
 const selectedPersonsCount = computed(() => selectedPersons.value.size);
+
+const handleSendTestEmail = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const response = await fetch('/api/v1/notifications/test-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to send test email');
+    }
+
+    const data = await response.json();
+    saveSuccess.value = true;
+    console.log('✅ Test email sent successfully:', data);
+
+    setTimeout(() => {
+      saveSuccess.value = false;
+    }, 3000);
+  } catch (e: any) {
+    error.value = e.message || 'Ошибка отправки тестового письма';
+    console.error('❌ Error sending test email:', e);
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -455,9 +488,19 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
         <li>Уведомления будут отправлены на: {{ email }}</li>
         <li>Частота: {{ digestFrequency === 'instant' ? 'Сразу же' : digestFrequency === 'daily' ? 'Ежедневно' : 'Еженедельно' }}</li>
       </ul>
-      <button class="primary" :disabled="loading" @click="handleSaveSettings">
-        {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
-      </button>
+      <div class="button-group">
+        <button class="primary" :disabled="loading" @click="handleSaveSettings">
+          {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
+        </button>
+        <button 
+          class="secondary" 
+          :disabled="loading || !email" 
+          @click="handleSendTestEmail"
+          title="Отправить тестовое письмо на указанный email"
+        >
+          📧 Тестовое письмо
+        </button>
+      </div>
     </section>
   </section>
 </template>
@@ -827,6 +870,35 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
   cursor: not-allowed;
 }
 
+.button-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.secondary {
+  padding: 12px 24px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+}
+
+.secondary:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.8);
+}
+
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .hero {
     flex-direction: column;
@@ -834,6 +906,14 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
 
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .primary, .secondary {
+    align-self: stretch;
   }
 }
 </style>
