@@ -43,3 +43,21 @@ class ArticleORM(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    
+    # Добавляем UNIQUE constraint если его ещё нет
+    from sqlalchemy import text
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        with engine.connect() as conn:
+            # Пытаемся добавить constraint
+            conn.execute(text("ALTER TABLE articles ADD CONSTRAINT articles_link_unique UNIQUE (link)"))
+            conn.commit()
+            logger.info("✅ UNIQUE constraint added to articles.link")
+    except Exception as e:
+        # Constraint уже существует или другая ошибка
+        if "already exists" in str(e) or "duplicate key" in str(e):
+            logger.info("ℹ️  UNIQUE constraint already exists on articles.link")
+        else:
+            logger.warning(f"⚠️  Note: {e}")
