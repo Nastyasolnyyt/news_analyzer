@@ -137,6 +137,23 @@ const handleSaveSettings = async () => {
     loading.value = false;
   }
 };
+
+const handleSendTestEmail = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    
+    const result = await api.sendTestEmail();
+    alert(`Тестовое письмо отправлено на ${result.to}!\nСтатус: ${result.status}`);
+    console.log('Test email sent:', result);
+  } catch (e: any) {
+    error.value = e.message || 'Ошибка при отправке тестового письма';
+    console.error('Error sending test email:', error.value);
+    alert(`Ошибка: ${error.value}`);
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -262,9 +279,14 @@ const handleSaveSettings = async () => {
         <li>Email-дайджест с ежедневным обзором найденных событий.</li>
         <li>Возможность быстро перейти в профиль или новость из уведомления.</li>
       </ul>
-      <button class="primary" :disabled="loading" @click="handleSaveSettings">
-        {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
-      </button>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="primary" :disabled="loading" @click="handleSaveSettings">
+          {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
+        </button>
+        <button class="outline" :disabled="loading" @click="handleSendTestEmail" title="Отправить тестовое письмо на ваш email">
+          {{ loading ? 'Отправляем...' : '📧 Отправить тест' }}
+        </button>
+      </div>
     </section>
   </section>
 </template>
