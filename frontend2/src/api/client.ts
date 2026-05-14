@@ -118,6 +118,11 @@ export interface NamedEntity {
   created_at: string;
 }
 
+export interface CreateEntityDTO {
+  name: string;
+  entity_type: string;
+}
+
 export interface Entity {
   id: number;
   name: string;
@@ -927,6 +932,28 @@ export const api = {
   },
 
   // ===== ORGANIZATIONS AND PERSONS =====
+
+  // Создать новую сущность (организацию или персону)
+  async createEntity(data: CreateEntityDTO): Promise<NamedEntity> {
+    try {
+      const url = `${API_BASE}/entities`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(error.detail || `API error: ${res.status}`);
+      }
+      const entity = await res.json();
+      console.log('✅ Entity created successfully:', entity);
+      return entity;
+    } catch (error) {
+      console.error('❌ Error creating entity:', error);
+      throw error;
+    }
+  },
 
   // Получить список всех организаций
   async getOrganizations(limit = 100): Promise<Entity[]> {

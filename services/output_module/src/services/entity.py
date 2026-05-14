@@ -380,3 +380,18 @@ class EntityService:
                 ))
 
         return stats
+
+    async def create_entity(self, name: str, entity_type: str) -> NamedEntityDTO:
+        """
+        Создает новую сущность, которую пользователь хочет отслеживать.
+        Возвращает созданную сущность с её ID.
+        """
+        # Валидация типа сущности
+        valid_types = ["ORG", "PER", "LOC", "Organization", "Person", "Location"]
+        if entity_type not in valid_types:
+            # Если приходит неизвестный тип, используем ORG по умолчанию
+            entity_type = "ORG"
+        
+        # Создаем сущность через репозиторий
+        created_entity = await self.ner_gateway.create_named_entity(name, entity_type)
+        return created_entity

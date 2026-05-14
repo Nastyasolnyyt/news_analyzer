@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { api as apiClient, type Entity } from '../api/client';
+import AddEntityModal from '../components/AddEntityModal.vue';
 
 const router = useRouter();
 
@@ -10,6 +11,10 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const saveSuccess = ref(false);
 const isAuthenticated = ref(false);
+
+// Модальное окно для добавления сущности
+const showAddEntityModal = ref(false);
+const addEntityType = ref<'ORG' | 'PER'>('ORG');
 
 // Данные
 const allOrganizations = ref<Entity[]>([]);
@@ -300,6 +305,41 @@ const handleSaveSettings = async () => {
   }
 };
 
+const handleOpenAddEntityModal = (type: 'ORG' | 'PER') => {
+  addEntityType.value = type;
+  showAddEntityModal.value = true;
+};
+
+const handleEntityAdded = async (newEntity: any) => {
+  console.log('✅ New entity added:', newEntity);
+  
+  // Добавляем новую сущность в соответствующий список
+  const entity: Entity = {
+    id: newEntity.id,
+    name: newEntity.name,
+    type: newEntity.entity_type === 'PER' ? 'Person' : 'Company',
+    entity_type: newEntity.entity_type,
+    description: `${newEntity.name} — ${newEntity.entity_type}`,
+  };
+  
+  if (newEntity.entity_type === 'ORG') {
+    // Добавляем в начало списка организаций
+    allOrganizations.value.unshift(entity);
+    // Автоматически выбираем новую сущность
+    selectedOrganizations.value.add(newEntity.id);
+  } else if (newEntity.entity_type === 'PER') {
+    // Добавляем в начало списка персон
+    allPersons.value.unshift(entity);
+    // Автоматически выбираем новую сущность
+    selectedPersons.value.add(newEntity.id);
+  }
+  
+  saveSuccess.value = true;
+  setTimeout(() => {
+    saveSuccess.value = false;
+  }, 3000);
+};
+
 const selectedOrgsCount = computed(() => selectedOrganizations.value.size);
 const selectedPersonsCount = computed(() => selectedPersons.value.size);
 
@@ -425,6 +465,13 @@ const handleSendTestEmail = async () => {
             <p class="overline">Организации</p>
             <h2>Отслеживать упоминания ({{ selectedOrgsCount }})</h2>
           </div>
+          <button 
+            class="add-entity-btn"
+            @click="handleOpenAddEntityModal('ORG')"
+            title="Добавить новую организацию"
+          >
+            + Добавить
+          </button>
         </header>
         <div class="search-box">
           <input
@@ -456,6 +503,13 @@ const handleSendTestEmail = async () => {
             <p class="overline">Персоны</p>
             <h2>Отслеживать упоминания ({{ selectedPersonsCount }})</h2>
           </div>
+          <button 
+            class="add-entity-btn"
+            @click="handleOpenAddEntityModal('PER')"
+            title="Добавить новую персону"
+          >
+            + Добавить
+          </button>
         </header>
         <div class="search-box">
           <input
@@ -502,6 +556,13 @@ const handleSendTestEmail = async () => {
         </button>
       </div>
     </section>
+
+    <!-- Add Entity Modal -->
+    <AddEntityModal
+      :is-open="showAddEntityModal"
+      @close="showAddEntityModal = false"
+      @entity-added="handleEntityAdded"
+    />
   </section>
 </template>
 
@@ -847,6 +908,35 @@ const handleSendTestEmail = async () => {
   left: 0;
   color: var(--positive);
   font-weight: 600;
+}
+
+.add-entity-btn {
+  padding: 8px 14px;
+  background: rgba(79, 138, 255, 0.15);
+  border: 1px solid rgba(79, 138, 255, 0.3);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.add-entity-btn:hover {
+  background: rgba(79, 138, 255, 0.25);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(79, 138, 255, 0.2);
+}
+
+.add-entity-btn:active {
+  transform: scale(0.95);
+}
+
+.add-entity-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .primary {

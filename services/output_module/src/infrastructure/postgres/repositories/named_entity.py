@@ -19,3 +19,10 @@ class NamedEntityDBGateWay:
         if named_entity is None:
             raise NamedEntityNotFoundException()
         return NamedEntityDTO.model_validate(named_entity.as_dict())
+
+    async def create_named_entity(self, name: str, entity_type: str) -> NamedEntityDTO:
+        """Создать новую сущность в БД"""
+        new_entity = NamedEntity(name=name, entity_type=entity_type)
+        self.session.add(new_entity)
+        await self.session.flush()  # Получаем ID без коммита
+        return NamedEntityDTO.model_validate(new_entity.as_dict())

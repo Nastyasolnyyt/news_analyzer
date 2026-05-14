@@ -3,11 +3,37 @@ from typing import List, Any, Optional
 from dishka import FromDishka
 from dishka.integrations.fastapi import DishkaRoute
 from fastapi import APIRouter, Depends, HTTPException
-from src.application.schemas.named_entity import EntityInfo, EntityMentionsFilterDTO, EntityDetailsResponse
+from src.application.schemas.named_entity import EntityInfo, EntityMentionsFilterDTO, EntityDetailsResponse, CreateEntityDTO, NamedEntityDTO
 from src.services.entity import EntityService
 
 
 ROUTER = APIRouter(prefix="/entities", route_class=DishkaRoute)
+
+
+@ROUTER.post(
+    "",
+    response_model=NamedEntityDTO,
+    summary="Создать новую сущность",
+    status_code=201,
+)
+async def create_entity(
+    entity_service: FromDishka[EntityService],
+    data: CreateEntityDTO,
+) -> NamedEntityDTO:
+    """
+    Создание новой сущности для отслеживания пользователем.
+    Можно создать организацию (ORG) или персону (PER).
+    """
+    try:
+        created_entity = await entity_service.create_entity(
+            name=data.name,
+            entity_type=data.entity_type
+        )
+        return created_entity
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 @ROUTER.get(
