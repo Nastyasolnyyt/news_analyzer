@@ -83,6 +83,10 @@ export interface NamedEntity {
     entity_type: string;
     created_at: string;
 }
+export interface CreateEntityDTO {
+    name: string;
+    entity_type: string;
+}
 export interface Entity {
     id: number;
     name: string;
@@ -241,10 +245,16 @@ export declare const api: {
     getNotificationSources(): Promise<NotificationSource[]>;
     createNotificationSource(data: Omit<NotificationSource, "id" | "created_at" | "updated_at">): Promise<NotificationSource>;
     updateNotificationSource(id: number, data: Partial<NotificationSource>): Promise<NotificationSource>;
+    sendTestEmail(): Promise<{
+        message: string;
+        to: string;
+        status: string;
+    }>;
     login(credentials: LoginRequest): Promise<TokenResponse>;
     register(data: RegisterRequest): Promise<UserDTO>;
     getCurrentUser(): Promise<UserDTO>;
     logout(): void;
+    createEntity(data: CreateEntityDTO): Promise<NamedEntity>;
     getOrganizations(limit?: number): Promise<Entity[]>;
     getPersons(limit?: number): Promise<Entity[]>;
     getUserReports(): Promise<any[]>;

@@ -32,7 +32,9 @@ class EntityExtractor:
             doc.segment(self.segmenter)
             doc.tag_ner(self.ner_tagger)
 
-            entities = []
+            # Use dict to deduplicate by lemma - keeps first occurrence
+            seen_lemmas = {}
+            
             for span in doc.spans:
                 entity_text = span.text.strip()
                 entity_type = span.type
@@ -42,14 +44,16 @@ class EntityExtractor:
                 lemma = self.morph.parse(normalized)[0].normal_form
 
                 if len(normalized) >= 3:
-                    entities.append({
-                        'text': entity_text,      # Оригинальное написание
-                        'normalized': normalized, # Для поиска (lowercase)
-                        'lemma': lemma,           # Именительный падеж для БД
-                        'type': entity_type
-                    })
+                    # Skip if we've already seen this lemma
+                    if lemma not in seen_lemmas:
+                        seen_lemmas[lemma] = {
+                            'text': entity_text,      # Оригинальное написание
+                            'normalized': normalized, # Для поиска (lowercase)
+                            'lemma': lemma,           # Именительный падеж для БД
+                            'type': entity_type
+                        }
 
-            return entities
+            return list(seen_lemmas.values())
             
         except Exception as e:
             logger.error(f"Error extracting entities: {e}")

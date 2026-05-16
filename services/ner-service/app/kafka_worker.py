@@ -3,7 +3,8 @@ import asyncio
 import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
-from sqlalchemy import select, update
+from sqlalchemy import select, update, insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .config import settings
 from .database import get_engine, get_session, NamedEntity, PostEntity, Base
@@ -63,6 +64,7 @@ async def consume_and_extract():
                 
                 db = Session()
                 saved_entities = []
+                entity_links = []
                 
                 try:
                     for ent in entities:
@@ -87,24 +89,20 @@ async def consume_and_extract():
                             db.flush()
                             entity_id = new_entity.id
                         
-                        # 2. Check if link already exists (composite PK: post_id + entity_id)
-                        existing_link = db.execute(
-                            select(1).where(
-                                (PostEntity.post_id == article_id) & 
-                                (PostEntity.entity_id == entity_id)
-                            )
-                        ).scalar_one_or_none()
+                        # Collect links for batch insert
+                        entity_links.append({'post_id': article_id, 'entity_id': entity_id})
                         
-                        # Insert link only if it doesn't exist
-                        if existing_link is None:
-                            db.add(PostEntity(post_id=article_id, entity_id=entity_id))
-                        
-                        # Always add to saved_entities list
+                        # Add to saved_entities list
                         saved_entities.append({
                             'text': entity_name,
                             'type': entity_type,
                             'id': entity_id
                         })
+                    
+                    # Batch insert post_entities with ON CONFLICT DO NOTHING
+                    if entity_links:
+                        stmt = pg_insert(PostEntity).values(entity_links).on_conflict_do_nothing()
+                        db.execute(stmt)
                     
                     db.commit()
                     logger.info(f"Article {article_id}: saved {len(saved_entities)} entities")

@@ -587,6 +587,28 @@ export const api = {
             throw error;
         }
     },
+    // Отправить тестовое email письмо
+    async sendTestEmail() {
+        try {
+            const url = `${API_BASE}/notifications/test-email`;
+            console.log('📧 Sending test email to:', url);
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(error.detail || `API error: ${res.status}`);
+            }
+            const data = await res.json();
+            console.log('✅ Test email sent successfully');
+            return data;
+        }
+        catch (error) {
+            console.error('❌ Error sending test email:', error);
+            throw error;
+        }
+    },
     // ===== AUTH METHODS =====
     // Вход
     async login(credentials) {
@@ -655,6 +677,28 @@ export const api = {
         console.log('✅ Logout successful');
     },
     // ===== ORGANIZATIONS AND PERSONS =====
+    // Создать новую сущность (организацию или персону)
+    async createEntity(data) {
+        try {
+            const url = `${API_BASE}/entities`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(error.detail || `API error: ${res.status}`);
+            }
+            const entity = await res.json();
+            console.log('✅ Entity created successfully:', entity);
+            return entity;
+        }
+        catch (error) {
+            console.error('❌ Error creating entity:', error);
+            throw error;
+        }
+    },
     // Получить список всех организаций
     async getOrganizations(limit = 100) {
         try {

@@ -12,11 +12,6 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path,
-        onError: (err, req, res) => {
-          console.error('Proxy error:', err);
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Backend unavailable', details: err.message }));
-        },
       },
     },
   },

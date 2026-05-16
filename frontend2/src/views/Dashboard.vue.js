@@ -38,7 +38,7 @@ const events = computed(() => {
         source: n.source,
         summary: n.summary || n.text?.slice(0, 200),
         risk: n.risk_level || 'low',
-        riskType: n.risk_type || null, // ✅ Добавляем тип риска
+        riskType: n.risk_type || null, //  Добавляем тип риска
     }));
 });
 const riskLegend = [
@@ -50,7 +50,7 @@ const riskLegend = [
 onMounted(async () => {
     try {
         loading.value = true;
-        console.log('📊 Loading dashboard data...');
+        console.log('Loading dashboard data...');
         // Загружаем новости
         const newsResponse = await api.getNews({
             page: 1,
@@ -69,7 +69,7 @@ onMounted(async () => {
         // Загружаем все сущности (для других целей)
         const entities = await api.getEntities({ limit: 10 });
         allEntities.value = entities;
-        console.log('✅ Dashboard loaded:', {
+        console.log('Dashboard loaded:', {
             newsItems: newsData.value.length,
             topEntities: topEntitiesData.value.length,
             entities: allEntities.value.length
@@ -77,7 +77,7 @@ onMounted(async () => {
     }
     catch (e) {
         error.value = e.message || 'Ошибка загрузки данных';
-        console.error('❌ Dashboard error:', error.value);
+        console.error('Dashboard error:', error.value);
     }
     finally {
         loading.value = false;
