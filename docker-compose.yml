@@ -83,7 +83,7 @@ services:
   notification-consumer:
     build:
       context: ./services/output_module
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.consumer
     container_name: notification-consumer
     env_file:
       - .env

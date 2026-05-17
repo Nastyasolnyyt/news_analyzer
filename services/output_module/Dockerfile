@@ -10,7 +10,9 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
         libgl1 \
         libglib2.0-0 \
         libpq-dev \
-        build-essential
+        build-essential \
+        ca-certificates \
+        openssl
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
