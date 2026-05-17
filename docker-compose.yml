@@ -68,14 +68,18 @@ services:
        - .env
     depends_on:
        - elasticsearch
+    # Добавляем DNS и сеть для доступа к интернету
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+       - news_network
     healthcheck:
        test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
        interval: 10s
        timeout: 5s
        retries: 5
     restart: always
-    networks:
-       - news_network
 
   notification-consumer:
     build:
@@ -84,6 +88,9 @@ services:
     container_name: notification-consumer
     env_file:
       - .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       DATABASE_URL: ${DATABASE_URL}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
