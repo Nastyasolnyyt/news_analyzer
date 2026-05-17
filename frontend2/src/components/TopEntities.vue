@@ -56,7 +56,7 @@ const handleViewAll = () => {
         </div>
         <div class="trend" :class="directionClass[entity.direction]">
           <span>{{ directionIcon[entity.direction] }}</span>
-          {{ entity.changePercent }}%
+          {{ entity.changePercent }} упом.
         </div>
         <button class="btn-tertiary" @click.stop="handleClick(entity.id)">Профиль</button>
       </li>
