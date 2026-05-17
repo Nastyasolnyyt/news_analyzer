@@ -25,8 +25,9 @@ const loading = ref(true);
 const error = ref<string | null>(null);
  
 // Статистика
+const totalNewsCount = ref(0);
 const stats = computed(() => ({
-  relevantNews: newsData.value.length,
+  relevantNews: totalNewsCount.value,
 }));
  
 // Сущности для отображения (топ за 24 часа из API)
@@ -71,6 +72,8 @@ onMounted(async () => {
       page_size: 20,
     });
     newsData.value = newsResponse.items;
+    totalNewsCount.value = newsResponse.total || newsResponse.items.length;
+
     
     // Загружаем топ сущностей за 24 часа (реальные данные из API)
     const topEntitiesRaw = await api.getTopEntities24h({ limit: 5 });

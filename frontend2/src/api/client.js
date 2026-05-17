@@ -246,9 +246,9 @@ export const api = {
                 id: e.id,
                 name: e.name,
                 entity_type: e.entity_type,
-                changePercent: Math.random() * 50 + 10, // временное значение
+                changePercent: e.count, // Используем понятное имя поля
                 direction: 'up',
-                category: e.entity_type === 'PER' ? 'Персона' : e.entity_type === 'LOC' ? 'Локация' : e.entity_type === 'ORG' ? 'Организация' : 'Сущность',
+                category: e.entity_type === 'PER' ? 'Персона' : 'Организация',
             }));
         }
         catch (error) {
