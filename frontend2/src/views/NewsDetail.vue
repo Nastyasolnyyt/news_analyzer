@@ -20,10 +20,25 @@ onMounted(async () => {
       relatedEntities.value = await api.getEntitiesByIds(article.value.relatedEntityIds);
     }
   } catch (e: any) {
-    error.value = e.message;
-    if (e.message.includes('Not found')) {
+        if (e.response?.data?.detail) {
+      error.value = typeof e.response.data.detail === 'string'
+        ? e.response.data.detail
+        : JSON.stringify(e.response.data.detail);
+    } else if (e.response?.data?.message) {
+      error.value = typeof e.response.data.message === 'string'
+        ? e.response.data.message
+        : JSON.stringify(e.response.data.message);
+    } else if (e.message) {
+      error.value = e.message;
+    } else if (typeof e === 'string') {
+      error.value = e;
+    } else {
+      error.value = 'Ошибка загрузки новости';
+    }
+    if (error.value.includes('Not found')) {
       router.push('/');
     }
+    console.error('❌ Error:', e);
   } finally {
     loading.value = false;
   }

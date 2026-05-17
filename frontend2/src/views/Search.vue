@@ -88,7 +88,7 @@
 
         <!-- Пустой поиск — показываем все новости -->
         <p v-if="!loading && !query.trim() && filteredResults.length === 0" class="placeholder">
-          Новости загружаются...
+          Пока новостей нет...
         </p>
 
         <!-- Список карточек -->
@@ -285,7 +285,7 @@ const fetchAllNews = async () => {
     allResults.value = data.items as NewsArticle[]
     displayedCount.value = 20
     selectedArticleId.value = null
-  } catch (error) {
+  } catch (error: any) {
     console.error('Ошибка при загрузке новостей:', error)
     allResults.value = []
   } finally {
@@ -314,7 +314,7 @@ const fetchResults = async () => {
     allResults.value = data.items as NewsArticle[]
     displayedCount.value = 20
     selectedArticleId.value = null
-  } catch (error) {
+  } catch (error: any) {
     console.error('Ошибка при поиске:', error)
     allResults.value = []
   } finally {

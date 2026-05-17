@@ -597,19 +597,33 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(credentials),
             });
+
             if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.detail || `API error: ${res.status}`);
+                let errorData;
+                try {
+                    errorData = await res.json();
+                } catch (e) {
+                    errorData = null;
+                }
+
+                let message = 'Ошибка входа';
+                if (errorData) {
+                    message = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData);
+                } else if (res.status === 401) {
+                    message = 'Неверный логин или пароль';
+                } else {
+                    message = `Ошибка сервера: ${res.status}`;
+                }
+                throw new Error(message);
             }
-            const data = await res.json();
-            console.log('✅ Login successful');
-            return data;
-        }
-        catch (error) {
+
+            return await res.json();
+        } catch (error) {
             console.error('❌ Login error:', error);
             throw error;
         }
     },
+
     // Регистрация
     async register(data) {
         try {
@@ -619,15 +633,28 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+
             if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.detail || `API error: ${res.status}`);
+                let errorData;
+                try {
+                    errorData = await res.json();
+                } catch (e) {
+                    errorData = null;
+                }
+
+                let message = 'Ошибка регистрации';
+                if (errorData) {
+                    message = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData);
+                } else if (res.status === 409) {
+                    message = 'Пользователь с таким логином уже существует';
+                } else {
+                    message = `Ошибка сервера: ${res.status}`;
+                }
+                throw new Error(message);
             }
-            const user = await res.json();
-            console.log('✅ Registration successful');
-            return user;
-        }
-        catch (error) {
+
+            return await res.json();
+        } catch (error) {
             console.error('❌ Registration error:', error);
             throw error;
         }

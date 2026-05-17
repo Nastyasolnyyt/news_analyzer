@@ -115,8 +115,22 @@ onMounted(async () => {
     news.value = data.items;
     console.log('Reports loaded:', data.items.length, 'items');
   } catch (e: any) {
-    error.value = e.message || 'Ошибка загрузки отчёта';
-    console.error('Reports error:', error.value);
+        if (e.response?.data?.detail) {
+      error.value = typeof e.response.data.detail === 'string'
+        ? e.response.data.detail
+        : JSON.stringify(e.response.data.detail);
+    } else if (e.response?.data?.message) {
+      error.value = typeof e.response.data.message === 'string'
+        ? e.response.data.message
+        : JSON.stringify(e.response.data.message);
+    } else if (e.message) {
+      error.value = e.message;
+    } else if (typeof e === 'string') {
+      error.value = e;
+    } else {
+      error.value = 'Ошибка загрузки отчёта';
+    }
+    console.error('Reports error:', e);
   } finally {
     loading.value = false;
   }
