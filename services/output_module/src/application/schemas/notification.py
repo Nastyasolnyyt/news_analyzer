@@ -89,19 +89,18 @@ class NotificationTriggerUpdateDTO(BaseModel):
     description: Optional[str] = None
     enabled: Optional[bool] = None
 
-
 class NotificationChannelCreateDTO(BaseModel):
     """Создание нового канала"""
     channel_type: str  # "app", "email", "telegram"
-    channel_address: Optional[EmailStr] = None
+    channel_address: Optional[str] = None
     enabled: bool = True
 
 
 class NotificationChannelUpdateDTO(BaseModel):
     """Обновление канала"""
+    channel_address: Optional[str] = None
     enabled: Optional[bool] = None
     verified: Optional[bool] = None
-
 
 class NotificationSourceCreateDTO(BaseModel):
     """Создание нового источника"""
