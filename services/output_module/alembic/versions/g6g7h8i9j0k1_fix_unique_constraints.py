@@ -16,7 +16,7 @@ import sqlalchemy as sa
 
 
 revision: str = 'g6g7h8i9j0k1'
-down_revision: Union[str, None] = 'f5f6g7h8i9j0'
+down_revision: Union[str, None] = '005_entity_triggers'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
