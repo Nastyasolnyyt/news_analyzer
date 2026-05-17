@@ -1,7 +1,12 @@
 """
-Notification Consumer для отправки email при упоминании отслеживаемых сущностей
+ИСПРАВЛЕНО:
+1. Поиск триггеров теперь работает по ИМЕНИ сущности (trigger_value = имя),
+   а не только по числовому ID — так работает UI на странице /notifications
+2. Добавлена поддержка trigger_type="entity" (универсальный тип из UI)
+3. Исправлена логика: если пользователь добавил сущность через UI, триггер
+   создаётся с trigger_value = название сущности, а не её ID в БД
+4. Добавлено логирование для диагностики
 """
-
 import asyncio
 import json
 import logging
@@ -11,7 +16,7 @@ from datetime import datetime
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 
 from src.infrastructure.postgres.models import (
     NotificationTrigger,
@@ -26,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationConsumer:
-    """Consumer для обработки статей и отправки уведомлений"""
+    """Consumer для обработки статей и отправки уведомлений при упоминании сущностей"""
 
     def __init__(
         self,
@@ -46,10 +51,8 @@ class NotificationConsumer:
         self.email_service = get_email_service()
 
     async def initialize(self):
-        """Инициализация подключений"""
-        logger.info("Initializing Notification Consumer...")
+        logger.info("Инициализация Notification Consumer...")
 
-        # Подключение к БД
         self.engine = create_async_engine(
             self.database_url,
             echo=False,
@@ -61,7 +64,6 @@ class NotificationConsumer:
             self.engine, class_=AsyncSession, expire_on_commit=False
         )
 
-        # Подключение к Kafka
         self.consumer = AIOKafkaConsumer(
             self.kafka_input_topic,
             bootstrap_servers=self.kafka_bootstrap_servers,
@@ -72,93 +74,128 @@ class NotificationConsumer:
         )
 
         await self.consumer.start()
-        logger.info(
-            f"✅ Kafka Consumer started. Listening to topic: {self.kafka_input_topic}"
-        )
+        logger.info(f"✅ Kafka Consumer запущен. Топик: {self.kafka_input_topic}")
+
+        if self.email_service.is_configured():
+            logger.info(
+                f"✅ Email сервис настроен: {self.email_service.smtp_username}"
+            )
+        else:
+            logger.warning(
+                "⚠️  Email сервис НЕ настроен — уведомления не будут отправляться. "
+                "Задайте SMTP_USERNAME и SMTP_PASSWORD в .env"
+            )
 
     async def shutdown(self):
-        """Остановка потребителя"""
         if self.consumer:
             await self.consumer.stop()
         if self.engine:
             await self.engine.dispose()
-        logger.info("Notification Consumer stopped")
+        logger.info("Notification Consumer остановлен")
 
     async def run(self):
-        """Главный цикл потребителя"""
         try:
             await self.initialize()
-
-            logger.info("🎯 Starting to consume messages...")
             async for message in self.consumer:
                 try:
                     await self._process_message(message)
                 except Exception as e:
-                    logger.error(f"❌ Error processing message: {e}", exc_info=True)
-
+                    logger.error(f"❌ Ошибка обработки сообщения: {e}", exc_info=True)
         except Exception as e:
-            logger.error(f"❌ Consumer error: {e}", exc_info=True)
+            logger.error(f"❌ Критическая ошибка consumer: {e}", exc_info=True)
             raise
         finally:
             await self.shutdown()
 
     async def _process_message(self, message):
-        """Обработать одну статью"""
+        """Обработать одну статью из Kafka"""
         try:
-            # Парсим сообщение
             data = json.loads(message.value.decode("utf-8"))
-            logger.debug(f"📬 Received message: {data.get('id', 'unknown')}")
 
-            # Извлекаем данные статьи
-            article_id = data.get("id") or data.get("post_id")
-            article_entities = data.get("entities", [])  # [{"id": 123, "name": "...", "type": "PER"}]
-            article_title = data.get("title", "")
-            article_summary = data.get("summary") or data.get("text", "")[:500]
+            article_id = data.get("id") or data.get("post_id") or data.get("article_id")
+            article_entities = data.get("entities", [])
+            article_title = data.get("title", "Новая статья")
+            article_summary = (data.get("summary") or data.get("text", ""))[:500]
             article_link = data.get("link") or data.get("url")
             risk_level = data.get("risk_level", "low")
             sentiment = data.get("sentiment_label", "neutral")
 
             if not article_entities:
-                logger.debug("⏭️  No entities in article, skipping")
+                logger.debug("⏭️  Нет сущностей в статье, пропускаю")
                 return
 
-            # Для каждой сущности в статье ищем пользователей, которые её отслеживают
-            entity_ids = [e["id"] for e in article_entities]
+            logger.info(
+                f"📬 Статья {article_id}: {len(article_entities)} сущностей, "
+                f"risk={risk_level}, sentiment={sentiment}"
+            )
+
             await self._send_notifications_for_entities(
-                entity_ids=entity_ids,
+                entities=article_entities,
                 article_id=article_id,
                 article_title=article_title,
                 article_summary=article_summary,
                 article_link=article_link,
-                entities=article_entities,
                 risk_level=risk_level,
                 sentiment=sentiment,
             )
 
         except json.JSONDecodeError as e:
-            logger.error(f"❌ Invalid JSON in message: {e}")
-        except KeyError as e:
-            logger.error(f"❌ Missing required field: {e}")
+            logger.error(f"❌ Невалидный JSON: {e}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка обработки сообщения: {e}", exc_info=True)
 
     async def _send_notifications_for_entities(
         self,
-        entity_ids: List[int],
+        entities: List[Dict],
         article_id: int,
         article_title: str,
         article_summary: str,
         article_link: Optional[str],
-        entities: List[Dict],
         risk_level: str,
         sentiment: str,
     ):
-        """Отправить уведомления всем пользователям, отслеживающим эти сущности"""
+        """Найти триггеры для сущностей и отправить уведомления"""
 
         async with self.AsyncSessionLocal() as session:
-            # Ищем все триггеры, которые отслеживают эти сущности и ВКЛЮЧЕНЫ
+            # Собираем все идентификаторы для поиска триггеров:
+            # - числовые ID сущностей
+            # - имена сущностей (строки)
+            entity_ids_str = [str(e["id"]) for e in entities if "id" in e]
+            entity_names = [
+                e.get("name", e.get("text", "")).lower().strip()
+                for e in entities
+                if e.get("name") or e.get("text")
+            ]
+
+            if not entity_ids_str and not entity_names:
+                return
+
+            # ИСПРАВЛЕНО: ищем триггеры по:
+            # 1. trigger_value = строковый ID сущности (старый способ)
+            # 2. trigger_value = имя сущности (новый способ из UI)
+            # trigger_type может быть "entity", "organization", "person"
+            conditions = []
+            if entity_ids_str:
+                conditions.append(
+                    NotificationTrigger.trigger_value.in_(entity_ids_str)
+                )
+            if entity_names:
+                # Ищем по частичному совпадению имени (case-insensitive)
+                for name in entity_names:
+                    if name:
+                        conditions.append(
+                            NotificationTrigger.trigger_value.ilike(f"%{name}%")
+                        )
+
+            if not conditions:
+                return
+
             stmt = select(NotificationTrigger).where(
                 and_(
-                    NotificationTrigger.trigger_type.in_(["organization", "person"]),
-                    NotificationTrigger.trigger_value.in_([str(e_id) for e_id in entity_ids]),
+                    NotificationTrigger.trigger_type.in_(
+                        ["entity", "organization", "person", "ORG", "PER"]
+                    ),
+                    or_(*conditions),
                     NotificationTrigger.enabled == True,
                 )
             )
@@ -167,22 +204,19 @@ class NotificationConsumer:
 
             if not triggers:
                 logger.debug(
-                    f"⏭️  No enabled triggers for entities {entity_ids}, skipping"
+                    f"⏭️  Нет триггеров для сущностей: ids={entity_ids_str[:3]}, "
+                    f"names={entity_names[:3]}"
                 )
                 return
 
-            logger.info(
-                f"🔔 Found {len(triggers)} triggers for entities {entity_ids}"
-            )
+            logger.info(f"🔔 Найдено {len(triggers)} триггеров для уведомлений")
 
-            # Группируем триггеры по пользователю
-            users_to_notify = {}
+            # Группируем по пользователю
+            users_to_notify: Dict[int, List] = {}
             for trigger in triggers:
-                if trigger.user_id not in users_to_notify:
-                    users_to_notify[trigger.user_id] = []
-                users_to_notify[trigger.user_id].append(trigger)
+                users_to_notify.setdefault(trigger.user_id, []).append(trigger)
 
-            # Отправляем уведомления каждому пользователю
+            # Отправляем каждому пользователю
             for user_id, user_triggers in users_to_notify.items():
                 await self._send_notification_to_user(
                     user_id=user_id,
@@ -200,7 +234,7 @@ class NotificationConsumer:
     async def _send_notification_to_user(
         self,
         user_id: int,
-        triggers: List[NotificationTrigger],
+        triggers: List,
         article_id: int,
         article_title: str,
         article_summary: str,
@@ -211,9 +245,8 @@ class NotificationConsumer:
         session: AsyncSession,
     ):
         """Отправить уведомление конкретному пользователю"""
-
         try:
-            # Получаем email канал пользователя
+            # Получаем email канал
             channel_stmt = select(NotificationChannel).where(
                 and_(
                     NotificationChannel.user_id == user_id,
@@ -225,51 +258,50 @@ class NotificationConsumer:
             email_channel = channel_result.scalars().first()
 
             if not email_channel or not email_channel.channel_address:
-                logger.debug(
-                    f"⏭️  User {user_id} has no enabled email channel, skipping"
-                )
+                logger.debug(f"⏭️  У пользователя {user_id} нет email-канала")
                 return
 
-            # Получаем настройки уведомлений пользователя
+            # Проверяем настройки уведомлений
             settings_stmt = select(NotificationSettings).where(
                 NotificationSettings.user_id == user_id
             )
             settings_result = await session.execute(settings_stmt)
             settings = settings_result.scalars().first()
 
-            if not settings or not settings.enabled:
-                logger.debug(f"⏭️  Notifications disabled for user {user_id}, skipping")
+            if settings and not settings.enabled:
+                logger.debug(f"⏭️  Уведомления отключены для пользователя {user_id}")
                 return
 
-            # Находим сущности, которые упоминаются в статье и отслеживаются пользователем
-            tracked_entities = [
-                e
-                for e in entities
-                if any(
-                    trigger.trigger_value == str(e["id"]) for trigger in triggers
-                )
-            ]
+            # Определяем сущность из триггера
+            trigger = triggers[0]
+            trigger_value = trigger.trigger_value
 
-            if not tracked_entities:
-                logger.debug(
-                    f"⏭️  No tracked entities in article for user {user_id}"
-                )
-                return
+            # Ищем сущность по имени или ID
+            matched_entity = None
+            for e in entities:
+                entity_name = e.get("name") or e.get("text") or ""
+                entity_id_str = str(e.get("id", ""))
+                if (
+                    trigger_value == entity_id_str
+                    or trigger_value.lower() in entity_name.lower()
+                    or entity_name.lower() in trigger_value.lower()
+                ):
+                    matched_entity = e
+                    break
 
-            # Формируем информацию о первой отслеживаемой сущности
-            first_entity = tracked_entities[0]
-            entity_name = first_entity.get("name", "Unknown")
-            entity_type = first_entity.get("entity_type") or first_entity.get(
-                "type", "ORG"
-            )
-            entity_type_name = "organization" if entity_type == "ORG" else "person"
+            if not matched_entity:
+                matched_entity = entities[0] if entities else {}
 
-            # Формируем тему письма
-            subject = f"🔔 Signal Desk: Упоминание {entity_name}"
-            if len(tracked_entities) > 1:
-                subject += f" и ещё {len(tracked_entities) - 1}"
+            entity_name = matched_entity.get("name") or matched_entity.get("text") or trigger_value
+            entity_type_raw = matched_entity.get("type") or matched_entity.get("entity_type") or "ORG"
+            entity_type_human = "organization" if entity_type_raw in ("ORG", "organization") else "person"
 
-            # Отправляем email
+            # Формируем тему
+            subject = f"🔔 Упоминание: {entity_name}"
+            if len(triggers) > 1:
+                subject += f" (+{len(triggers) - 1} ещё)"
+
+            # Отправляем
             success = await self.email_service.send_notification_email(
                 to_email=email_channel.channel_address,
                 subject=subject,
@@ -277,49 +309,46 @@ class NotificationConsumer:
                 article_summary=article_summary,
                 article_link=article_link,
                 entity_name=entity_name,
-                entity_type=entity_type_name,
+                entity_type=entity_type_human,
                 risk_level=risk_level,
                 sentiment=sentiment,
             )
 
             if success:
                 logger.info(
-                    f"✅ Email sent to user {user_id} ({email_channel.channel_address}) "
-                    f"for article {article_id}"
+                    f"✅ Email отправлен пользователю {user_id} "
+                    f"({email_channel.channel_address}), статья {article_id}, "
+                    f"сущность: {entity_name}"
                 )
             else:
                 logger.warning(
-                    f"⚠️  Failed to send email to user {user_id} "
-                    f"({email_channel.channel_address})"
+                    f"⚠️  Не удалось отправить email пользователю {user_id}"
                 )
 
         except Exception as e:
             logger.error(
-                f"❌ Error sending notification to user {user_id}: {e}",
+                f"❌ Ошибка отправки уведомления пользователю {user_id}: {e}",
                 exc_info=True,
             )
 
 
-# Точка входа
 async def run_notification_consumer(
     database_url: str,
     kafka_bootstrap_servers: str,
     kafka_input_topic: str = "articles_analyzed",
     kafka_group_id: str = "notifications-sender-group",
 ):
-    """Запустить consumer уведомлений"""
     consumer = NotificationConsumer(
         database_url=database_url,
         kafka_bootstrap_servers=kafka_bootstrap_servers,
         kafka_input_topic=kafka_input_topic,
         kafka_group_id=kafka_group_id,
     )
-
     try:
         await consumer.run()
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        logger.info("Остановка...")
         await consumer.shutdown()
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+        logger.error(f"Критическая ошибка: {e}", exc_info=True)
         raise

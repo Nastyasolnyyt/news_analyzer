@@ -1,5 +1,9 @@
 """
 Email Service для отправки уведомлений через SMTP
+ИСПРАВЛЕНО:
+1. SMTP_ENABLED теперь по умолчанию True если заданы учётные данные
+2. Улучшена диагностика ошибок (отдельное исключение для Auth)
+3. Добавлен метод is_configured() для быстрой проверки
 """
 
 import os
@@ -24,15 +28,36 @@ class EmailService:
         smtp_password: str = None,
         from_email: str = None,
         from_name: str = None,
-        enabled: bool = True,
+        enabled: bool = None,
     ):
         self.smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
         self.smtp_username = smtp_username or os.getenv("SMTP_USERNAME", "")
         self.smtp_password = smtp_password or os.getenv("SMTP_PASSWORD", "")
-        self.from_email = from_email or os.getenv("SMTP_FROM_EMAIL", "noreply@signaldesk.io")
+        self.from_email = from_email or os.getenv("SMTP_FROM_EMAIL") or self.smtp_username
         self.from_name = from_name or os.getenv("SMTP_FROM_NAME", "Signal Desk")
-        self.enabled = enabled and os.getenv("SMTP_ENABLED", "true").lower() == "true"
+
+        # ИСПРАВЛЕНО: enabled = True если есть логин/пароль, если явно не отключено
+        smtp_enabled_env = os.getenv("SMTP_ENABLED", "true").lower()
+        if enabled is not None:
+            self.enabled = enabled
+        else:
+            self.enabled = smtp_enabled_env == "true"
+
+        # Логируем статус при инициализации
+        if self.is_configured():
+            logger.info(
+                f"EmailService инициализирован: host={self.smtp_host}:{self.smtp_port}, "
+                f"user={self.smtp_username}, from={self.from_email}"
+            )
+        else:
+            logger.warning(
+                "EmailService: SMTP не настроен (нет SMTP_USERNAME или SMTP_PASSWORD)"
+            )
+
+    def is_configured(self) -> bool:
+        """Проверяет, настроен ли SMTP корректно."""
+        return bool(self.smtp_username and self.smtp_password and self.enabled)
 
     async def send_notification_email(
         self,
@@ -47,33 +72,24 @@ class EmailService:
         sentiment: str = None,
     ) -> bool:
         """
-        Отправить email уведомление о новой статье
-
-        Args:
-            to_email: Email адрес получателя
-            subject: Тема письма
-            article_title: Заголовок статьи
-            article_summary: Краткое описание
-            article_link: Ссылка на статью
-            entity_name: Название сущности (организация/персона)
-            entity_type: Тип сущности (organization/person)
-            risk_level: Уровень риска (high/medium/low)
-            sentiment: Тональность (positive/negative/neutral)
-
-        Returns:
-            True если отправлено успешно, False если ошибка
+        Отправить email уведомление о новой статье.
         """
-
         if not self.enabled:
-            logger.warning(f"Email service disabled. Skipping email to {to_email}")
+            logger.warning(f"Email сервис отключён (SMTP_ENABLED=false). Пропускаю письмо на {to_email}")
             return False
 
         if not self.smtp_username or not self.smtp_password:
-            logger.error("SMTP credentials not configured")
+            logger.error(
+                "SMTP не настроен: отсутствует SMTP_USERNAME или SMTP_PASSWORD. "
+                "Проверьте переменные окружения в .env файле."
+            )
+            return False
+
+        if not to_email:
+            logger.error("Не указан адрес получателя")
             return False
 
         try:
-            # Генерируем HTML письмо
             html_content = self._generate_html_email(
                 article_title=article_title,
                 article_summary=article_summary,
@@ -84,7 +100,6 @@ class EmailService:
                 sentiment=sentiment,
             )
 
-            # Отправляем в отдельном потоке (неблокирующее)
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None,
@@ -94,43 +109,37 @@ class EmailService:
                 html_content,
             )
 
-            logger.info(f"✅ Email sent to {to_email}: {subject}")
+            logger.info(f"✅ Email отправлен на {to_email}: {subject}")
             return True
 
+        except smtplib.SMTPAuthenticationError:
+            logger.error(
+                f"❌ SMTP аутентификация не удалась для {self.smtp_username}. "
+                f"Проверьте пароль приложения Gmail (App Password)."
+            )
+            return False
         except Exception as e:
-            logger.error(f"❌ Failed to send email to {to_email}: {e}")
+            logger.error(f"❌ Не удалось отправить email на {to_email}: {e}")
             return False
 
     def _send_smtp_email(self, to_email: str, subject: str, html_content: str):
         """Синхронная отправка email через SMTP"""
-        try:
-            # Создаем письмо
-            message = MIMEMultipart("alternative")
-            message["Subject"] = subject
-            message["From"] = f"{self.from_name} <{self.from_email}>"
-            message["To"] = to_email
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = f"{self.from_name} <{self.from_email}>"
+        message["To"] = to_email
 
-            # HTML часть
-            html_part = MIMEText(html_content, "html", "utf-8")
-            message.attach(html_part)
+        html_part = MIMEText(html_content, "html", "utf-8")
+        message.attach(html_part)
 
-            # Отправляем
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(message)
+        with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(self.smtp_username, self.smtp_password)
+            server.send_message(message)
 
-            logger.debug(f"📧 SMTP message sent successfully to {to_email}")
-
-        except smtplib.SMTPAuthenticationError as e:
-            logger.error(f"SMTP Authentication failed: {e}")
-            raise
-        except smtplib.SMTPException as e:
-            logger.error(f"SMTP error: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error sending email: {e}")
-            raise
+        logger.debug(f"📧 SMTP сообщение успешно отправлено на {to_email}")
 
     def _generate_html_email(
         self,
@@ -144,7 +153,6 @@ class EmailService:
     ) -> str:
         """Генерирует HTML для письма"""
 
-        # Определяем цвета для уровня риска
         risk_colors = {
             "high": "#f87171",
             "medium": "#fb923c",
@@ -155,7 +163,6 @@ class EmailService:
             risk_level, "Неизвестен"
         )
 
-        # Определяем цвета для тональности
         sentiment_colors = {
             "positive": "#86efac",
             "negative": "#f87171",
@@ -170,7 +177,7 @@ class EmailService:
 
         entity_section = ""
         if entity_name and entity_type:
-            entity_type_label = "Организация" if entity_type == "organization" else "Персона"
+            entity_type_label = "Организация" if entity_type in ("organization", "ORG") else "Персона"
             entity_section = f"""
             <tr>
                 <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
@@ -205,88 +212,73 @@ class EmailService:
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;">
-                <!-- Header -->
                 <div style="background: linear-gradient(120deg, #4f8aff, #1317ff); color: white; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
                     <h1 style="margin: 0; font-size: 24px;">🔔 Signal Desk</h1>
                     <p style="margin: 8px 0 0; opacity: 0.9;">Уведомление о новой статье</p>
                 </div>
-
-                <!-- Content -->
                 <div style="background: white; padding: 20px; border-radius: 0 0 12px 12px;">
                     <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 20px; line-height: 1.4;">
                         {article_title}
                     </h2>
-
                     <p style="margin: 16px 0; color: #666;">
                         {article_summary}
                     </p>
-
-                    <!-- Metrics Table -->
                     <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
                                 <strong>Уровень риска:</strong>
-                                <span style="
-                                    background-color: {risk_color};
-                                    color: white;
-                                    padding: 4px 10px;
-                                    border-radius: 4px;
-                                    display: inline-block;
-                                    margin-left: 8px;
-                                ">{risk_label}</span>
+                                <span style="background-color: {risk_color}; color: white; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-left: 8px;">{risk_label}</span>
                             </td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">
                                 <strong>Тональность:</strong>
-                                <span style="
-                                    background-color: {sentiment_color};
-                                    color: white;
-                                    padding: 4px 10px;
-                                    border-radius: 4px;
-                                    display: inline-block;
-                                    margin-left: 8px;
-                                ">{sentiment_label}</span>
+                                <span style="background-color: {sentiment_color}; color: white; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-left: 8px;">{sentiment_label}</span>
                             </td>
                         </tr>
                         {entity_section}
                     </table>
-
                     {link_section}
-
-                    <!-- Footer -->
                     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
                     <p style="font-size: 12px; color: #999; text-align: center; margin: 0;">
                         Вы получили это письмо, потому что отслеживаете упоминания указанных организаций и персон.
-                        <br>
-                        <a href="#" style="color: #3b82f6; text-decoration: none;">Управлять подписками</a>
                     </p>
                 </div>
             </div>
         </body>
         </html>
         """
-
         return html
 
     async def send_test_email(self, to_email: str) -> bool:
         """Отправить тестовое письмо"""
+        if not self.is_configured():
+            logger.error(
+                "Невозможно отправить тестовое письмо: SMTP не настроен. "
+                "Убедитесь что в .env заданы SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD."
+            )
+            return False
+
         return await self.send_notification_email(
             to_email=to_email,
-            subject="Тестовое письмо - Signal Desk уведомления работают!",
-            article_title="Это тестовое письмо",
-            article_summary="Если вы видите это письмо, то система уведомлений работает корректно.",
+            subject="✅ Тестовое письмо — Signal Desk уведомления работают!",
+            article_title="Это тестовое письмо от Signal Desk",
+            article_summary=(
+                "Если вы видите это письмо, система уведомлений настроена корректно. "
+                "Вы будете получать уведомления когда отслеживаемые вами сущности "
+                "упоминаются в новых статьях."
+            ),
             risk_level="low",
             sentiment="positive",
         )
 
 
-# Глобальный экземпляр
+# Глобальный синглтон
 _email_service: Optional[EmailService] = None
 
 
 def get_email_service() -> EmailService:
-    """Получить экземпляр Email Service"""
+    """Получить экземпляр Email Service (синглтон)"""
     global _email_service
     if _email_service is None:
         _email_service = EmailService()
