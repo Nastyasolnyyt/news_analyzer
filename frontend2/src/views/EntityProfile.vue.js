@@ -13,14 +13,14 @@ const error = ref(null);
 onMounted(async () => {
     try {
         loading.value = true;
-        console.log('📋 Loading entity profile:', entityId);
+        console.log('Loading entity profile:', entityId);
         // Получаем полный профиль сущности
         const profile = await api.getEntityProfile(entityId);
         entity.value = profile.entity;
         chartData.value = profile.chartData;
         relatedEntities.value = profile.relatedEntities;
         newsList.value = profile.news;
-        console.log('✅ Entity profile loaded:', entity.value?.name, {
+        console.log('Entity profile loaded:', entity.value?.name, {
             chartPoints: chartData.value.length,
             relatedEntities: relatedEntities.value.length,
             newsCount: newsList.value.length,
@@ -28,7 +28,7 @@ onMounted(async () => {
     }
     catch (e) {
         error.value = e.message || 'Ошибка загрузки профиля сущности';
-        console.error('❌ Error:', error.value);
+        console.error('Error:', error.value);
     }
     finally {
         loading.value = false;
@@ -148,7 +148,7 @@ else if (__VLS_ctx.entity) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "entity-type" },
     });
-    (__VLS_ctx.entity.type === 'Company' ? '🏢 Компания' : __VLS_ctx.entity.type === 'Person' ? '👤 Персона' : '📅 Событие');
+    (__VLS_ctx.entity.type === 'Company' ? 'Компания' : __VLS_ctx.entity.type === 'Person' ? 'Персона' : 'Событие');
     if (__VLS_ctx.entity.entity_type) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
             ...{ class: "meta" },

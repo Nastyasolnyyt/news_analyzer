@@ -10,6 +10,12 @@ class NamedEntityDTO(BaseModel):
     created_at: datetime
 
 
+class CreateEntityDTO(BaseModel):
+    """DTO для создания новой сущности"""
+    name: str = Field(..., min_length=1, max_length=255, description="Название сущности")
+    entity_type: str = Field(..., description="Тип сущности (ORG или PER)")
+
+
 class EntityInfo(BaseModel):
     entity: NamedEntityDTO
     post_id: int

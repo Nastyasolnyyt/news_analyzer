@@ -13,13 +13,13 @@ const filteredEntities = ref<Entity[]>([]);
 onMounted(async () => {
   try {
     loading.value = true;
-    console.log('📚 Loading all entities...');
+    console.log('Loading all entities...');
     
     const allEntities = await api.getEntities({ limit: 100 });
     entities.value = allEntities;
     filteredEntities.value = allEntities;
     
-    console.log('✅ Loaded entities:', allEntities.length);
+    console.log('Loaded entities:', allEntities.length);
   } catch (e: any) {
     if (e.response?.data?.detail) {
       error.value = typeof e.response.data.detail === 'string'
@@ -93,7 +93,7 @@ const reloadPage = async () => {
 
     <!-- ERROR STATE -->
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка загрузки</p>
+      <p class="error-title">Ошибка загрузки</p>
       <p class="error-message">{{ error }}</p>
       <button class="btn-secondary" @click="reloadPage()">Попробовать снова</button>
     </div>
@@ -105,7 +105,7 @@ const reloadPage = async () => {
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="🔍 Поиск по названию..."
+          placeholder="Поиск по названию..."
           class="search-input"
           @input="handleSearch"
         />
@@ -141,11 +141,11 @@ const reloadPage = async () => {
 
             <div v-if="(entity as any).recentMentions || (entity as any).topicCount" class="entity-stats">
               <div v-if="(entity as any).recentMentions" class="stat">
-                <span class="stat-label">💬 Упоминаний:</span>
+                <span class="stat-label">Упоминаний:</span>
                 <span class="stat-value">{{ (entity as any).recentMentions }}</span>
               </div>
               <div v-if="(entity as any).topicCount" class="stat">
-                <span class="stat-label">📌 Темы:</span>
+                <span class="stat-label">Темы:</span>
                 <span class="stat-value">{{ (entity as any).topicCount }}</span>
               </div>
             </div>

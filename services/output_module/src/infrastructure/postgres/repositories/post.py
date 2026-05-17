@@ -45,15 +45,23 @@ class PostDBGateWay:
         Получить список постов с фильтрацией.
         Возвращает список словарей для удобства в service слое.
         """
+        """
+        Получить список постов с фильтрацией.
+        Возвращает список словарей для удобства в service слое.
+        Использует eager loading для предотвращения проблемы N+1.
+        """
         from src.infrastructure.postgres.models.risk import Risk
-        
-        # Основной запрос с eager loading
+        from src.infrastructure.postgres.models.post_analysis import PostAnalysis
+        from src.infrastructure.postgres.models.topic import Topic
+        from src.infrastructure.postgres.models.post_entity import PostEntity
+        from src.infrastructure.postgres.models.named_entity import NamedEntity
+
+        # Основной запрос с eager loading всех связанных данных
         query = select(Article).options(
-            joinedload(Article.analyses),
+            joinedload(Article.analyses).joinedload(PostAnalysis.topic),
             joinedload(Article.risks),
-            selectinload(Article.entities),
+            selectinload(Article.entities).joinedload(PostEntity.entity),
         )
-        
         # Поиск по заголовку или контенту
         if filters.search:
             search_term = f"%{filters.search}%"

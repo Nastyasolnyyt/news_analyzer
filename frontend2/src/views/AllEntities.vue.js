@@ -10,15 +10,15 @@ const filteredEntities = ref([]);
 onMounted(async () => {
     try {
         loading.value = true;
-        console.log('📚 Loading all entities...');
+        console.log('Loading all entities...');
         const allEntities = await api.getEntities({ limit: 100 });
         entities.value = allEntities;
         filteredEntities.value = allEntities;
-        console.log('✅ Loaded entities:', allEntities.length);
+        console.log('Loaded entities:', allEntities.length);
     }
     catch (e) {
         error.value = e.message || 'Ошибка загрузки сущностей';
-        console.error('❌ Error:', error.value);
+        console.error('Error:', error.value);
     }
     finally {
         loading.value = false;
@@ -136,7 +136,7 @@ else {
         ...{ onInput: (__VLS_ctx.handleSearch) },
         value: (__VLS_ctx.searchQuery),
         type: "text",
-        placeholder: "🔍 Поиск по названию...",
+        placeholder: "Поиск по названию...",
         ...{ class: "search-input" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { api as apiClient, type Entity } from '../api/client';
+import AddEntityModal from '../components/AddEntityModal.vue';
 
 const router = useRouter();
 
@@ -11,16 +12,29 @@ const error = ref<string | null>(null);
 const saveSuccess = ref(false);
 const isAuthenticated = ref(false);
 
+// Модальное окно для добавления сущности
+const showAddEntityModal = ref(false);
+const addEntityType = ref<'ORG' | 'PER'>('ORG');
+
 // Данные
-const organizations = ref<Entity[]>([]);
-const persons = ref<Entity[]>([]);
+const allOrganizations = ref<Entity[]>([]);
+const allPersons = ref<Entity[]>([]);
 const selectedOrganizations = ref<Set<number>>(new Set());
 const selectedPersons = ref<Set<number>>(new Set());
 
+// Поиск
+const orgSearchQuery = ref('');
+const personSearchQuery = ref('');
+
 // Настройки уведомлений
 const email = ref('');
-const mentionThreshold = ref(1);
 const digestFrequency = ref('instant'); // instant, daily, weekly
+
+// IDs триггеров и каналов для обновления
+const orgTriggersMap = ref<Map<number, number>>(new Map());
+const personTriggersMap = ref<Map<number, number>>(new Map());
+let emailChannelId: number | null = null;
+let notificationSettingsId: number | null = null;
 
 // Проверка аутентификации
 const checkAuth = () => {
@@ -33,6 +47,17 @@ const checkAuth = () => {
   return true;
 };
 
+// Вычисляемые свойства для фильтрации
+const filteredOrganizations = computed(() => {
+  const query = orgSearchQuery.value.toLowerCase();
+  return query ? allOrganizations.value.filter(org => org.name.toLowerCase().includes(query)) : allOrganizations.value;
+});
+
+const filteredPersons = computed(() => {
+  const query = personSearchQuery.value.toLowerCase();
+  return query ? allPersons.value.filter(person => person.name.toLowerCase().includes(query)) : allPersons.value;
+});
+
 // Загрузить данные
 onMounted(async () => {
   if (!checkAuth()) {
@@ -44,29 +69,72 @@ onMounted(async () => {
     error.value = null;
 
     // Загружаем конфиг, организации и персон параллельно
-    const [config, orgs, persons_list] = await Promise.all([
+    let [config, orgs, persons_list] = await Promise.all([
       apiClient.getNotificationConfig(),
       apiClient.getOrganizations(100),
       apiClient.getPersons(100),
     ]);
 
     // Сохраняем организации и персон
-    organizations.value = orgs;
-    persons.value = persons_list;
+    allOrganizations.value = orgs;
+    allPersons.value = persons_list;
 
-    // Восстанавливаем сохраненные триггеры
-    config.triggers.forEach(trigger => {
-      if (trigger.trigger_type === 'organization') {
-        selectedOrganizations.value.add(parseInt(trigger.trigger_value));
-      } else if (trigger.trigger_type === 'person') {
-        selectedPersons.value.add(parseInt(trigger.trigger_value));
+    // Инициализируем основные настройки, если их нет
+    if (!config.settings || !config.settings.id) {
+      console.log('⚠️ Settings not initialized, creating...');
+      const newSettings = await apiClient.updateNotificationSettings({
+        enabled: true,
+        digest_frequency: 'instant',
+      });
+      config.settings = newSettings;
+      notificationSettingsId = newSettings.id;
+    } else {
+      notificationSettingsId = config.settings.id;
+    }
+
+    // Инициализируем email канал, если его нет
+    if (!config.channels || config.channels.length === 0) {
+      console.log('⚠️ Email channel not found, creating...');
+      try {
+        const newChannel = await apiClient.createNotificationChannel({
+          channel_type: 'email',
+          channel_address: '',
+          enabled: true,
+        } as any);
+        config.channels = [newChannel];
+        emailChannelId = newChannel.id;
+      } catch (e) {
+        console.error('❌ Failed to create email channel:', e);
       }
-    });
+    } else if (config.channels.length > 0 && config.channels[0].channel_type === 'email') {
+      emailChannelId = config.channels[0].id;
+    }
 
     // Загружаем настройки
     const settings = config.settings;
     statusEnabled.value = settings.enabled;
     digestFrequency.value = settings.digest_frequency || 'instant';
+
+    // Восстанавливаем сохраненные триггеры
+    const enabledOrgIds = new Set<number>();
+    const enabledPersonIds = new Set<number>();
+    
+    config.triggers.forEach(trigger => {
+      if (trigger.enabled) {
+        if (trigger.trigger_type === 'organization') {
+          const orgId = parseInt(trigger.trigger_value);
+          enabledOrgIds.add(orgId);
+          orgTriggersMap.value.set(orgId, trigger.id);
+        } else if (trigger.trigger_type === 'person') {
+          const personId = parseInt(trigger.trigger_value);
+          enabledPersonIds.add(personId);
+          personTriggersMap.value.set(personId, trigger.id);
+        }
+      }
+    });
+    
+    selectedOrganizations.value = enabledOrgIds;
+    selectedPersons.value = enabledPersonIds;
 
     // Попытаемся получить email из первого канала (если есть)
     if (config.channels.length > 0 && config.channels[0].channel_type === 'email') {
@@ -112,42 +180,119 @@ const handleSaveSettings = async () => {
     loading.value = true;
     error.value = null;
 
-    // Обновляем основные настройки
-    await apiClient.updateNotificationSettings({
-      enabled: statusEnabled.value,
-      digest_frequency: digestFrequency.value,
-    });
-
-    // Обновляем триггеры для организаций
-    const config = await apiClient.getNotificationConfig();
-    const orgTriggers = config.triggers.filter(t => t.trigger_type === 'organization');
-    for (const trigger of orgTriggers) {
-      const orgId = parseInt(trigger.trigger_value);
-      await apiClient.updateNotificationTrigger(trigger.id, {
-        enabled: selectedOrganizations.value.has(orgId),
-      } as any);
+    // 1. Обновляем основные настройки
+    if (notificationSettingsId) {
+      await apiClient.updateNotificationSettings({
+        enabled: statusEnabled.value,
+        digest_frequency: digestFrequency.value,
+      });
+      console.log('✅ Settings updated');
     }
 
-    // Обновляем триггеры для персон
-    const personTriggers = config.triggers.filter(t => t.trigger_type === 'person');
-    for (const trigger of personTriggers) {
-      const personId = parseInt(trigger.trigger_value);
-      await apiClient.updateNotificationTrigger(trigger.id, {
-        enabled: selectedPersons.value.has(personId),
-      } as any);
-    }
-
-    // Обновляем email канал
-    const emailChannel = config.channels.find(c => c.channel_type === 'email');
-    if (emailChannel) {
-      await apiClient.updateNotificationChannel(emailChannel.id, {
+    // 2. Обновляем email канал
+    if (emailChannelId) {
+      await apiClient.updateNotificationChannel(emailChannelId, {
         channel_address: email.value,
         enabled: true,
       } as any);
+      console.log('✅ Email channel updated');
+    } else {
+      // Создаем новый канал, если его нет
+      const newChannel = await apiClient.createNotificationChannel({
+        channel_type: 'email',
+        channel_address: email.value,
+        enabled: true,
+      } as any);
+      emailChannelId = newChannel.id;
+      console.log('✅ Email channel created');
+    }
+
+    // 3. Синхронизируем триггеры для организаций
+    // Получаем все текущие триггеры
+    const config = await apiClient.getNotificationConfig();
+    const currentOrgTriggers = new Map<number, number>();
+    const currentPersonTriggers = new Map<number, number>();
+    
+    config.triggers.forEach(trigger => {
+      if (trigger.trigger_type === 'organization') {
+        const orgId = parseInt(trigger.trigger_value);
+        currentOrgTriggers.set(orgId, trigger.id);
+      } else if (trigger.trigger_type === 'person') {
+        const personId = parseInt(trigger.trigger_value);
+        currentPersonTriggers.set(personId, trigger.id);
+      }
+    });
+
+    // Обновляем или создаем триггеры для организаций
+    for (const orgId of selectedOrganizations.value) {
+      if (currentOrgTriggers.has(orgId)) {
+        // Обновляем существующий триггер
+        const triggerId = currentOrgTriggers.get(orgId)!;
+        await apiClient.updateNotificationTrigger(triggerId, {
+          enabled: true,
+        } as any);
+        console.log(`✅ Org trigger ${orgId} updated`);
+      } else {
+        // Создаем новый триггер
+        const org = allOrganizations.value.find(o => o.id === orgId);
+        if (org) {
+          await apiClient.createNotificationTrigger({
+            name: `Watch ${org.name}`,
+            trigger_type: 'organization',
+            trigger_value: String(orgId),
+            enabled: true,
+          });
+          console.log(`✅ Org trigger ${orgId} created`);
+        }
+      }
+    }
+
+    // Отключаем триггеры для невыбранных организаций
+    for (const [orgId, triggerId] of currentOrgTriggers) {
+      if (!selectedOrganizations.value.has(orgId)) {
+        await apiClient.updateNotificationTrigger(triggerId, {
+          enabled: false,
+        } as any);
+        console.log(`✅ Org trigger ${orgId} disabled`);
+      }
+    }
+
+    // Обновляем или создаем триггеры для персон
+    for (const personId of selectedPersons.value) {
+      if (currentPersonTriggers.has(personId)) {
+        // Обновляем существующий триггер
+        const triggerId = currentPersonTriggers.get(personId)!;
+        await apiClient.updateNotificationTrigger(triggerId, {
+          enabled: true,
+        } as any);
+        console.log(`✅ Person trigger ${personId} updated`);
+      } else {
+        // Создаем новый триггер
+        const person = allPersons.value.find(p => p.id === personId);
+        if (person) {
+          await apiClient.createNotificationTrigger({
+            name: `Watch ${person.name}`,
+            trigger_type: 'person',
+            trigger_value: String(personId),
+            enabled: true,
+          });
+          console.log(`✅ Person trigger ${personId} created`);
+        }
+      }
+    }
+
+    // Отключаем триггеры для невыбранных персон
+    for (const [personId, triggerId] of currentPersonTriggers) {
+      if (!selectedPersons.value.has(personId)) {
+        await apiClient.updateNotificationTrigger(triggerId, {
+          enabled: false,
+        } as any);
+        console.log(`✅ Person trigger ${personId} disabled`);
+      }
     }
 
     saveSuccess.value = true;
-    console.log('✅ Settings saved');
+    console.log('✅ All settings saved successfully');
 
     setTimeout(() => {
       saveSuccess.value = false;
@@ -160,8 +305,76 @@ const handleSaveSettings = async () => {
   }
 };
 
+const handleOpenAddEntityModal = (type: 'ORG' | 'PER') => {
+  addEntityType.value = type;
+  showAddEntityModal.value = true;
+};
+
+const handleEntityAdded = async (newEntity: any) => {
+  console.log('✅ New entity added:', newEntity);
+  
+  // Добавляем новую сущность в соответствующий список
+  const entity: Entity = {
+    id: newEntity.id,
+    name: newEntity.name,
+    type: newEntity.entity_type === 'PER' ? 'Person' : 'Company',
+    entity_type: newEntity.entity_type,
+    description: `${newEntity.name} — ${newEntity.entity_type}`,
+  };
+  
+  if (newEntity.entity_type === 'ORG') {
+    // Добавляем в начало списка организаций
+    allOrganizations.value.unshift(entity);
+    // Автоматически выбираем новую сущность
+    selectedOrganizations.value.add(newEntity.id);
+  } else if (newEntity.entity_type === 'PER') {
+    // Добавляем в начало списка персон
+    allPersons.value.unshift(entity);
+    // Автоматически выбираем новую сущность
+    selectedPersons.value.add(newEntity.id);
+  }
+  
+  saveSuccess.value = true;
+  setTimeout(() => {
+    saveSuccess.value = false;
+  }, 3000);
+};
+
 const selectedOrgsCount = computed(() => selectedOrganizations.value.size);
 const selectedPersonsCount = computed(() => selectedPersons.value.size);
+
+const handleSendTestEmail = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const response = await fetch('/api/v1/notifications/test-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to send test email');
+    }
+
+    const data = await response.json();
+    saveSuccess.value = true;
+    console.log('✅ Test email sent successfully:', data);
+
+    setTimeout(() => {
+      saveSuccess.value = false;
+    }, 3000);
+  } catch (e: any) {
+    error.value = e.message || 'Ошибка отправки тестового письма';
+    console.error('❌ Error sending test email:', e);
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -210,12 +423,12 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
     </div>
 
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка</p>
+      <p class="error-title">Ошибка</p>
       <p class="error-message">{{ error }}</p>
     </div>
 
     <div v-if="saveSuccess" class="success-banner">
-      ✅ Настройки успешно сохранены!
+      Настройки успешно сохранены!
     </div>
 
     <section v-if="!loading && !error" class="settings-grid">
@@ -252,12 +465,27 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
             <p class="overline">Организации</p>
             <h2>Отслеживать упоминания ({{ selectedOrgsCount }})</h2>
           </div>
+          <button 
+            class="add-entity-btn"
+            @click="handleOpenAddEntityModal('ORG')"
+            title="Добавить новую организацию"
+          >
+            + Добавить
+          </button>
         </header>
+        <div class="search-box">
+          <input
+            v-model="orgSearchQuery"
+            type="text"
+            placeholder="🔍 Поиск организации..."
+            class="search-input"
+          />
+        </div>
         <div class="entities-list">
-          <div v-if="organizations.length === 0" class="empty-state">
-            Организации не найдены
+          <div v-if="filteredOrganizations.length === 0" class="empty-state">
+            {{ orgSearchQuery ? 'Организации не найдены' : 'Организации не загружены' }}
           </div>
-          <label v-for="org in organizations" :key="org.id" class="entity-checkbox">
+          <label v-for="org in filteredOrganizations" :key="org.id" class="entity-checkbox">
             <input
               type="checkbox"
               :checked="selectedOrganizations.has(org.id)"
@@ -275,12 +503,27 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
             <p class="overline">Персоны</p>
             <h2>Отслеживать упоминания ({{ selectedPersonsCount }})</h2>
           </div>
+          <button 
+            class="add-entity-btn"
+            @click="handleOpenAddEntityModal('PER')"
+            title="Добавить новую персону"
+          >
+            + Добавить
+          </button>
         </header>
+        <div class="search-box">
+          <input
+            v-model="personSearchQuery"
+            type="text"
+            placeholder="🔍 Поиск персоны..."
+            class="search-input"
+          />
+        </div>
         <div class="entities-list">
-          <div v-if="persons.length === 0" class="empty-state">
-            Персоны не найдены
+          <div v-if="filteredPersons.length === 0" class="empty-state">
+            {{ personSearchQuery ? 'Персоны не найдены' : 'Персоны не загружены' }}
           </div>
-          <label v-for="person in persons" :key="person.id" class="entity-checkbox">
+          <label v-for="person in filteredPersons" :key="person.id" class="entity-checkbox">
             <input
               type="checkbox"
               :checked="selectedPersons.has(person.id)"
@@ -299,10 +542,27 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
         <li>Уведомления будут отправлены на: {{ email }}</li>
         <li>Частота: {{ digestFrequency === 'instant' ? 'Сразу же' : digestFrequency === 'daily' ? 'Ежедневно' : 'Еженедельно' }}</li>
       </ul>
-      <button class="primary" :disabled="loading" @click="handleSaveSettings">
-        {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
-      </button>
+      <div class="button-group">
+        <button class="primary" :disabled="loading" @click="handleSaveSettings">
+          {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
+        </button>
+        <button 
+          class="secondary" 
+          :disabled="loading || !email" 
+          @click="handleSendTestEmail"
+          title="Отправить тестовое письмо на указанный email"
+        >
+          📧 Тестовое письмо
+        </button>
+      </div>
     </section>
+
+    <!-- Add Entity Modal -->
+    <AddEntityModal
+      :is-open="showAddEntityModal"
+      @close="showAddEntityModal = false"
+      @entity-added="handleEntityAdded"
+    />
   </section>
 </template>
 
@@ -587,6 +847,34 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
   font-size: 0.9rem;
 }
 
+.search-box {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(79, 138, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .summary {
   grid-column: 1 / -1;
 }
@@ -622,6 +910,35 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
   font-weight: 600;
 }
 
+.add-entity-btn {
+  padding: 8px 14px;
+  background: rgba(79, 138, 255, 0.15);
+  border: 1px solid rgba(79, 138, 255, 0.3);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.add-entity-btn:hover {
+  background: rgba(79, 138, 255, 0.25);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(79, 138, 255, 0.2);
+}
+
+.add-entity-btn:active {
+  transform: scale(0.95);
+}
+
+.add-entity-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .primary {
   padding: 12px 24px;
   background: rgba(79, 138, 255, 0.1);
@@ -643,6 +960,35 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
   cursor: not-allowed;
 }
 
+.button-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.secondary {
+  padding: 12px 24px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+}
+
+.secondary:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.8);
+}
+
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .hero {
     flex-direction: column;
@@ -650,6 +996,14 @@ const selectedPersonsCount = computed(() => selectedPersons.value.size);
 
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .primary, .secondary {
+    align-self: stretch;
   }
 }
 </style>

@@ -8,7 +8,7 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 
-from .database import SessionLocal, ArticleORM
+from .database import SessionLocal, ArticleORM, init_db
 from .models import Article
 from .parsers import parse_rss
 from .kafka_producer import send_article_to_kafka
@@ -97,6 +97,9 @@ async def start_scheduler():
     max_instances=1 оставляем — дублирование не нужно.
     misfire_grace_time=None означает «запустить, даже если опоздал».
     """
+    # Инициализируем БД и добавляем constraint если нужно
+    init_db()
+    
     scheduler.add_job(
         scheduled_parse_job,
         "interval",

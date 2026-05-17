@@ -49,7 +49,7 @@ const events = computed(() => {
     source: n.source,
     summary: n.summary || n.text?.slice(0, 200),
     risk: n.risk_level || 'low',
-    riskType: n.risk_type || null,  // ✅ Добавляем тип риска
+    riskType: n.risk_type || null,  //  Добавляем тип риска
   }));
 });
 
@@ -63,7 +63,7 @@ const riskLegend: Array<{ level: RiskLevel; label: string; description: string }
 onMounted(async () => {
   try {
     loading.value = true;
-    console.log('📊 Loading dashboard data...');
+    console.log('Loading dashboard data...');
     
     // Загружаем новости
     const newsResponse = await api.getNews({
@@ -86,7 +86,7 @@ onMounted(async () => {
     const entities = await api.getEntities({ limit: 10 });
     allEntities.value = entities;
     
-    console.log('✅ Dashboard loaded:', {
+    console.log('Dashboard loaded:', {
       newsItems: newsData.value.length,
       topEntities: topEntitiesData.value.length,
       entities: allEntities.value.length

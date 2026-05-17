@@ -36,7 +36,7 @@ const handleLogin = async () => {
     localStorage.setItem('accessToken', response.access_token);
     localStorage.setItem('refreshToken', response.refresh_token);
 
-    console.log('✅ Успешный вход');
+    console.log('Успешный вход');
     router.push('/');
     } catch (e: any) {
     if (e.response?.data?.detail) {
@@ -76,7 +76,7 @@ const handleRegister = async () => {
       name: registerForm.value.name,
     });
 
-    console.log('✅ Успешная регистрация');
+    console.log('Успешная регистрация');
     // Переходим на вход
     isLogin.value = true;
     registerForm.value = { login: '', password: '', name: '', passwordConfirm: '' };

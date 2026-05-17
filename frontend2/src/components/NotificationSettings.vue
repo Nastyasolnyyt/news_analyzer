@@ -62,10 +62,10 @@ onMounted(async () => {
     // Загружаем статус
     statusEnabled.value = config.settings.enabled;
     
-    console.log('✅ Notification config loaded');
+    console.log('Notification config loaded');
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки настроек уведомлений';
-    console.error('❌ Error:', error.value);
+    console.error('Error:', error.value);
   } finally {
     loading.value = false;
   }
@@ -127,12 +127,29 @@ const handleSaveSettings = async () => {
       } as any);
     }
     
-    console.log('✅ Settings saved successfully');
+    console.log('Settings saved successfully');
     error.value = null;
     alert('Настройки успешно сохранены!');
   } catch (e: any) {
     error.value = e.message || 'Ошибка сохранения настроек';
-    console.error('❌ Error saving settings:', error.value);
+    console.error('Error saving settings:', error.value);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleSendTestEmail = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    
+    const result = await api.sendTestEmail();
+    alert(`Тестовое письмо отправлено на ${result.to}!\nСтатус: ${result.status}`);
+    console.log('Test email sent:', result);
+  } catch (e: any) {
+    error.value = e.message || 'Ошибка при отправке тестового письма';
+    console.error('Error sending test email:', error.value);
+    alert(`Ошибка: ${error.value}`);
   } finally {
     loading.value = false;
   }
@@ -185,9 +202,9 @@ const handleSaveSettings = async () => {
     </div>
 
     <div v-else-if="error" class="error-state">
-      <p class="error-title">❌ Ошибка</p>
+      <p class="error-title">Ошибка</p>
       <p class="error-message">{{ error }}</p>
-      <button class="outline" @click="window.location.reload()">Попробовать снова</button>
+      <button class="outline" @click="reloadPage()">Попробовать снова</button>
     </div>
 
     <section v-else class="settings-grid">
@@ -262,9 +279,14 @@ const handleSaveSettings = async () => {
         <li>Email-дайджест с ежедневным обзором найденных событий.</li>
         <li>Возможность быстро перейти в профиль или новость из уведомления.</li>
       </ul>
-      <button class="primary" :disabled="loading" @click="handleSaveSettings">
-        {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
-      </button>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="primary" :disabled="loading" @click="handleSaveSettings">
+          {{ loading ? 'Сохраняем...' : 'Сохранить настройки' }}
+        </button>
+        <button class="outline" :disabled="loading" @click="handleSendTestEmail" title="Отправить тестовое письмо на ваш email">
+          {{ loading ? 'Отправляем...' : '📧 Отправить тест' }}
+        </button>
+      </div>
     </section>
   </section>
 </template>

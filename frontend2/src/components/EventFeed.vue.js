@@ -5,7 +5,7 @@ const riskLabel = {
     medium: 'Средний риск',
     low: 'Низкий риск',
 };
-// ✅ Форматируем тип риска для отображения
+// Форматируем тип риска для отображения
 const riskTypeLabel = (type) => {
     if (!type)
         return '';

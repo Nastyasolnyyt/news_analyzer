@@ -291,3 +291,61 @@ async def get_notification_config(
 ) -> NotificationConfigDTO:
     """Получить полную конфигурацию (настройки, триггеры, каналы, источники)"""
     return await notification_service.get_user_config(user_id)
+
+
+# ===== TEST ENDPOINTS =====
+
+@ROUTER.post(
+    "/test-email",
+    response_model=dict,
+    summary="Отправить тестовое email уведомление",
+)
+async def send_test_email(
+    notification_service: FromDishka[NotificationService],
+    user_id: int = Depends(get_current_user_id),
+) -> dict:
+    """
+    Отправить тестовое email уведомление на адрес, 
+    указанный в настройках пользователя
+    """
+    from src.services.email_service import get_email_service
+    
+    try:
+        # Получаем email канал пользователя
+        channels = await notification_service.get_user_channels(user_id)
+        email_channel = next(
+            (c for c in channels if c.channel_type == "email" and c.channel_address),
+            None
+        )
+        
+        if not email_channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email channel not configured"
+            )
+        
+        # Отправляем тестовое письмо
+        email_service = get_email_service()
+        success = await email_service.send_test_email(to_email=email_channel.channel_address)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send test email"
+            )
+        
+        return {
+            "message": "Test email sent successfully",
+            "to": email_channel.channel_address,
+            "status": "sent"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in send_test_email: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )

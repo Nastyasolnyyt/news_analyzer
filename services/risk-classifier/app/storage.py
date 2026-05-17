@@ -3,7 +3,7 @@ risk-classifier/app/storage.py
 Сохранение типов риска в PostgreSQL
 """
 import logging
-from sqlalchemy import Column, Integer, String, Float, create_engine
+from sqlalchemy import Column, Integer, String, Float, create_engine, delete
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import insert
 from .config import settings
@@ -43,13 +43,26 @@ def save_risk_result(article_id: int, result):
             risk_type=result.risk_type,
             confidence=result.confidence
         ).on_conflict_do_update(
-            index_elements=['article_id'],
+            constraint='uq_risks_article_id',
             set_={
                 "risk_type": result.risk_type,
                 "confidence": result.confidence
             }
         )
-        db.execute(stmt)
+        try:
+            db.execute(stmt)
+        except Exception as e:
+            # Fallback if constraint doesn't exist
+            db.rollback()
+            logger.debug(f"Constraint not found, attempting update/insert fallback for article {article_id}")
+            # Delete existing record first, then insert new one
+            db.execute(delete(Risk).where(Risk.article_id == article_id))
+            db.add(Risk(
+                article_id=article_id,
+                risk_type=result.risk_type,
+                confidence=result.confidence
+            ))
+        
         db.commit()
         logger.debug(f"✅ Article {article_id}: {result.risk_type} ({result.confidence:.2f})")
     except Exception as e:
@@ -69,18 +82,32 @@ def save_risk_type(article_id: int, risk_type: str, confidence: float):
     """
     db = SessionLocal()
     try:
+        # Try to use ON CONFLICT with explicit constraint name
         stmt = insert(Risk).values(
             article_id=article_id,
             risk_type=risk_type,
             confidence=confidence
         ).on_conflict_do_update(
-            index_elements=['article_id'],
+            constraint='uq_risks_article_id',  # Use the explicit constraint name from migration
             set_={
                 "risk_type": risk_type,
                 "confidence": confidence
             }
         )
-        db.execute(stmt)
+        try:
+            db.execute(stmt)
+        except Exception as e:
+            # If constraint doesn't exist, fall back to simple insert or update
+            db.rollback()
+            logger.debug(f"Constraint not found, attempting update/insert fallback for article {article_id}")
+            # Try to delete existing record first, then insert new one
+            db.execute(delete(Risk).where(Risk.article_id == article_id))
+            db.add(Risk(
+                article_id=article_id,
+                risk_type=risk_type,
+                confidence=confidence
+            ))
+        
         db.commit()
         logger.debug(f"✅ Article {article_id}: type={risk_type} ({confidence:.2f})")
     except Exception as e:

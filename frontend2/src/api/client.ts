@@ -118,6 +118,11 @@ export interface NamedEntity {
   created_at: string;
 }
 
+export interface CreateEntityDTO {
+  name: string;
+  entity_type: string;
+}
+
 export interface Entity {
   id: number;
   name: string;
@@ -833,6 +838,31 @@ export const api = {
     }
   },
 
+  // Отправить тестовое email письмо
+  async sendTestEmail(): Promise<{ message: string; to: string; status: string }> {
+    try {
+      const url = `${API_BASE}/notifications/test-email`;
+      console.log('📧 Sending test email to:', url);
+      
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(error.detail || `API error: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('✅ Test email sent successfully');
+      return data;
+    } catch (error) {
+      console.error('❌ Error sending test email:', error);
+      throw error;
+    }
+  },
+
   // ===== AUTH METHODS =====
 
   // Вход
@@ -903,6 +933,28 @@ export const api = {
 
   // ===== ORGANIZATIONS AND PERSONS =====
 
+  // Создать новую сущность (организацию или персону)
+  async createEntity(data: CreateEntityDTO): Promise<NamedEntity> {
+    try {
+      const url = `${API_BASE}/entities`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(error.detail || `API error: ${res.status}`);
+      }
+      const entity = await res.json();
+      console.log('✅ Entity created successfully:', entity);
+      return entity;
+    } catch (error) {
+      console.error('❌ Error creating entity:', error);
+      throw error;
+    }
+  },
+
   // Получить список всех организаций
   async getOrganizations(limit = 100): Promise<Entity[]> {
     try {
@@ -929,5 +981,21 @@ export const api = {
       console.error('❌ Error fetching persons:', error);
       throw error;
     }
+  },
+
+  // ===== USER REPORTS =====
+
+  // Получить отчеты пользователя
+  async getUserReports(): Promise<any[]> {
+    // Если API недоступен, возвращаем пустой массив
+    console.warn('⚠️ User reports API not implemented yet');
+    return [];
+  },
+
+  // Удалить отчет
+  async deleteReport(reportId: number): Promise<void> {
+    // Если API недоступен, просто логируем предупреждение
+    console.warn('⚠️ Delete report API not implemented yet');
+    throw new Error('Delete report API not implemented');
   },
 };

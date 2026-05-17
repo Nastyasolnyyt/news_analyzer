@@ -77,6 +77,35 @@ services:
     networks:
        - news_network
 
+  notification-consumer:
+    build:
+      context: ./services/output_module
+      dockerfile: Dockerfile
+    container_name: notification-consumer
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_INPUT_TOPIC: articles_analyzed
+      KAFKA_NOTIFICATION_GROUP_ID: notifications-sender-group
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      SMTP_ENABLED: "true"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      db:
+        condition: service_started
+    restart: always
+    networks:
+      - news_network
+
   # НОВЫЙ СЕРВИС: Анализ тональности
   sentiment_analysis:
       build: ./services/sentiment_analysis

@@ -6,6 +6,7 @@ import EntityProfile from './views/EntityProfile.vue';
 import NewsDetail from './views/NewsDetail.vue';
 import Notifications from './views/Notifications.vue';
 import Reports from './views/Reports.vue';
+import Profile from './views/Profile.vue';
 import Auth from './views/Auth.vue';
 
 const router = createRouter({
@@ -59,6 +60,12 @@ const router = createRouter({
       path: '/reports',
       name: 'reports',
       component: Reports,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: Profile,
       meta: { requiresAuth: true },
     },
   ],

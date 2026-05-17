@@ -39,11 +39,11 @@ onMounted(async () => {
         selectedChannels.value = new Set(config.channels.filter(c => c.enabled).map(c => c.id));
         // Загружаем статус
         statusEnabled.value = config.settings.enabled;
-        console.log('✅ Notification config loaded');
+        console.log('Notification config loaded');
     }
     catch (e) {
         error.value = e.message || 'Ошибка загрузки настроек уведомлений';
-        console.error('❌ Error:', error.value);
+        console.error('Error:', error.value);
     }
     finally {
         loading.value = false;
@@ -67,6 +67,9 @@ const handleSourceToggle = (value) => {
 };
 const handleChannelToggle = (value) => {
     selectedChannels.value = toggleSetValue(selectedChannels.value, value);
+};
+const reloadPage = () => {
+    window.location.reload();
 };
 const handleSaveSettings = async () => {
     try {
@@ -93,13 +96,30 @@ const handleSaveSettings = async () => {
                 enabled: selectedChannels.value.has(channel.id),
             });
         }
-        console.log('✅ Settings saved successfully');
+        console.log('Settings saved successfully');
         error.value = null;
         alert('Настройки успешно сохранены!');
     }
     catch (e) {
         error.value = e.message || 'Ошибка сохранения настроек';
-        console.error('❌ Error saving settings:', error.value);
+        console.error('Error saving settings:', error.value);
+    }
+    finally {
+        loading.value = false;
+    }
+};
+const handleSendTestEmail = async () => {
+    try {
+        loading.value = true;
+        error.value = null;
+        const result = await api.sendTestEmail();
+        alert(`Тестовое письмо отправлено на ${result.to}!\nСтатус: ${result.status}`);
+        console.log('Test email sent:', result);
+    }
+    catch (e) {
+        error.value = e.message || 'Ошибка при отправке тестового письма';
+        console.error('Error sending test email:', error.value);
+        alert(`Ошибка: ${error.value}`);
     }
     finally {
         loading.value = false;
@@ -238,7 +258,7 @@ else if (__VLS_ctx.error) {
                     return;
                 if (!(__VLS_ctx.error))
                     return;
-                __VLS_ctx.window.location.reload();
+                __VLS_ctx.reloadPage();
             } },
         ...{ class: "outline" },
     });
@@ -349,12 +369,22 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.ul, __VLS_intrinsicElements.ul
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.li, __VLS_intrinsicElements.li)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ style: {} },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.handleSaveSettings) },
     ...{ class: "primary" },
     disabled: (__VLS_ctx.loading),
 });
 (__VLS_ctx.loading ? 'Сохраняем...' : 'Сохранить настройки');
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.handleSendTestEmail) },
+    ...{ class: "outline" },
+    disabled: (__VLS_ctx.loading),
+    title: "Отправить тестовое письмо на ваш email",
+});
+(__VLS_ctx.loading ? 'Отправляем...' : '📧 Отправить тест');
 /** @type {__VLS_StyleScopedClasses['notify-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['logo']} */ ;
@@ -388,6 +418,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 /** @type {__VLS_StyleScopedClasses['summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['outline']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -405,7 +436,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             handleTriggerToggle: handleTriggerToggle,
             handleSourceToggle: handleSourceToggle,
             handleChannelToggle: handleChannelToggle,
+            reloadPage: reloadPage,
             handleSaveSettings: handleSaveSettings,
+            handleSendTestEmail: handleSendTestEmail,
         };
     },
 });
