@@ -9,7 +9,7 @@ defineProps<{
     <div class="badge">Новые релевантные новости</div>
     <div class="value">
       {{ count }}
-      <span class="unit">/ 24 часа</span>
+      <span class="unit">/ Всего новостей</span>
     </div>
     <p>Система отобрала новости с наивысшей релевантностью для ваших подписок.</p>
   </section>
