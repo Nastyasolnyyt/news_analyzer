@@ -31,11 +31,11 @@ class Risk(Base):
     article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), unique=True)
     
     # ✅ УРОВЕНЬ РИСКА (от risklevel-classifier)
-    risk_level = Column(String)         # high / medium / low
+    risk_level = Column(String(16))         # high / medium / low
     risk_confidence = Column(Float)     # 0..1 - уверенность УРОВНЯ
     
     # ❓ ТИП РИСКА (от risk-classifier) - может быть заполнено позже
-    risk_type = Column(String)          # политический / экономический / социальный
+    risk_type = Column(String(32))          # политический / экономический / социальный
     risk_type_confidence = Column(Float) # 0..1 - уверенность ТИПА
     
     created_at = Column(DateTime, server_default=func.now())
@@ -55,7 +55,7 @@ def init_db():
     logger.info("✅ Database инициализирована")
 
 
-def save_risk_result(article_id: int, risk_level: str, confidence: float):
+def save_risk_level(article_id: int, risk_level: str, confidence: float):
     """
     Сохраняет уровень риска для статьи
     
