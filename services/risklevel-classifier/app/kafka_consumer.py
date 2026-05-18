@@ -10,7 +10,7 @@ import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from .config import settings
-from .classifier import RiskTypeClassifier
+from .classifier import HFRiskClassifier
 from .storage import save_risk_type
 from sqlalchemy import create_engine, text as sql_text
 from sqlalchemy.orm import sessionmaker
@@ -26,7 +26,7 @@ async def consume_from_kafka():
     """Main Kafka consumer для анализа типов риска"""
 
     logger.info("Инициализирую классификатор типов риска...")
-    classifier = RiskTypeClassifier()
+    classifier = HFRiskClassifier()
     logger.info("Классификатор готов")
 
     # Проверяем подключение к БД при старте
