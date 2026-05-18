@@ -14,10 +14,10 @@ class Article(BaseModel):
 
 class RiskResult(BaseModel):
     # Используем Field для описания и валидатор, чтобы ограничить значения
-    risk_type: str = Field(..., description="Уровень риска: high, medium или low")
+    risk_level: str = Field(..., description="Уровень риска: high, medium или low")
     confidence: float = Field(..., ge=0, le=1.0)
 
-    @field_validator('risk_type')
+    @field_validator('risk_level')
     def validate_risk_level(cls, v):
         # Приводим к нижнему регистру на случай, если нейронка ответит "High"
         v = v.lower().strip()
