@@ -101,7 +101,7 @@ async def consume_from_kafka():
                     **article_data,
                     'article_id': article_id,  # гарантируем наличие article_id
                     'risk_level': result['risk_level'],
-                    'risk_type_confidence': result['confidence']
+                    'risk_confidence': result['confidence']
                 }
 
                 await producer.send_and_wait(settings.output_topic, output_message)
