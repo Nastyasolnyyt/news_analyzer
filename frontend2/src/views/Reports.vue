@@ -12,6 +12,9 @@ const sentimentFilter = ref<string>('all');
 const riskTypeFilter = ref<string>('all');
 const selectedNewsIds = ref<Set<number>>(new Set());
 const selectMode = ref<'all' | 'manual'>('all');
+
+// Доступные значения для фильтров (динамически обновляются)
+const availableRiskTypes = ref<string[]>([]);
  
 const riskLevels: Record<string, { label: string; color: string }> = {
   high: { label: 'Высокий риск', color: '#ff6464' },
@@ -24,7 +27,8 @@ const filteredNews = computed(() => {
   return news.value.filter(item => {
     const riskMatch = riskFilter.value === 'all' || item.risk_level === riskFilter.value;
     const sentimentMatch = sentimentFilter.value === 'all' || item.sentiment_label === sentimentFilter.value;
-    const riskTypeMatch = riskTypeFilter.value === 'all' || item.risk_type === riskTypeFilter.value;
+    const riskTypeMatch = riskTypeFilter.value === 'all' || !riskTypeFilter.value || !item.risk_type || 
+      (item.risk_type === riskTypeFilter.value);
     return riskMatch && sentimentMatch && riskTypeMatch;
   });
 });
@@ -107,13 +111,51 @@ onMounted(async () => {
     loading.value = true;
     console.log('Loading reports data...');
     
-    const data = await api.getNews({
-      page: 1,
-      page_size: 500,  // Увеличили лимит до 500 новостей
-    });
+    // Загружаем ВСЕ новости с пейджинацией
+    const allNews: News[] = [];
+    let page = 1;
+    let pageSize = 100;
+    let hasMore = true;
+    let total = 0;
     
-    news.value = data.items;
-    console.log('Reports loaded:', data.items.length, 'items');
+    while (hasMore) {
+      try {
+        const data = await api.getNews({
+          page: page,
+          page_size: pageSize,
+        });
+        
+        if (data.items.length === 0) {
+          hasMore = false;
+        } else {
+          allNews.push(...data.items);
+          total = data.total || 0;
+          console.log(`✅ Loaded page ${page}: ${data.items.length} items, total: ${total}`);
+          
+          // Если загрузили все данные
+          if (allNews.length >= total && total > 0) {
+            hasMore = false;
+          }
+          page++;
+        }
+      } catch (e) {
+        console.error('Error loading page:', page, e);
+        hasMore = false;
+      }
+    }
+    
+    news.value = allNews;
+    console.log('Reports loaded: total', allNews.length, 'items out of', total);
+    
+    // Собираем все доступные типы рисков
+    const riskTypes = new Set<string>();
+    allNews.forEach(item => {
+      if (item.risk_type) {
+        riskTypes.add(item.risk_type);
+      }
+    });
+    availableRiskTypes.value = Array.from(riskTypes).sort();
+    console.log('✅ Available risk types:', availableRiskTypes.value);
   } catch (e: any) {
         if (e.response?.data?.detail) {
       error.value = typeof e.response.data.detail === 'string'
@@ -270,9 +312,9 @@ const reloadPage = () => {
           <label>Тип риска:</label>
           <select v-model="riskTypeFilter" class="filter-select">
             <option value="all">Все типы</option>
-            <option value="политический">Политический</option>
-            <option value="экономический">Экономический</option>
-            <option value="социальный">Социальный</option>
+            <option v-for="riskType in availableRiskTypes" :key="riskType" :value="riskType">
+              {{ riskType }}
+            </option>
           </select>
         </div>
 

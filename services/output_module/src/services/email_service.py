@@ -10,6 +10,8 @@ import asyncio
 import logging
 import os
 import smtplib
+import socket
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -25,12 +27,23 @@ class EmailService:
         self.from_name = os.getenv("SMTP_FROM_NAME", "Signal Desk")
 
         logger.info(
-            "EmailService инициализирован: relay=%s:%s, from=%s",
-            self.smtp_host, self.smtp_port, self.from_email,
+            "📧 EmailService инициализирован: relay=%s:%s, from=%s <%s>",
+            self.smtp_host, self.smtp_port, self.from_name, self.from_email,
         )
 
     def is_configured(self) -> bool:
         return True
+
+    def _check_relay_available(self) -> bool:
+        """Проверить доступность SMTP relay"""
+        try:
+            sock = socket.create_connection((self.smtp_host, self.smtp_port), timeout=5)
+            sock.close()
+            logger.debug(f"✅ SMTP relay доступен: {self.smtp_host}:{self.smtp_port}")
+            return True
+        except Exception as e:
+            logger.warning(f"⚠️ SMTP relay недоступен: {self.smtp_host}:{self.smtp_port} - {e}")
+            return False
 
     async def send_notification_email(
         self,
@@ -45,7 +58,7 @@ class EmailService:
         sentiment: str = None,
     ) -> bool:
         if not to_email:
-            logger.error("Не указан адрес получателя")
+            logger.error("❌ Не указан адрес получателя")
             return False
 
         html = self._build_html(
@@ -59,15 +72,17 @@ class EmailService:
         )
 
         try:
+            logger.info(f"📤 Попытка отправки письма на {to_email} через {self.smtp_host}:{self.smtp_port}")
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self._send, to_email, subject, html)
-            logger.info("✅ Email отправлен на %s: %s", to_email, subject)
+            logger.info(f"✅ Email успешно отправлен на {to_email}: {subject}")
             return True
         except Exception as exc:
-            logger.error("❌ Не удалось отправить email на %s: %s", to_email, exc)
+            logger.error(f"❌ Ошибка отправки email на {to_email}: {type(exc).__name__}: {exc}", exc_info=True)
             return False
 
     async def send_test_email(self, to_email: str) -> bool:
+        logger.info(f"🧪 Отправка тестового письма на {to_email}")
         return await self.send_notification_email(
             to_email=to_email,
             subject="✅ Тестовое письмо — Signal Desk",
@@ -81,16 +96,48 @@ class EmailService:
         )
 
     def _send(self, to_email: str, subject: str, html: str) -> None:
+        """Отправить письмо с retry логикой"""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = f"{self.from_name} <{self.from_email}>"
         msg["To"] = to_email
         msg.attach(MIMEText(html, "html", "utf-8"))
 
-        with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30) as server:
-            server.send_message(msg)
-
-        logger.debug("📧 Принято relay: %s → %s", self.from_email, to_email)
+        max_retries = 3
+        retry_delay = 2
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"📧 Попытка {attempt + 1}/{max_retries}: подключение к {self.smtp_host}:{self.smtp_port}")
+                
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30) as server:
+                    server.send_message(msg)
+                    
+                logger.debug(f"📧 Письмо успешно принято relay: {self.from_email} → {to_email}")
+                return
+                
+            except smtplib.SMTPException as e:
+                last_error = f"SMTP Error: {e}"
+                logger.warning(f"⚠️ Попытка {attempt + 1} не удалась: {last_error}")
+            except socket.timeout as e:
+                last_error = f"Socket Timeout: {e}"
+                logger.warning(f"⚠️ Попытка {attempt + 1} не удалась: {last_error}")
+            except ConnectionRefusedError as e:
+                last_error = f"Connection Refused: {e}"
+                logger.warning(f"⚠️ Попытка {attempt + 1} не удалась: {last_error}")
+            except Exception as e:
+                last_error = f"{type(e).__name__}: {e}"
+                logger.warning(f"⚠️ Попытка {attempt + 1} не удалась: {last_error}")
+            
+            # Если это не последняя попытка, подождать перед retry
+            if attempt < max_retries - 1:
+                logger.info(f"⏳ Ожидание {retry_delay}с перед следующей попыткой...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Экспоненциальный backoff
+        
+        # Если все попытки исчерпаны
+        raise Exception(f"Failed to send email after {max_retries} attempts: {last_error}")
 
     def _build_html(
         self,
