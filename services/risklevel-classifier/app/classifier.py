@@ -22,7 +22,7 @@ class MistralNeuralClassifier:
             },
             timeout=30.0
         )
-        self.model = "openrouter/hunter-alpha"
+        self.model = "qwen/qwen3-8b:free"
 
     def classify(self, text: str) -> RiskResult:
         """Основной входной метод"""
@@ -34,17 +34,16 @@ class MistralNeuralClassifier:
         return self._call_model(clean_text)
 
     def _create_mistral_prompt(self, text: str) -> str:
-        return f"""
-        Analyze the business risk of the following news.
-        Return ONLY one word: 'high', 'medium', or 'low'.
+        return f"""Ты анализируешь риск новости для бизнеса и общества. 
+        Верни ТОЛЬКО одно слово: high, medium или low.
 
-        - 'high': Sanctions, arrests, bankruptcy, cyberattacks, war, major lawsuits.
-        - 'medium': Fines, investigations, resignations, market drops, warnings.
-        - 'low': General news, partnerships, growth, appointments.
+        high — война, санкции, арест, банкротство, катастрофа, теракт, кризис, обвал
+        medium — штраф, расследование, отставка, падение рынка, реформа, ограничения  
+        low — обычные новости, партнёрство, рост, назначения
 
-        Text: {text[:1500]}
-        
-        RISK LEVEL:"""
+        Текст: {text[:1000]}
+
+        УРОВЕНЬ РИСКА:"""
 
     def _call_model(self, text: str) -> RiskResult:
         try:
@@ -63,16 +62,18 @@ class MistralNeuralClassifier:
             logger.error(f"Error in Mistral API: {e}")
             return RiskResult(risk_type="low", confidence=0.0)
 
-def _parse_risk_level(self, response: str) -> tuple[str, float]:
-    response_clean = re.sub(r'[^a-z]', '', response.lower())
-    
-    # Ищем точное совпадение или проверяем наличие с приоритетом
-    if response_clean == "high":
-        return "high", 0.95
-    if response_clean == "medium":
-        return "medium", 0.85
-    if response_clean == "low":
-        return "low", 0.85
+    def _parse_risk_level(self, response: str) -> tuple[str, float]:  # ← должен быть внутри класса
+        response_clean = re.sub(r'[^a-z]', '', response.lower())
+        if response_clean == "high":
+            return "high", 0.95
+        if response_clean == "medium":
+            return "medium", 0.85
+        if response_clean == "low":
+            return "low", 0.85
+        for level, conf in [("high", 0.9), ("medium", 0.8), ("low", 0.7)]:
+            if level in response_clean:
+                return level, conf
+        return "low", 0.1
         
     # Если ответила длинно, берем по приоритету опасности
     for level, conf in [("high", 0.9), ("medium", 0.8), ("low", 0.7)]:
