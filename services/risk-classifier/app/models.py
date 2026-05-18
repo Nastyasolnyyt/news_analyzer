@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -16,7 +16,7 @@ class RiskResult(BaseModel):
     risk_type: str = Field(..., description="Тип риска: политический, экономический или социальный")
     confidence: float = Field(..., ge=0, le=1.0)
 
-    @validator('risk_type')
+    @field_validator('risk_type')
     def validate_risk_type(cls, v):
         v = v.lower().strip()
         allowed = ['политический', 'экономический', 'социальный', 'ошибка_нейросети', 'неопределенный']
