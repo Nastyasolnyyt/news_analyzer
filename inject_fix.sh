@@ -1,10 +1,21 @@
+#!/bin/bash
+# inject_fix.sh - копирует исправленный файл прямо в контейнер без пересборки
+# запускать из ~/news_analyzer
+
+set -e
+
+echo "=== Пишем исправленный notification_consumer.py ==="
+
+cat > /tmp/notification_consumer_fixed.py << 'PYEOF'
 """
-Notification Consumer — использует синхронный psycopg2 (async engine не нужен,
-consumer и так работает в asyncio через run_in_executor для блокирующих операций).
+Notification Consumer — синхронный psycopg2, без async engine.
 """
 import asyncio
 import json
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import List, Dict, Optional
 
 from aiokafka import AIOKafkaConsumer
@@ -29,12 +40,13 @@ class NotificationConsumer:
         kafka_input_topic: str = "articles_analyzed",
         kafka_group_id: str = "notifications-sender-group",
     ):
-        self.database_url = database_url
         self.kafka_bootstrap_servers = kafka_bootstrap_servers
         self.kafka_input_topic = kafka_input_topic
         self.kafka_group_id = kafka_group_id
+        self.consumer = None
+        self.email_service = get_email_service()
 
-        # Синхронный движок — psycopg2 не требует asyncpg
+        # Синхронный движок — psycopg2
         db_url = database_url
         if "+asyncpg" in db_url:
             db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
@@ -43,12 +55,9 @@ class NotificationConsumer:
 
         self.engine = create_engine(db_url, pool_pre_ping=True, pool_size=5)
         self.SessionLocal = sessionmaker(bind=self.engine)
-        self.consumer = None
-        self.email_service = get_email_service()
 
     async def initialize(self):
         logger.info("Инициализация Notification Consumer...")
-
         self.consumer = AIOKafkaConsumer(
             self.kafka_input_topic,
             bootstrap_servers=self.kafka_bootstrap_servers,
@@ -59,17 +68,12 @@ class NotificationConsumer:
         )
         await self.consumer.start()
         logger.info("✅ Kafka Consumer запущен. Топик: %s", self.kafka_input_topic)
-
-        if self.email_service.is_configured():
-            logger.info("✅ Email relay: %s:%s", self.email_service.smtp_host, self.email_service.smtp_port)
-        else:
-            logger.warning("⚠️  Email relay не настроен")
+        logger.info("✅ Email relay: %s:%s", self.email_service.smtp_host, self.email_service.smtp_port)
 
     async def shutdown(self):
         if self.consumer:
             await self.consumer.stop()
-        if self.engine:
-            self.engine.dispose()
+        self.engine.dispose()
         logger.info("Notification Consumer остановлен")
 
     async def run(self):
@@ -79,9 +83,9 @@ class NotificationConsumer:
                 try:
                     await self._process_message(message)
                 except Exception as e:
-                    logger.error("❌ Ошибка обработки сообщения: %s", e, exc_info=True)
+                    logger.error("❌ Ошибка: %s", e, exc_info=True)
         except Exception as e:
-            logger.error("❌ Критическая ошибка consumer: %s", e, exc_info=True)
+            logger.error("❌ Критическая ошибка: %s", e, exc_info=True)
             raise
         finally:
             await self.shutdown()
@@ -93,43 +97,33 @@ class NotificationConsumer:
             return
 
         article_id = data.get("id") or data.get("post_id") or data.get("article_id")
-        article_entities = data.get("entities", [])
-        article_title = data.get("title", "Новая статья")
-        article_summary = (data.get("summary") or data.get("text", ""))[:500]
-        article_link = data.get("link") or data.get("url")
+        entities = data.get("entities", [])
+        title = data.get("title", "Новая статья")
+        summary = (data.get("summary") or data.get("text", ""))[:500]
+        link = data.get("link") or data.get("url")
         risk_level = data.get("risk_level", "low")
         sentiment = data.get("sentiment_label", "neutral")
 
-        if not article_entities:
+        if not entities:
             return
 
-        logger.info("📬 Статья %s: %d сущностей", article_id, len(article_entities))
+        logger.info("📬 Статья %s: %d сущностей", article_id, len(entities))
 
-        # Запускаем синхронную работу с БД в executor
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            self._handle_entities_sync,
-            article_entities, article_id, article_title,
-            article_summary, article_link, risk_level, sentiment,
+            self._handle_sync,
+            entities, article_id, title, summary, link, risk_level, sentiment,
         )
 
-    def _handle_entities_sync(
-        self, entities, article_id, article_title,
-        article_summary, article_link, risk_level, sentiment,
-    ):
-        """Синхронная часть — работа с БД через psycopg2."""
+    def _handle_sync(self, entities, article_id, title, summary, link, risk_level, sentiment):
         session = self.SessionLocal()
         try:
             entity_ids_str = [str(e["id"]) for e in entities if "id" in e]
             entity_names = [
                 e.get("name", e.get("text", "")).lower().strip()
-                for e in entities
-                if e.get("name") or e.get("text")
+                for e in entities if e.get("name") or e.get("text")
             ]
-
-            if not entity_ids_str and not entity_names:
-                return
 
             conditions = []
             if entity_ids_str:
@@ -154,7 +148,6 @@ class NotificationConsumer:
             ).scalars().all()
 
             if not triggers:
-                logger.debug("⏭️  Нет триггеров для сущностей")
                 return
 
             logger.info("🔔 Найдено %d триггеров", len(triggers))
@@ -164,19 +157,11 @@ class NotificationConsumer:
                 users.setdefault(t.user_id, []).append(t)
 
             for user_id, user_triggers in users.items():
-                self._send_to_user_sync(
-                    session, user_id, user_triggers, article_id,
-                    article_title, article_summary, article_link,
-                    entities, risk_level, sentiment,
-                )
+                self._send_to_user(session, user_id, user_triggers, entities, title, summary, link, risk_level, sentiment)
         finally:
             session.close()
 
-    def _send_to_user_sync(
-        self, session, user_id, triggers, article_id,
-        article_title, article_summary, article_link,
-        entities, risk_level, sentiment,
-    ):
+    def _send_to_user(self, session, user_id, triggers, entities, title, summary, link, risk_level, sentiment):
         try:
             channel = session.execute(
                 select(NotificationChannel).where(
@@ -192,47 +177,36 @@ class NotificationConsumer:
                 return
 
             settings = session.execute(
-                select(NotificationSettings).where(
-                    NotificationSettings.user_id == user_id
-                )
+                select(NotificationSettings).where(NotificationSettings.user_id == user_id)
             ).scalars().first()
 
             if settings and not settings.enabled:
                 return
 
             trigger = triggers[0]
-            trigger_value = trigger.trigger_value
-
-            matched_entity = None
+            matched = None
             for e in entities:
                 name = e.get("name") or e.get("text") or ""
-                if (
-                    trigger_value == str(e.get("id", ""))
-                    or trigger_value.lower() in name.lower()
-                    or name.lower() in trigger_value.lower()
-                ):
-                    matched_entity = e
+                if (trigger.trigger_value == str(e.get("id", ""))
+                        or trigger.trigger_value.lower() in name.lower()
+                        or name.lower() in trigger.trigger_value.lower()):
+                    matched = e
                     break
-            if not matched_entity:
-                matched_entity = entities[0] if entities else {}
+            if not matched:
+                matched = entities[0] if entities else {}
 
-            entity_name = matched_entity.get("name") or matched_entity.get("text") or trigger_value
-            entity_type_raw = matched_entity.get("type") or matched_entity.get("entity_type") or "ORG"
+            entity_name = matched.get("name") or matched.get("text") or trigger.trigger_value
+            entity_type_raw = matched.get("type") or matched.get("entity_type") or "ORG"
             entity_type = "organization" if entity_type_raw in ("ORG", "organization") else "person"
 
             subject = f"🔔 Упоминание: {entity_name}"
             if len(triggers) > 1:
                 subject += f" (+{len(triggers)-1} ещё)"
 
-            # Синхронная отправка
-            import smtplib
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-
             html = self.email_service._build_html(
-                article_title=article_title,
-                article_summary=article_summary,
-                article_link=article_link,
+                article_title=title,
+                article_summary=summary,
+                article_link=link,
                 entity_name=entity_name,
                 entity_type=entity_type,
                 risk_level=risk_level,
@@ -248,10 +222,7 @@ class NotificationConsumer:
             with smtplib.SMTP(self.email_service.smtp_host, self.email_service.smtp_port, timeout=30) as srv:
                 srv.send_message(msg)
 
-            logger.info(
-                "✅ Email → %s (user=%s, сущность=%s)",
-                channel.channel_address, user_id, entity_name,
-            )
+            logger.info("✅ Email → %s (user=%s, %s)", channel.channel_address, user_id, entity_name)
         except Exception as e:
             logger.error("❌ Ошибка отправки user %s: %s", user_id, e)
 
@@ -272,3 +243,31 @@ async def run_notification_consumer(
         await consumer.run()
     except KeyboardInterrupt:
         await consumer.shutdown()
+PYEOF
+
+echo "=== Копируем файл прямо в контейнер ==="
+docker cp /tmp/notification_consumer_fixed.py \
+    notification-consumer:/app/src/services/notification_consumer.py
+
+echo "✅ Файл скопирован в контейнер"
+
+echo ""
+echo "=== Перезапускаем процесс внутри контейнера ==="
+docker restart notification-consumer
+sleep 6
+
+echo ""
+echo "=== Логи ==="
+docker logs notification-consumer --tail=25
+
+echo ""
+echo "=== Проверяем relay ==="
+docker exec notification-consumer python3 -c "
+import smtplib
+try:
+    s = smtplib.SMTP('mailrelay', 25, timeout=10)
+    print('✅ Postfix relay доступен!')
+    s.quit()
+except Exception as e:
+    print(f'❌ {e}')
+"

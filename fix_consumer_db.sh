@@ -1,3 +1,6 @@
+#!/bin/bash
+# fix_consumer_db.sh - запускать из ~/news_analyzer
+cat > services/output_module/src/services/notification_consumer.py << 'PYEOF'
 """
 Notification Consumer — использует синхронный psycopg2 (async engine не нужен,
 consumer и так работает в asyncio через run_in_executor для блокирующих операций).
@@ -272,3 +275,27 @@ async def run_notification_consumer(
         await consumer.run()
     except KeyboardInterrupt:
         await consumer.shutdown()
+PYEOF
+
+echo "✅ notification_consumer.py обновлён"
+
+echo ""
+echo "=== Перезапускаем notification-consumer ==="
+docker compose up -d --no-deps --force-recreate notification-consumer
+sleep 6
+
+echo ""
+echo "=== Логи (последние 20 строк) ==="
+docker compose logs notification-consumer --tail=20
+
+echo ""
+echo "=== Проверяем relay ==="
+docker exec notification-consumer python3 -c "
+import smtplib
+try:
+    s = smtplib.SMTP('mailrelay', 25, timeout=10)
+    print('✅ Postfix relay доступен!')
+    s.quit()
+except Exception as e:
+    print(f'❌ {e}')
+"

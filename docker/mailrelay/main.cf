@@ -1,0 +1,25 @@
+myhostname = mailrelay
+mydomain = localdomain
+myorigin = $myhostname
+
+inet_interfaces = all
+inet_protocols = ipv4
+
+mynetworks = 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+
+mydestination =
+
+maximal_queue_lifetime = 1h
+bounce_queue_lifetime = 1h
+maximal_backoff_time = 15m
+minimal_backoff_time = 5m
+queue_run_delay = 5m
+
+message_size_limit = 26214400
+
+maillog_file = /dev/stdout
+
+smtp_address_preference = ipv4
+
+smtp_tls_security_level = may
+smtp_tls_loglevel = 1

@@ -53,10 +53,22 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 15s
+      timeout: 15s
+      retries: 30
+      start_period: 90s
     restart: always
+    networks:
+      - news_network
+
+
+  mailrelay:
+    build: ./docker/mailrelay
+    container_name: mailrelay
+    restart: always
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     networks:
       - news_network
 
@@ -68,9 +80,6 @@ services:
        - .env
     depends_on:
        - elasticsearch
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     healthcheck:
        test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
        interval: 10s
@@ -87,25 +96,20 @@ services:
     container_name: notification-consumer
     env_file:
       - .env
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     environment:
       DATABASE_URL: ${DATABASE_URL}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_INPUT_TOPIC: articles_analyzed
       KAFKA_NOTIFICATION_GROUP_ID: notifications-sender-group
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_HOST: mailrelay
+      SMTP_PORT: "25"
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       SMTP_ENABLED: "true"
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       db:
         condition: service_started
     restart: always
@@ -125,7 +129,7 @@ services:
         DATABASE_URL: ${DATABASE_URL}
       depends_on:
         kafka:
-          condition: service_healthy
+          condition: service_started
       networks:
         - news_network
 
@@ -155,7 +159,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       # output_module:
       #   condition: service_healthy
     restart: always
@@ -173,7 +177,7 @@ services:
       KAFKA_TOPIC: raw_articles
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       # output_module:
       #   condition: service_healthy
     restart: always
@@ -210,7 +214,7 @@ services:
       OUTPUT_TOPIC: entities_extracted
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
     restart: always
     networks:
       - news_network
@@ -233,7 +237,7 @@ services:
 
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
     networks:
@@ -268,7 +272,7 @@ services:
       OUTPUT_TOPIC_SYNC: text_for_kg_sync
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       # output_module:
       #   condition: service_healthy
     restart: always
