@@ -91,32 +91,6 @@ def save_risk_result(article_id: int, risk_level: str, confidence: float):
     finally:
         db.close()
 
-
-def save_risk_result(article_id: int, risk_level: str, confidence: float):
-    db = SessionLocal()
-    try:
-        stmt = insert(Risk).values(
-            article_id=article_id,
-            risk_level=risk_level,           # ✅
-            risk_confidence=confidence       # ✅
-        ).on_conflict_do_update(
-            index_elements=['article_id'],
-            set_={
-                "risk_level": risk_level,        # ✅
-                "risk_confidence": confidence    # ✅
-            }
-        )
-        db.execute(stmt)
-        db.commit()
-        logger.debug(f"✅ Article {article_id}: {risk_level} ({confidence:.2f})")
-    except Exception as e:
-        db.rollback()
-        logger.error(f"❌ Ошибка: {e}")
-        raise
-    finally:
-        db.close()
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     init_db()
