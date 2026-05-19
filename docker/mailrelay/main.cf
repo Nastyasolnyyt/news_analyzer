@@ -31,3 +31,7 @@ smtp_address_preference = ipv4
 
 smtp_tls_security_level = may
 smtp_tls_loglevel = 1
+# Принудительно отключаем использование chroot для сетевых служб
+disable_dns_lookups = no
+lmtp_host_lookup = dns
+smtp_host_lookup = dns
