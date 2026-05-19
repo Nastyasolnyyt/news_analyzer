@@ -69,6 +69,7 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    dns_search: []
     networks:
       - news_network
 
