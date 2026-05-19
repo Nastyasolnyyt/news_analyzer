@@ -17,12 +17,13 @@ class Risk(Base):
     __tablename__ = "risks"
     id = Column(Integer, primary_key=True, index=True)
     article_id = Column(Integer, unique=True, index=True)
-    risk_type = Column(String)          # политический / экономический / социальный
+    risk_type = Column(String(32))          # политический / экономический / социальный
     confidence = Column(Float)          # уверенность типа риска
 
 engine = create_engine(
     settings.database_url,
-    pool_pre_ping=True
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -43,7 +44,7 @@ def save_risk_result(article_id: int, result):
             risk_type=result.risk_type,
             confidence=result.confidence
         ).on_conflict_do_update(
-            constraint='uq_risks_article_id',
+            index_elements=['article_id'],
             set_={
                 "risk_type": result.risk_type,
                 "confidence": result.confidence
@@ -88,7 +89,7 @@ def save_risk_type(article_id: int, risk_type: str, confidence: float):
             risk_type=risk_type,
             confidence=confidence
         ).on_conflict_do_update(
-            constraint='uq_risks_article_id',  # Use the explicit constraint name from migration
+            index_elements=['article_id'],  # Use the explicit constraint name from migration
             set_={
                 "risk_type": risk_type,
                 "confidence": confidence

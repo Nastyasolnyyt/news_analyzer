@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 # Импортируем worker
 from app.kafka_worker import main as run_consumer
-
+from app.storage import init_db
 
 async def main():
     """Основная точка входа"""
     logger.info("Запуск risk-classifier (Hugging Face модель)...")
+    init_db()
     try:
         await run_consumer()
     except Exception as e:

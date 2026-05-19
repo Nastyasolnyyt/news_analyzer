@@ -10,8 +10,8 @@ import json
 import logging
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from .config import settings
-from .classifier import RiskTypeClassifier
-from .storage import save_risk_type
+from .classifier import HFRiskClassifier
+from .storage import save_risk_level
 from sqlalchemy import create_engine, text as sql_text
 from sqlalchemy.orm import sessionmaker
 
@@ -26,7 +26,7 @@ async def consume_from_kafka():
     """Main Kafka consumer для анализа типов риска"""
 
     logger.info("Инициализирую классификатор типов риска...")
-    classifier = RiskTypeClassifier()
+    classifier = HFRiskClassifier()
     logger.info("Классификатор готов")
 
     # Проверяем подключение к БД при старте
@@ -88,20 +88,20 @@ async def consume_from_kafka():
 
                 logger.info(
                     f"Статья {article_id}: "
-                    f"risk_type={result['risk_type']}, "
+                    f"risk_level={result['risk_level']}, "
                     f"confidence={result['confidence']:.2f}"
                 )
 
                 # Сохраняем в БД
-                save_risk_type(article_id, result["risk_type"], result["confidence"])
+                save_risk_level(article_id, result["risk_level"], result["confidence"])
 
                 # ИСПРАВЛЕНО: явно указываем article_id в сообщении
                 # (некоторые сообщения могут иметь только 'id', а не 'article_id')
                 output_message = {
                     **article_data,
                     'article_id': article_id,  # гарантируем наличие article_id
-                    'risk_type': result['risk_type'],
-                    'risk_type_confidence': result['confidence']
+                    'risk_level': result['risk_level'],
+                    'risk_confidence': result['confidence']
                 }
 
                 await producer.send_and_wait(settings.output_topic, output_message)
