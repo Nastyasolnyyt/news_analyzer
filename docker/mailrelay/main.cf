@@ -12,6 +12,11 @@ mydestination =
 smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination
 smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
 
+# Локальные домены для тестирования
+virtual_mailbox_domains = news-analyzer.local, localhost
+virtual_mailbox_maps = static:yes
+virtual_alias_maps = static:yes
+
 maximal_queue_lifetime = 1h
 bounce_queue_lifetime = 1h
 maximal_backoff_time = 15m

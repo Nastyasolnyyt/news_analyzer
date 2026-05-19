@@ -13,13 +13,36 @@ const filteredEntities = ref<Entity[]>([]);
 onMounted(async () => {
   try {
     loading.value = true;
-    console.log('Loading all entities...');
+    console.log('🚀 Loading all entities directly...');
     
-    const allEntities = await api.getEntities({ limit: 100 });
-    entities.value = allEntities;
-    filteredEntities.value = allEntities;
+    // Загружаем организации и персоны параллельно
+    const [orgs, persons] = await Promise.all([
+      api.getOrganizations(10000).catch(e => {
+        console.error('❌ Error loading organizations:', e);
+        return [];
+      }),
+      api.getPersons(10000).catch(e => {
+        console.error('❌ Error loading persons:', e);
+        return [];
+      }),
+    ]);
     
-    console.log('Loaded entities:', allEntities.length);
+    console.log(`✅ Loaded ${orgs.length} organizations and ${persons.length} persons`);
+    
+    // Объединяем и дедублицируем по ID
+    const allEntities = new Map<number, Entity>();
+    
+    [...orgs, ...persons].forEach(entity => {
+      if (entity && entity.id && !allEntities.has(entity.id)) {
+        allEntities.set(entity.id, entity);
+      }
+    });
+    
+    const entitiesArray = Array.from(allEntities.values());
+    entities.value = entitiesArray;
+    filteredEntities.value = entitiesArray;
+    
+    console.log(`✅ Total unique entities loaded: ${entitiesArray.length}`);
   } catch (e: any) {
     if (e.response?.data?.detail) {
       error.value = typeof e.response.data.detail === 'string'
@@ -61,9 +84,74 @@ const reloadPage = async () => {
   loading.value = true;
   error.value = null;
   try {
-    const allEntities = await api.getEntities({ limit: 100 });
-    entities.value = allEntities;
-    filteredEntities.value = allEntities;
+    // Собираем ВСЕ сущности из всех постов с пейджинацией
+    const allEntities = new Map<number, any>();
+    let page = 1;
+    let pageSize = 100;
+    let hasMore = true;
+    let total = 0;
+    
+    while (hasMore) {
+      try {
+        const data = await api.getNews({
+          page: page,
+          page_size: pageSize,
+        });
+        
+        if (data.items.length === 0) {
+          hasMore = false;
+        } else {
+          // Собираем все уникальные сущности из этой страницы
+          for (const item of data.items) {
+            // item может быть News или NewsResponse
+            let itemEntities: any[] = [];
+            
+            if ((item as any).entities) {
+              // Это NewsResponse с массивом entities
+              itemEntities = (item as any).entities;
+            } else if ((item as any).post?.entities) {
+              // Вложенная структура post.entities
+              itemEntities = (item as any).post.entities;
+            }
+            
+            // Если entities не массив но объект - оборачиваем
+            if (!Array.isArray(itemEntities)) {
+              itemEntities = [];
+            }
+            
+            for (const entity of itemEntities) {
+              if (entity && entity.id) {
+                if (!allEntities.has(entity.id)) {
+                  allEntities.set(entity.id, {
+                    id: entity.id,
+                    name: entity.name || 'Unknown',
+                    type: entity.entity_type === 'PER' ? 'Person' : entity.entity_type === 'LOC' ? 'Location' : entity.entity_type === 'ORG' ? 'Organization' : 'Company',
+                    entity_type: entity.entity_type,
+                    description: `${entity.name} — ${entity.entity_type === 'PER' ? 'Персона' : entity.entity_type === 'LOC' ? 'Локация' : entity.entity_type === 'ORG' ? 'Организация' : 'Сущность'}`,
+                    recentMentions: 0,
+                    previousMentions: 0,
+                    topicCount: 0,
+                  });
+                }
+              }
+            }
+          }
+          
+          total = data.total || 0;
+          if (page * pageSize >= total && total > 0) {
+            hasMore = false;
+          }
+          page++;
+        }
+      } catch (e) {
+        console.error('Error loading page:', page, e);
+        hasMore = false;
+      }
+    }
+    
+    const entitiesArray = Array.from(allEntities.values());
+    entities.value = entitiesArray;
+    filteredEntities.value = entitiesArray;
   } catch (e: any) {
     error.value = e.message || 'Ошибка загрузки сущностей';
   } finally {
