@@ -53,10 +53,17 @@ async def get_all_entities(
     entity_service: FromDishka[EntityService],
     limit: int = 100,
     entity_type: Optional[str] = None,
+    search: Optional[str] = None,
 ) -> List[Any]:
-    """Получение списка всех сущностей с их статистикой упоминаний."""
+    """Получение списка всех сущностей с их статистикой упоминаний.
+    
+    Query Parameters:
+    - limit: максимальное количество сущностей (по умолчанию 100)
+    - entity_type: фильтр по типу (ORG, PER, LOC и т.д.)
+    - search: поиск по названию (case-insensitive)
+    """
     try:
-        return await entity_service.get_all_entities(limit=limit, entity_type=entity_type)
+        return await entity_service.get_all_entities(limit=limit, entity_type=entity_type, search=search)
     except Exception as e:
         logger.error(f"Error in get_all_entities: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

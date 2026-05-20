@@ -27,19 +27,22 @@ class EntityService:
         self.post_entity_gateway = post_entity_gateway
         self.post_gateway = post_gateway
 
-    async def get_all_entities(self, limit: int = 100, entity_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_all_entities(self, limit: int = 100, entity_type: Optional[str] = None, search: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Получить список всех сущностей с их статистикой упоминаний.
         Возвращает сущности с полями recentMentions, previousMentions, topicCount.
         Если указан entity_type, фильтрует по типу сущности.
+        Если указан search, фильтрует по названию (case-insensitive).
         """
-        from sqlalchemy import select
+        from sqlalchemy import select, ilike
         from src.infrastructure.postgres.models.named_entity import NamedEntity
         
-        # Получаем все сущности из БД (с опциональной фильтрацией по типу)
+        # Получаем все сущности из БД (с опциональной фильтрацией по типу и названию)
         query = select(NamedEntity)
         if entity_type:
             query = query.where(NamedEntity.entity_type == entity_type)
+        if search:
+            query = query.where(ilike(NamedEntity.name, f"%{search}%"))
         query = query.order_by(NamedEntity.created_at.desc()).limit(limit)
         result = await self.ner_gateway.session.execute(query)
         entities = result.scalars().all()

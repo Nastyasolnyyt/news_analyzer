@@ -983,6 +983,38 @@ export const api = {
     }
   },
 
+  // Быстрый поиск сущности по имени и типу (для проверки дублирования)
+  async searchEntity(name: string, entity_type: string): Promise<Entity[]> {
+    try {
+      if (!name.trim()) return [];
+      
+      // Используем новый параметр search и limit=100 для лучшего результата
+      const url = `${API_BASE}/entities?entity_type=${entity_type}&limit=100&search=${encodeURIComponent(name.trim())}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn('⚠️ Search failed with status:', res.status);
+        return [];
+      }
+      const data = await res.json();
+      
+      // Фильтруем результаты по exact match (case-insensitive)
+      const results = Array.isArray(data) ? data : [];
+      const exactMatches = results.filter(e => 
+        e.name.toLowerCase() === name.trim().toLowerCase() &&
+        e.entity_type === entity_type
+      );
+      
+      if (exactMatches.length > 0) {
+        console.log(`✅ Found ${exactMatches.length} exact match(es) for "${name}":`, exactMatches);
+      }
+      
+      return exactMatches;
+    } catch (error) {
+      console.error('⚠️ Error searching entity:', error);
+      return [];
+    }
+  },
+
   // ===== USER REPORTS =====
 
   // Получить отчеты пользователя

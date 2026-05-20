@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, type Entity } from '../api/client';
 
@@ -8,26 +8,45 @@ const entities = ref<Entity[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
-const filteredEntities = ref<Entity[]>([]);
+
+// Пагинация
+const currentPage = ref(1);
+const pageSize = 50; // Загружаем по 50 вместо 10000
+const totalEntities = ref(0);
+
+// Фильтрованные сущности для текущей страницы
+const filteredEntities = computed(() => {
+  const query = searchQuery.value.toLowerCase();
+  const filtered = query
+    ? entities.value.filter(entity => entity.name.toLowerCase().includes(query))
+    : entities.value;
+  return filtered.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize);
+});
+
+const totalPages = computed(() => Math.ceil(totalEntities.value / pageSize));
 
 onMounted(async () => {
+  await loadEntities();
+});
+
+const loadEntities = async () => {
   try {
     loading.value = true;
-    console.log('🚀 Loading all entities directly...');
+    console.log('🚀 Loading entities with pagination...');
     
-    // Загружаем организации и персоны параллельно
+    // Загружаем только первую страницу (50 сущностей) вместо 10000
     const [orgs, persons] = await Promise.all([
-      api.getOrganizations(10000).catch(e => {
+      api.getOrganizations(pageSize).catch(e => {
         console.error('❌ Error loading organizations:', e);
         return [];
       }),
-      api.getPersons(10000).catch(e => {
+      api.getPersons(pageSize).catch(e => {
         console.error('❌ Error loading persons:', e);
         return [];
       }),
     ]);
     
-    console.log(`✅ Loaded ${orgs.length} organizations and ${persons.length} persons`);
+    console.log(`✅ Loaded ${orgs.length} organizations and ${persons.length} persons (first page)`);
     
     // Объединяем и дедублицируем по ID
     const allEntities = new Map<number, Entity>();
@@ -40,122 +59,40 @@ onMounted(async () => {
     
     const entitiesArray = Array.from(allEntities.values());
     entities.value = entitiesArray;
-    filteredEntities.value = entitiesArray;
+    totalEntities.value = entitiesArray.length;
     
-    console.log(`✅ Total unique entities loaded: ${entitiesArray.length}`);
+    console.log(`✅ Total entities loaded: ${entitiesArray.length}`);
   } catch (e: any) {
-    if (e.response?.data?.detail) {
-      error.value = typeof e.response.data.detail === 'string'
-        ? e.response.data.detail
-        : JSON.stringify(e.response.data.detail);
-    } else if (e.response?.data?.message) {
-      error.value = typeof e.response.data.message === 'string'
-        ? e.response.data.message
-        : JSON.stringify(e.response.data.message);
-    } else if (e.message) {
-      error.value = e.message;
-    } else if (typeof e === 'string') {
-      error.value = e;
-    } else {
-      error.value = 'Ошибка загрузки сущностей';
-    }
+    error.value = e.message || 'Ошибка загрузки сущностей';
     console.error('❌ Error:', e);
   } finally {
     loading.value = false;
   }
-});
+};
 
 const handleSearch = () => {
-  const query = searchQuery.value.toLowerCase();
-  if (!query) {
-    filteredEntities.value = entities.value;
-  } else {
-    filteredEntities.value = entities.value.filter(entity =>
-      entity.name.toLowerCase().includes(query)
-    );
-  }
+  currentPage.value = 1; // Сбрасываем на первую страницу при поиске
 };
 
 const handleEntityClick = (entityId: number) => {
   router.push(`/entity/${entityId}`);
 };
 
-const reloadPage = async () => {
-  loading.value = true;
-  error.value = null;
-  try {
-    // Собираем ВСЕ сущности из всех постов с пейджинацией
-    const allEntities = new Map<number, any>();
-    let page = 1;
-    let pageSize = 100;
-    let hasMore = true;
-    let total = 0;
-    
-    while (hasMore) {
-      try {
-        const data = await api.getNews({
-          page: page,
-          page_size: pageSize,
-        });
-        
-        if (data.items.length === 0) {
-          hasMore = false;
-        } else {
-          // Собираем все уникальные сущности из этой страницы
-          for (const item of data.items) {
-            // item может быть News или NewsResponse
-            let itemEntities: any[] = [];
-            
-            if ((item as any).entities) {
-              // Это NewsResponse с массивом entities
-              itemEntities = (item as any).entities;
-            } else if ((item as any).post?.entities) {
-              // Вложенная структура post.entities
-              itemEntities = (item as any).post.entities;
-            }
-            
-            // Если entities не массив но объект - оборачиваем
-            if (!Array.isArray(itemEntities)) {
-              itemEntities = [];
-            }
-            
-            for (const entity of itemEntities) {
-              if (entity && entity.id) {
-                if (!allEntities.has(entity.id)) {
-                  allEntities.set(entity.id, {
-                    id: entity.id,
-                    name: entity.name || 'Unknown',
-                    type: entity.entity_type === 'PER' ? 'Person' : entity.entity_type === 'LOC' ? 'Location' : entity.entity_type === 'ORG' ? 'Organization' : 'Company',
-                    entity_type: entity.entity_type,
-                    description: `${entity.name} — ${entity.entity_type === 'PER' ? 'Персона' : entity.entity_type === 'LOC' ? 'Локация' : entity.entity_type === 'ORG' ? 'Организация' : 'Сущность'}`,
-                    recentMentions: 0,
-                    previousMentions: 0,
-                    topicCount: 0,
-                  });
-                }
-              }
-            }
-          }
-          
-          total = data.total || 0;
-          if (page * pageSize >= total && total > 0) {
-            hasMore = false;
-          }
-          page++;
-        }
-      } catch (e) {
-        console.error('Error loading page:', page, e);
-        hasMore = false;
-      }
-    }
-    
-    const entitiesArray = Array.from(allEntities.values());
-    entities.value = entitiesArray;
-    filteredEntities.value = entitiesArray;
-  } catch (e: any) {
-    error.value = e.message || 'Ошибка загрузки сущностей';
-  } finally {
-    loading.value = false;
+const goToPage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
+};
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+  }
+};
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--;
   }
 };
 </script>
@@ -183,7 +120,7 @@ const reloadPage = async () => {
     <div v-else-if="error" class="error-state">
       <p class="error-title">Ошибка загрузки</p>
       <p class="error-message">{{ error }}</p>
-      <button class="btn-secondary" @click="reloadPage()">Попробовать снова</button>
+      <button class="btn-secondary" @click="loadEntities()">Попробовать снова</button>
     </div>
 
     <!-- LOADED STATE -->
@@ -242,6 +179,29 @@ const reloadPage = async () => {
           </article>
         </div>
       </section>
+
+      <!-- Pagination -->
+      <div v-if="filteredEntities.length > 0" class="pagination">
+        <button 
+          class="pagination-btn"
+          @click="prevPage"
+          :disabled="currentPage === 1"
+        >
+          ← Предыдущая
+        </button>
+        
+        <div class="pagination-info">
+          Страница {{ currentPage }} из {{ totalPages }}
+        </div>
+        
+        <button 
+          class="pagination-btn"
+          @click="nextPage"
+          :disabled="currentPage === totalPages"
+        >
+          Следующая →
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -555,6 +515,48 @@ const reloadPage = async () => {
   transform: translateX(2px);
 }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  margin-top: 24px;
+}
+
+.pagination-btn {
+  padding: 10px 16px;
+  background: rgba(79, 138, 255, 0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: rgba(79, 138, 255, 0.2);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 150px;
+  text-align: center;
+}
+
 @media (max-width: 768px) {
   .entities-grid {
     grid-template-columns: 1fr;
@@ -566,6 +568,15 @@ const reloadPage = async () => {
 
   .entity-card {
     padding: 16px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pagination-btn {
+    width: 100%;
   }
 }
 </style>

@@ -18,7 +18,42 @@ const emit = defineEmits<{
 const entityName = ref('');
 const entityType = ref<'ORG' | 'PER'>('ORG');
 const loading = ref(false);
+const checking = ref(false);
 const error = ref<string | null>(null);
+const isDuplicate = ref(false);
+
+// Проверяем существование сущности через backend вместо загрузки всех
+const checkDuplicate = async (name: string, type: string) => {
+  if (!name.trim()) {
+    isDuplicate.value = false;
+    return;
+  }
+
+  try {
+    checking.value = true;
+    // Используем поиск через limit=1 и search-подобный параметр
+    const results = await api.searchEntity(name.trim(), type);
+    isDuplicate.value = results.length > 0;
+    if (isDuplicate.value) {
+      console.log('⚠️ Entity found:', results[0]);
+    }
+  } catch (e) {
+    console.error('Error checking duplicate:', e);
+    isDuplicate.value = false;
+  } finally {
+    checking.value = false;
+  }
+};
+
+const handleNameInput = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  // Дебаунс: проверяем после набора текста
+  await checkDuplicate(target.value, entityType.value);
+};
+
+const handleTypeChange = async () => {
+  await checkDuplicate(entityName.value, entityType.value);
+};
 
 const handleAddEntity = async () => {
   if (!entityName.value.trim()) {
@@ -26,28 +61,45 @@ const handleAddEntity = async () => {
     return;
   }
 
+  if (isDuplicate.value) {
+    error.value = `❌ Сущность '${entityName.value}' типа '${entityType.value === 'ORG' ? 'Организация' : 'Персона'}' уже существует в системе`;
+    return;
+  }
+
+  // ДВОЙНАЯ ПРОВЕРКА: перед отправкой проверяем еще раз
   try {
     loading.value = true;
     error.value = null;
+    
+    console.log(`🔍 Double-checking for duplicates before submit...`);
+    const finalCheck = await api.searchEntity(entityName.value.trim(), entityType.value);
+    
+    if (finalCheck.length > 0) {
+      error.value = `❌ Сущность '${entityName.value}' типа '${entityType.value === 'ORG' ? 'Организация' : 'Персона'}' уже существует в системе`;
+      console.warn('⚠️ Duplicate detected on final check:', finalCheck);
+      return;
+    }
 
     const newEntity = await api.createEntity({
       name: entityName.value.trim(),
       entity_type: entityType.value,
     });
 
-    console.log('✅ Entity created:', newEntity);
-
-    // Эмитим событие с новой сущностью
+    console.log('✅ Entity created successfully:', newEntity);
     emit('entityAdded', newEntity);
 
     // Очищаем форму
     entityName.value = '';
     entityType.value = 'ORG';
+    isDuplicate.value = false;
 
-    // Закрываем модальное окно
     emit('close');
   } catch (e: any) {
-    error.value = e.message || 'Ошибка при добавлении сущности';
+    if (e.message && e.message.includes('Сущность')) {
+      error.value = e.message.replace(/^❌\s*/, '');
+    } else {
+      error.value = e.message || 'Ошибка при добавлении сущности';
+    }
     console.error('❌ Error:', e);
   } finally {
     loading.value = false;
@@ -57,6 +109,7 @@ const handleAddEntity = async () => {
 const handleClose = () => {
   entityName.value = '';
   error.value = null;
+  isDuplicate.value = false;
   emit('close');
 };
 </script>
@@ -74,8 +127,16 @@ const handleClose = () => {
           {{ error }}
         </div>
 
+        <div v-if="isDuplicate" class="warning-message">
+          ⚠️ Такая сущность уже существует в системе!
+        </div>
+
         <div class="form-group">
-          <label for="entity-name">Название сущности *</label>
+          <label for="entity-name">
+            Название сущности *
+            <span v-if="isDuplicate" class="duplicate-badge">уже существует</span>
+            <span v-if="checking" class="checking-badge">⏳ проверка...</span>
+          </label>
           <input
             id="entity-name"
             v-model="entityName"
@@ -83,6 +144,8 @@ const handleClose = () => {
             placeholder="Например: ООО Компания или Иван Петров"
             class="input-field"
             :disabled="loading"
+            :class="{ 'input-error': isDuplicate }"
+            @input="handleNameInput"
           />
         </div>
 
@@ -93,6 +156,7 @@ const handleClose = () => {
             v-model="entityType"
             class="input-field"
             :disabled="loading"
+            @change="handleTypeChange"
           >
             <option value="ORG">Организация</option>
             <option value="PER">Персона</option>
@@ -115,9 +179,9 @@ const handleClose = () => {
         <button
           class="btn-primary"
           @click="handleAddEntity"
-          :disabled="loading || !entityName.trim()"
+          :disabled="loading || !entityName.trim() || isDuplicate || checking"
         >
-          {{ loading ? 'Добавляем...' : 'Добавить' }}
+          {{ isDuplicate ? '❌ Уже существует' : loading ? 'Добавляем...' : 'Добавить' }}
         </button>
       </footer>
     </div>
@@ -147,6 +211,316 @@ const handleClose = () => {
     opacity: 1;
   }
 }
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+}
+
+.modal-body {
+  padding: 20px;
+  flex: 1;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.duplicate-badge,
+.checking-badge {
+  display: inline-block;
+  background: #fee;
+  color: #c33;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.checking-badge {
+  background: #ffeaa7;
+  color: #d63031;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.input-error {
+  border-color: #cc3333;
+  background-color: #fff5f5;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border-left: 4px solid #c33;
+}
+
+.warning-message {
+  background-color: #ffeaa7;
+  color: #d63031;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border-left: 4px solid #fdcb6e;
+}
+
+.info-text {
+  color: #666;
+  font-size: 13px;
+  margin: 12px 0 0 0;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+  justify-content: flex-end;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #0066cc;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0052a3;
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+}
+
+.modal-body {
+  padding: 20px;
+  flex: 1;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.duplicate-badge {
+  display: inline-block;
+  background: #fee;
+  color: #c33;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.input-error {
+  border-color: #cc3333;
+  background-color: #fff5f5;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border-left: 4px solid #c33;
+}
+
+.warning-message {
+  background-color: #ffeaa7;
+  color: #d63031;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border-left: 4px solid #fdcb6e;
+}
+
+.info-text {
+  color: #666;
+  font-size: 13px;
+  margin: 12px 0 0 0;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+  justify-content: flex-end;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #0066cc;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0052a3;
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e0e0e0;
+}
+
 
 .modal-content {
   background: white;

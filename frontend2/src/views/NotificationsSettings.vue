@@ -68,11 +68,11 @@ onMounted(async () => {
     loading.value = true;
     error.value = null;
 
-    // Загружаем конфиг, организации и персон параллельно
+    // Загружаем конфиг, организации и персон параллельно (только первые 30 для быстрой загрузки)
     let [config, orgs, persons_list] = await Promise.all([
       apiClient.getNotificationConfig(),
-      apiClient.getOrganizations(100),
-      apiClient.getPersons(100),
+      apiClient.getOrganizations(30),  // Уменьили с 100 на 30
+      apiClient.getPersons(30),        // Уменьили с 100 на 30
     ]);
 
     // Сохраняем организации и персон
