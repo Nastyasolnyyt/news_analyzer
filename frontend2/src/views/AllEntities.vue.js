@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../api/client';
 const router = useRouter();
@@ -6,50 +6,111 @@ const entities = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const searchQuery = ref('');
-const filteredEntities = ref([]);
+// Пагинация
+const currentPage = ref(1);
+const pageSize = 50;
+const totalEntities = ref(0);
+const isLoadingMore = ref(false);
+// Кэш для всех загруженных сущностей
+const allLoadedEntities = ref(new Map());
+// Фильтрованные сущности для текущей страницы
+const filteredEntities = computed(() => {
+    const query = searchQuery.value.toLowerCase();
+    const allEntities = Array.from(allLoadedEntities.value.values());
+    const filtered = query
+        ? allEntities.filter(entity => entity.name.toLowerCase().includes(query))
+        : allEntities;
+    return filtered.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize);
+});
+const totalPages = computed(() => {
+    const allEntities = Array.from(allLoadedEntities.value.values());
+    const query = searchQuery.value.toLowerCase();
+    const filtered = query
+        ? allEntities.filter(entity => entity.name.toLowerCase().includes(query))
+        : allEntities;
+    return Math.ceil(filtered.length / pageSize);
+});
 onMounted(async () => {
+    await loadEntities();
+});
+const loadEntities = async () => {
     try {
         loading.value = true;
-        console.log('Loading all entities...');
-        const allEntities = await api.getEntities({ limit: 100 });
-        entities.value = allEntities;
-        filteredEntities.value = allEntities;
-        console.log('Loaded entities:', allEntities.length);
+        error.value = null;
+        console.log('🚀 Loading all entities with pagination...');
+        // Загружаем все сущности страница за страницей
+        let page = 1;
+        let hasMore = true;
+        while (hasMore) {
+            try {
+                const result = await api.getEntities({
+                    limit: pageSize,
+                    page: page,
+                });
+                console.log(`📄 Loaded page ${page}: ${result.items.length} entities (total: ${result.total})`);
+                // Добавляем в кэш (дедублицируем по ID)
+                result.items.forEach(entity => {
+                    if (entity && entity.id) {
+                        allLoadedEntities.value.set(entity.id, entity);
+                    }
+                });
+                totalEntities.value = result.total;
+                // Проверяем, есть ли еще сущности для загрузки
+                if (result.items.length < pageSize || allLoadedEntities.value.size >= result.total) {
+                    hasMore = false;
+                }
+                else {
+                    page++;
+                }
+            }
+            catch (pageError) {
+                console.error(`❌ Error loading page ${page}:`, pageError);
+                // Продолжаем со следующей страницы или завершаем
+                if (page === 1) {
+                    throw pageError;
+                }
+                hasMore = false;
+            }
+        }
+        entities.value = Array.from(allLoadedEntities.value.values());
+        console.log(`✅ Total entities loaded: ${entities.value.length} of ${totalEntities.value}`);
     }
     catch (e) {
         error.value = e.message || 'Ошибка загрузки сущностей';
-        console.error('Error:', error.value);
+        console.error('❌ Error:', e);
     }
     finally {
         loading.value = false;
     }
-});
+};
 const handleSearch = () => {
-    const query = searchQuery.value.toLowerCase();
-    if (!query) {
-        filteredEntities.value = entities.value;
-    }
-    else {
-        filteredEntities.value = entities.value.filter(entity => entity.name.toLowerCase().includes(query));
-    }
+    currentPage.value = 1; // Сбрасываем на первую страницу при поиске
 };
 const handleEntityClick = (entityId) => {
     router.push(`/entity/${entityId}`);
 };
+const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+const nextPage = () => {
+    if (currentPage.value < totalPages.value) {
+        currentPage.value++;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+const prevPage = () => {
+    if (currentPage.value > 1) {
+        currentPage.value--;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
 const reloadPage = async () => {
-    loading.value = true;
-    error.value = null;
-    try {
-        const allEntities = await api.getEntities({ limit: 100 });
-        entities.value = allEntities;
-        filteredEntities.value = allEntities;
-    }
-    catch (e) {
-        error.value = e.message || 'Ошибка загрузки сущностей';
-    }
-    finally {
-        loading.value = false;
-    }
+    allLoadedEntities.value.clear();
+    currentPage.value = 1;
+    await loadEntities();
 };
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -66,9 +127,13 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['entity-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['entity-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn-view']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['entities-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['entity-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-btn']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -120,7 +185,7 @@ else if (__VLS_ctx.error) {
                     return;
                 if (!(__VLS_ctx.error))
                     return;
-                __VLS_ctx.reloadPage();
+                __VLS_ctx.loadEntities();
             } },
         ...{ class: "btn-secondary" },
     });
@@ -233,6 +298,26 @@ else {
             });
         }
     }
+    if (__VLS_ctx.filteredEntities.length > 0) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "pagination" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.prevPage) },
+            ...{ class: "pagination-btn" },
+            disabled: (__VLS_ctx.currentPage === 1),
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "pagination-info" },
+        });
+        (__VLS_ctx.currentPage);
+        (__VLS_ctx.totalPages);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.nextPage) },
+            ...{ class: "pagination-btn" },
+            disabled: (__VLS_ctx.currentPage === __VLS_ctx.totalPages),
+        });
+    }
 }
 /** @type {__VLS_StyleScopedClasses['all-entities-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-header']} */ ;
@@ -265,6 +350,10 @@ else {
 /** @type {__VLS_StyleScopedClasses['stat-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['stat-value']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn-view']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-info']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-btn']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -274,10 +363,14 @@ const __VLS_self = (await import('vue')).defineComponent({
             loading: loading,
             error: error,
             searchQuery: searchQuery,
+            currentPage: currentPage,
             filteredEntities: filteredEntities,
+            totalPages: totalPages,
+            loadEntities: loadEntities,
             handleSearch: handleSearch,
             handleEntityClick: handleEntityClick,
-            reloadPage: reloadPage,
+            nextPage: nextPage,
+            prevPage: prevPage,
         };
     },
 });

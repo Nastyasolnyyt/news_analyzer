@@ -90,7 +90,7 @@ export interface CreateEntityDTO {
 export interface Entity {
     id: number;
     name: string;
-    type: 'Company' | 'Person' | 'Event';
+    type: 'Company' | 'Person' | 'Event' | 'Location' | 'Organization';
     entity_type?: string;
     description?: string;
     jurisdiction?: string;
@@ -210,11 +210,16 @@ export declare const api: {
     }>>;
     getEntities(params?: {
         limit?: number;
-    }): Promise<Array<Entity & {
-        recentMentions: number;
-        previousMentions: number;
-        topicCount: number;
-    }>>;
+        page?: number;
+        entity_type?: string;
+    }): Promise<{
+        items: Array<Entity & {
+            recentMentions: number;
+            previousMentions: number;
+            topicCount: number;
+        }>;
+        total: number;
+    }>;
     getEntityById(id: number): Promise<Entity>;
     getEntitiesByIds(ids: number[]): Promise<Entity[]>;
     getHighRiskNews(params?: {
@@ -257,6 +262,7 @@ export declare const api: {
     createEntity(data: CreateEntityDTO): Promise<NamedEntity>;
     getOrganizations(limit?: number): Promise<Entity[]>;
     getPersons(limit?: number): Promise<Entity[]>;
+    searchEntity(name: string, entity_type: string): Promise<Entity[]>;
     getUserReports(): Promise<any[]>;
     deleteReport(reportId: number): Promise<void>;
 };

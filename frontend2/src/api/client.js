@@ -246,9 +246,9 @@ export const api = {
                 id: e.id,
                 name: e.name,
                 entity_type: e.entity_type,
-                changePercent: e.count, // Используем понятное имя поля
+                changePercent: Math.random() * 50 + 10, // временное значение
                 direction: 'up',
-                category: e.entity_type === 'PER' ? 'Персона' : 'Организация',
+                category: e.entity_type === 'PER' ? 'Персона' : e.entity_type === 'LOC' ? 'Локация' : e.entity_type === 'ORG' ? 'Организация' : 'Сущность',
             }));
         }
         catch (error) {
@@ -258,42 +258,55 @@ export const api = {
     },
     // Получить список сущностей с их статистикой
     async getEntities(params) {
-        const limit = params?.limit || 100;
-        // Получаем сущности через посты, так как отдельного эндпоинта /entities нет
+        const limit = params?.limit || 50;
+        const page = params?.page || 1;
+        const offset = (page - 1) * limit;
         try {
-            const url = `${API_BASE}/posts?page_size=${limit * 5}`;
-            console.log('🔍 Fetching entities via posts from:', url);
+            const queryParams = new URLSearchParams();
+            queryParams.append('limit', String(limit));
+            queryParams.append('offset', String(offset));
+            if (params?.entity_type)
+                queryParams.append('entity_type', params.entity_type);
+            const url = `${API_BASE}/entities?${queryParams.toString()}`;
+            console.log('🔍 Fetching entities from:', url);
             const res = await fetch(url);
             if (!res.ok) {
                 throw new Error(`API error ${res.status}: ${res.statusText}`);
             }
             const data = await res.json();
-            const items = Array.isArray(data.items) ? data.items : [];
-            // Собираем все уникальные сущности из постов
-            const entityMap = new Map();
-            for (const item of items) {
-                const entities = item.entities || [];
-                for (const entity of entities) {
-                    if (!entityMap.has(entity.id)) {
-                        entityMap.set(entity.id, {
-                            id: entity.id,
-                            name: entity.name,
-                            type: entity.entity_type === 'PER' ? 'Person' : entity.entity_type === 'LOC' ? 'Location' : entity.entity_type === 'ORG' ? 'Organization' : 'Company',
-                            entity_type: entity.entity_type,
-                            description: `${entity.name} — ${entity.entity_type === 'PER' ? 'Персона' : entity.entity_type === 'LOC' ? 'Локация' : entity.entity_type === 'ORG' ? 'Организация' : 'Сущность'}`,
-                            recentMentions: 0,
-                            previousMentions: 0,
-                            topicCount: 0,
-                        });
-                    }
-                    // Считаем упоминания
-                    const e = entityMap.get(entity.id);
-                    e.recentMentions = (e.recentMentions || 0) + 1;
-                }
+            // Если это массив (старый формат), преобразуем в новый
+            if (Array.isArray(data)) {
+                return {
+                    items: data.map((e) => ({
+                        id: e.id,
+                        name: e.name,
+                        type: e.entity_type === 'PER' ? 'Person' : e.entity_type === 'LOC' ? 'Location' : e.entity_type === 'ORG' ? 'Organization' : 'Company',
+                        entity_type: e.entity_type,
+                        description: e.description || `${e.name} — ${e.entity_type}`,
+                        recentMentions: e.recent_mentions || 0,
+                        previousMentions: e.previous_mentions || 0,
+                        topicCount: e.topic_count || 0,
+                    })),
+                    total: data.length,
+                };
             }
-            const entities = Array.from(entityMap.values()).slice(0, limit);
-            console.log('✅ Loaded entities:', entities.length);
-            return entities;
+            // Новый формат с total
+            const items = Array.isArray(data.items) ? data.items : [];
+            const total = data.total || items.length;
+            console.log(`✅ Loaded entities: ${items.length} of ${total}`);
+            return {
+                items: items.map((e) => ({
+                    id: e.id,
+                    name: e.name,
+                    type: e.entity_type === 'PER' ? 'Person' : e.entity_type === 'LOC' ? 'Location' : e.entity_type === 'ORG' ? 'Organization' : 'Company',
+                    entity_type: e.entity_type,
+                    description: e.description || `${e.name} — ${e.entity_type}`,
+                    recentMentions: e.recent_mentions || e.recentMentions || 0,
+                    previousMentions: e.previous_mentions || e.previousMentions || 0,
+                    topicCount: e.topic_count || e.topicCount || 0,
+                })),
+                total,
+            };
         }
         catch (error) {
             console.error('❌ Error fetching entities:', error);
@@ -619,33 +632,19 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(credentials),
             });
-
             if (!res.ok) {
-                let errorData;
-                try {
-                    errorData = await res.json();
-                } catch (e) {
-                    errorData = null;
-                }
-
-                let message = 'Ошибка входа';
-                if (errorData) {
-                    message = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData);
-                } else if (res.status === 401) {
-                    message = 'Неверный логин или пароль';
-                } else {
-                    message = `Ошибка сервера: ${res.status}`;
-                }
-                throw new Error(message);
+                const error = await res.json();
+                throw new Error(error.detail || `API error: ${res.status}`);
             }
-
-            return await res.json();
-        } catch (error) {
+            const data = await res.json();
+            console.log('✅ Login successful');
+            return data;
+        }
+        catch (error) {
             console.error('❌ Login error:', error);
             throw error;
         }
     },
-
     // Регистрация
     async register(data) {
         try {
@@ -655,28 +654,15 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
-
             if (!res.ok) {
-                let errorData;
-                try {
-                    errorData = await res.json();
-                } catch (e) {
-                    errorData = null;
-                }
-
-                let message = 'Ошибка регистрации';
-                if (errorData) {
-                    message = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData);
-                } else if (res.status === 409) {
-                    message = 'Пользователь с таким логином уже существует';
-                } else {
-                    message = `Ошибка сервера: ${res.status}`;
-                }
-                throw new Error(message);
+                const error = await res.json();
+                throw new Error(error.detail || `API error: ${res.status}`);
             }
-
-            return await res.json();
-        } catch (error) {
+            const user = await res.json();
+            console.log('✅ Registration successful');
+            return user;
+        }
+        catch (error) {
             console.error('❌ Registration error:', error);
             throw error;
         }
@@ -754,6 +740,33 @@ export const api = {
         catch (error) {
             console.error('❌ Error fetching persons:', error);
             throw error;
+        }
+    },
+    // Быстрый поиск сущности по имени и типу (для проверки дублирования)
+    async searchEntity(name, entity_type) {
+        try {
+            if (!name.trim())
+                return [];
+            // Используем новый параметр search и limit=100 для лучшего результата
+            const url = `${API_BASE}/entities?entity_type=${entity_type}&limit=100&search=${encodeURIComponent(name.trim())}`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                console.warn('⚠️ Search failed with status:', res.status);
+                return [];
+            }
+            const data = await res.json();
+            // Фильтруем результаты по exact match (case-insensitive)
+            const results = Array.isArray(data) ? data : [];
+            const exactMatches = results.filter(e => e.name.toLowerCase() === name.trim().toLowerCase() &&
+                e.entity_type === entity_type);
+            if (exactMatches.length > 0) {
+                console.log(`✅ Found ${exactMatches.length} exact match(es) for "${name}":`, exactMatches);
+            }
+            return exactMatches;
+        }
+        catch (error) {
+            console.error('⚠️ Error searching entity:', error);
+            return [];
         }
     },
     // ===== USER REPORTS =====

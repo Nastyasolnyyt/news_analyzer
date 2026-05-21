@@ -9,6 +9,8 @@ const sentimentFilter = ref('all');
 const riskTypeFilter = ref('all');
 const selectedNewsIds = ref(new Set());
 const selectMode = ref('all');
+// Доступные значения для фильтров (динамически обновляются)
+const availableRiskTypes = ref([]);
 const riskLevels = {
     high: { label: 'Высокий риск', color: '#ff6464' },
     medium: { label: 'Средний риск', color: '#ffa500' },
@@ -19,7 +21,8 @@ const filteredNews = computed(() => {
     return news.value.filter(item => {
         const riskMatch = riskFilter.value === 'all' || item.risk_level === riskFilter.value;
         const sentimentMatch = sentimentFilter.value === 'all' || item.sentiment_label === sentimentFilter.value;
-        const riskTypeMatch = riskTypeFilter.value === 'all' || item.risk_type === riskTypeFilter.value;
+        const riskTypeMatch = riskTypeFilter.value === 'all' || !riskTypeFilter.value || !item.risk_type ||
+            (item.risk_type === riskTypeFilter.value);
         return riskMatch && sentimentMatch && riskTypeMatch;
     });
 });
@@ -95,16 +98,70 @@ onMounted(async () => {
     try {
         loading.value = true;
         console.log('Loading reports data...');
-        const data = await api.getNews({
-            page: 1,
-            page_size: 500, // Увеличили лимит до 500 новостей
+        // Загружаем ВСЕ новости с пейджинацией
+        const allNews = [];
+        let page = 1;
+        let pageSize = 100;
+        let hasMore = true;
+        let total = 0;
+        while (hasMore) {
+            try {
+                const data = await api.getNews({
+                    page: page,
+                    page_size: pageSize,
+                });
+                if (data.items.length === 0) {
+                    hasMore = false;
+                }
+                else {
+                    allNews.push(...data.items);
+                    total = data.total || 0;
+                    console.log(`✅ Loaded page ${page}: ${data.items.length} items, total: ${total}`);
+                    // Если загрузили все данные
+                    if (allNews.length >= total && total > 0) {
+                        hasMore = false;
+                    }
+                    page++;
+                }
+            }
+            catch (e) {
+                console.error('Error loading page:', page, e);
+                hasMore = false;
+            }
+        }
+        news.value = allNews;
+        console.log('Reports loaded: total', allNews.length, 'items out of', total);
+        // Собираем все доступные типы рисков
+        const riskTypes = new Set();
+        allNews.forEach(item => {
+            if (item.risk_type) {
+                riskTypes.add(item.risk_type);
+            }
         });
-        news.value = data.items;
-        console.log('Reports loaded:', data.items.length, 'items');
+        availableRiskTypes.value = Array.from(riskTypes).sort();
+        console.log('✅ Available risk types:', availableRiskTypes.value);
     }
     catch (e) {
-        error.value = e.message || 'Ошибка загрузки отчёта';
-        console.error('Reports error:', error.value);
+        if (e.response?.data?.detail) {
+            error.value = typeof e.response.data.detail === 'string'
+                ? e.response.data.detail
+                : JSON.stringify(e.response.data.detail);
+        }
+        else if (e.response?.data?.message) {
+            error.value = typeof e.response.data.message === 'string'
+                ? e.response.data.message
+                : JSON.stringify(e.response.data.message);
+        }
+        else if (e.message) {
+            error.value = e.message;
+        }
+        else if (typeof e === 'string') {
+            error.value = e;
+        }
+        else {
+            error.value = 'Ошибка загрузки отчёта';
+        }
+        console.error('Reports error:', e);
     }
     finally {
         loading.value = false;
@@ -346,15 +403,13 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
         value: "all",
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-        value: "политический",
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-        value: "экономический",
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-        value: "социальный",
-    });
+    for (const [riskType] of __VLS_getVForSourceType((__VLS_ctx.availableRiskTypes))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+            key: (riskType),
+            value: (riskType),
+        });
+        (riskType);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (__VLS_ctx.resetFilters) },
         ...{ class: "btn-reset" },
@@ -837,6 +892,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             riskTypeFilter: riskTypeFilter,
             selectedNewsIds: selectedNewsIds,
             selectMode: selectMode,
+            availableRiskTypes: availableRiskTypes,
             riskLevels: riskLevels,
             filteredNews: filteredNews,
             reportNews: reportNews,

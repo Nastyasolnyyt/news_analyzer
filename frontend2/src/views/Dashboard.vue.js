@@ -16,8 +16,9 @@ const topEntitiesData = ref([]);
 const loading = ref(true);
 const error = ref(null);
 // Статистика
+const totalNewsCount = ref(0);
 const stats = computed(() => ({
-    relevantNews: newsData.value.length,
+    relevantNews: totalNewsCount.value,
 }));
 // Сущности для отображения (топ за 24 часа из API)
 const topEntities = computed(() => {
@@ -57,6 +58,7 @@ onMounted(async () => {
             page_size: 20,
         });
         newsData.value = newsResponse.items;
+        totalNewsCount.value = newsResponse.total || newsResponse.items.length;
         // Загружаем топ сущностей за 24 часа (реальные данные из API)
         const topEntitiesRaw = await api.getTopEntities24h({ limit: 5 });
         topEntitiesData.value = topEntitiesRaw.map((e) => ({
@@ -67,8 +69,8 @@ onMounted(async () => {
             category: mapEntityTypeToCategory(e.entity_type),
         }));
         // Загружаем все сущности (для других целей)
-        const entities = await api.getEntities({ limit: 10 });
-        allEntities.value = entities;
+        const entitiesResult = await api.getEntities({ limit: 10 });
+        allEntities.value = entitiesResult.items;
         console.log('Dashboard loaded:', {
             newsItems: newsData.value.length,
             topEntities: topEntitiesData.value.length,
@@ -76,8 +78,26 @@ onMounted(async () => {
         });
     }
     catch (e) {
-        error.value = e.message || 'Ошибка загрузки данных';
-        console.error('Dashboard error:', error.value);
+        if (e.response?.data?.detail) {
+            error.value = typeof e.response.data.detail === 'string'
+                ? e.response.data.detail
+                : JSON.stringify(e.response.data.detail);
+        }
+        else if (e.response?.data?.message) {
+            error.value = typeof e.response.data.message === 'string'
+                ? e.response.data.message
+                : JSON.stringify(e.response.data.message);
+        }
+        else if (e.message) {
+            error.value = e.message;
+        }
+        else if (typeof e === 'string') {
+            error.value = e;
+        }
+        else {
+            error.value = 'Ошибка загрузки данных';
+        }
+        console.error('❌ Dashboard error:', e);
     }
     finally {
         loading.value = false;

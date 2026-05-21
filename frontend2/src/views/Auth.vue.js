@@ -32,8 +32,19 @@ const handleLogin = async () => {
         router.push('/');
     }
     catch (e) {
-        error.value = e.message || 'Ошибка входа';
-        console.error('Login error:', e);
+        if (e.response?.data?.detail) {
+            error.value = e.response.data.detail;
+        }
+        else if (e.response?.data?.message) {
+            error.value = e.response.data.message;
+        }
+        else if (e.message && e.message !== '[object Object]') {
+            error.value = e.message;
+        }
+        else {
+            error.value = 'Неверный логин или пароль';
+        }
+        console.error('❌ Login error:', e);
     }
     finally {
         loading.value = false;
@@ -62,8 +73,19 @@ const handleRegister = async () => {
         registerForm.value = { login: '', password: '', name: '', passwordConfirm: '' };
     }
     catch (e) {
-        error.value = e.message || 'Ошибка регистрации';
-        console.error('Register error:', e);
+        if (e.response?.data?.detail) {
+            error.value = e.response.data.detail;
+        }
+        else if (e.response?.data?.message) {
+            error.value = e.response.data.message;
+        }
+        else if (e.message && e.message !== '[object Object]') {
+            error.value = e.message;
+        }
+        else {
+            error.value = 'Ошибка при регистрации';
+        }
+        console.error('❌ Register error:', e);
     }
     finally {
         loading.value = false;

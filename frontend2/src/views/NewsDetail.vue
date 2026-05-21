@@ -35,7 +35,7 @@ onMounted(async () => {
     } else {
       error.value = 'Ошибка загрузки новости';
     }
-    if (error.value.includes('Not found')) {
+    if (typeof error.value === 'string' && error.value.includes('Not found')) {
       router.push('/');
     }
     console.error('❌ Error:', e);

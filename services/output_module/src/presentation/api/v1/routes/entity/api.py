@@ -46,24 +46,35 @@ async def get_top_entities_24h(
 
 @ROUTER.get(
     "",
-    response_model=List[Any],
-    summary="Список всех сущностей",
+    response_model=dict,
+    summary="Список всех сущностей с пагинацией",
 )
 async def get_all_entities(
     entity_service: FromDishka[EntityService],
     limit: int = 100,
+    page: int = 1,
     entity_type: Optional[str] = None,
     search: Optional[str] = None,
-) -> List[Any]:
-    """Получение списка всех сущностей с их статистикой упоминаний.
+) -> dict:
+    """Получение списка всех сущностей с их статистикой упоминаний и поддержкой пагинации.
     
     Query Parameters:
-    - limit: максимальное количество сущностей (по умолчанию 100)
+    - limit: максимальное количество сущностей на странице (по умолчанию 100)
+    - page: номер страницы (по умолчанию 1)
     - entity_type: фильтр по типу (ORG, PER, LOC и т.д.)
     - search: поиск по названию (case-insensitive)
+    
+    Response:
+    {
+        "items": [список сущностей],
+        "total": общее количество,
+        "limit": лимит на странице,
+        "page": текущая страница,
+        "total_pages": общее количество страниц
+    }
     """
     try:
-        return await entity_service.get_all_entities(limit=limit, entity_type=entity_type, search=search)
+        return await entity_service.get_all_entities(limit=limit, page=page, entity_type=entity_type, search=search)
     except Exception as e:
         logger.error(f"Error in get_all_entities: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

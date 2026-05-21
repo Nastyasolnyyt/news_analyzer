@@ -27,28 +27,52 @@ class EntityService:
         self.post_entity_gateway = post_entity_gateway
         self.post_gateway = post_gateway
 
-    async def get_all_entities(self, limit: int = 100, entity_type: Optional[str] = None, search: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_all_entities(self, limit: int = 100, page: int = 1, entity_type: Optional[str] = None, search: Optional[str] = None) -> Dict[str, Any]:
         """
-        Получить список всех сущностей с их статистикой упоминаний.
-        Возвращает сущности с полями recentMentions, previousMentions, topicCount.
-        Если указан entity_type, фильтрует по типу сущности.
-        Если указан search, фильтрует по названию (case-insensitive).
+        Получить список всех сущностей с их статистикой упоминаний и поддержкой пагинации.
+        Возвращает объект с полями: items, total, limit, page, total_pages.
+        
+        Параметры:
+        - limit: максимальное количество сущностей на странице (по умолчанию 100)
+        - page: номер страницы (по умолчанию 1)
+        - entity_type: фильтр по типу сущности
+        - search: поиск по названию
         """
-        from sqlalchemy import select, ilike
+        from sqlalchemy import select, ilike, func
         from src.infrastructure.postgres.models.named_entity import NamedEntity
         
-        # Получаем все сущности из БД (с опциональной фильтрацией по типу и названию)
+        # Сначала получаем общее количество сущностей
+        count_query = select(func.count(NamedEntity.id))
+        if entity_type:
+            count_query = count_query.where(NamedEntity.entity_type == entity_type)
+        if search:
+            count_query = count_query.where(ilike(NamedEntity.name, f"%{search}%"))
+        
+        total_result = await self.ner_gateway.session.execute(count_query)
+        total = total_result.scalar() or 0
+        
+        # Вычисляем offset
+        offset = (page - 1) * limit
+        total_pages = (total + limit - 1) // limit  # Округляем вверх
+        
+        # Получаем сущности для текущей страницы
         query = select(NamedEntity)
         if entity_type:
             query = query.where(NamedEntity.entity_type == entity_type)
         if search:
             query = query.where(ilike(NamedEntity.name, f"%{search}%"))
-        query = query.order_by(NamedEntity.created_at.desc()).limit(limit)
+        query = query.order_by(NamedEntity.created_at.desc()).offset(offset).limit(limit)
         result = await self.ner_gateway.session.execute(query)
         entities = result.scalars().all()
         
         if not entities:
-            return []
+            return {
+                "items": [],
+                "total": total,
+                "limit": limit,
+                "page": page,
+                "total_pages": total_pages,
+            }
         
         # Для каждой сущности считаем статистику
         result_list = []
@@ -92,12 +116,18 @@ class EntityService:
                 "name": entity.name,
                 "entity_type": entity.entity_type,
                 "description": f"{entity.name} — {entity.entity_type}",
-                "recent_mentions": recent_mentions,
-                "previous_mentions": previous_mentions,
-                "topic_count": len(topic_ids),
+                "recentMentions": recent_mentions,
+                "previousMentions": previous_mentions,
+                "topicCount": len(topic_ids),
             })
         
-        return result_list
+        return {
+            "items": result_list,
+            "total": total,
+            "limit": limit,
+            "page": page,
+            "total_pages": total_pages,
+        }
 
     async def get_entity_mentions(
         self, entity_id: int, filters: Optional[EntityMentionsFilterDTO] = None

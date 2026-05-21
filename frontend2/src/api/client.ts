@@ -126,7 +126,7 @@ export interface CreateEntityDTO {
 export interface Entity {
   id: number;
   name: string;
-  type: 'Company' | 'Person' | 'Event';
+  type: 'Company' | 'Person' | 'Event' | 'Location' | 'Organization';
   entity_type?: string;
   description?: string;
   jurisdiction?: string;
@@ -496,13 +496,19 @@ export const api = {
   },
 
   // Получить список сущностей с их статистикой
-  async getEntities(params?: { limit?: number }): Promise<Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>> {
-    const limit = params?.limit || 100;
+  async getEntities(params?: { limit?: number; page?: number; entity_type?: string }): Promise<{ items: Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>; total: number }> {
+    const limit = params?.limit || 50;
+    const page = params?.page || 1;
+    const offset = (page - 1) * limit;
     
-    // Получаем сущности через посты, так как отдельного эндпоинта /entities нет
     try {
-      const url = `${API_BASE}/posts?page_size=${limit * 5}`;
-      console.log('🔍 Fetching entities via posts from:', url);
+      const queryParams = new URLSearchParams();
+      queryParams.append('limit', String(limit));
+      queryParams.append('offset', String(offset));
+      if (params?.entity_type) queryParams.append('entity_type', params.entity_type);
+      
+      const url = `${API_BASE}/entities?${queryParams.toString()}`;
+      console.log('🔍 Fetching entities from:', url);
       
       const res = await fetch(url);
       if (!res.ok) {
@@ -510,35 +516,43 @@ export const api = {
       }
       
       const data = await res.json();
-      const items = Array.isArray(data.items) ? data.items : [];
       
-      // Собираем все уникальные сущности из постов
-      const entityMap = new Map<number, any>();
-      for (const item of items) {
-        const entities = item.entities || [];
-        for (const entity of entities) {
-          if (!entityMap.has(entity.id)) {
-            entityMap.set(entity.id, {
-              id: entity.id,
-              name: entity.name,
-              type: entity.entity_type === 'PER' ? 'Person' : entity.entity_type === 'LOC' ? 'Location' : entity.entity_type === 'ORG' ? 'Organization' : 'Company',
-              entity_type: entity.entity_type,
-              description: `${entity.name} — ${entity.entity_type === 'PER' ? 'Персона' : entity.entity_type === 'LOC' ? 'Локация' : entity.entity_type === 'ORG' ? 'Организация' : 'Сущность'}`,
-              recentMentions: 0,
-              previousMentions: 0,
-              topicCount: 0,
-            });
-          }
-          // Считаем упоминания
-          const e = entityMap.get(entity.id);
-          e.recentMentions = (e.recentMentions || 0) + 1;
-        }
+      // Если это массив (старый формат), преобразуем в новый
+      if (Array.isArray(data)) {
+        return {
+          items: data.map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            type: e.entity_type === 'PER' ? 'Person' : e.entity_type === 'LOC' ? 'Location' : e.entity_type === 'ORG' ? 'Organization' : 'Company',
+            entity_type: e.entity_type,
+            description: e.description || `${e.name} — ${e.entity_type}`,
+            recentMentions: e.recent_mentions || 0,
+            previousMentions: e.previous_mentions || 0,
+            topicCount: e.topic_count || 0,
+          })),
+          total: data.length,
+        };
       }
       
-      const entities = Array.from(entityMap.values()).slice(0, limit);
-      console.log('✅ Loaded entities:', entities.length);
+      // Новый формат с total
+      const items = Array.isArray(data.items) ? data.items : [];
+      const total = data.total || items.length;
       
-      return entities;
+      console.log(`✅ Loaded entities: ${items.length} of ${total}`);
+      
+      return {
+        items: items.map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          type: e.entity_type === 'PER' ? 'Person' : e.entity_type === 'LOC' ? 'Location' : e.entity_type === 'ORG' ? 'Organization' : 'Company',
+          entity_type: e.entity_type,
+          description: e.description || `${e.name} — ${e.entity_type}`,
+          recentMentions: e.recent_mentions || e.recentMentions || 0,
+          previousMentions: e.previous_mentions || e.previousMentions || 0,
+          topicCount: e.topic_count || e.topicCount || 0,
+        })),
+        total,
+      };
     } catch (error) {
       console.error('❌ Error fetching entities:', error);
       throw error;

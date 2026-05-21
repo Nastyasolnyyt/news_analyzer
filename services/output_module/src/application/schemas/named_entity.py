@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,15 @@ class CreateEntityDTO(BaseModel):
     """DTO для создания новой сущности"""
     name: str = Field(..., min_length=1, max_length=255, description="Название сущности")
     entity_type: str = Field(..., description="Тип сущности (ORG или PER)")
+
+
+class PaginatedEntitiesResponse(BaseModel):
+    """Ответ с пагинированными сущностями"""
+    items: List[dict] = Field(..., description="Список сущностей со статистикой")
+    total: int = Field(..., description="Общее количество сущностей")
+    limit: int = Field(..., description="Лимит на странице")
+    page: int = Field(..., description="Текущая страница")
+    total_pages: int = Field(..., description="Общее количество страниц")
 
 
 class EntityInfo(BaseModel):

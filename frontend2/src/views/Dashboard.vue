@@ -86,8 +86,8 @@ onMounted(async () => {
     }));
     
     // Загружаем все сущности (для других целей)
-    const entities = await api.getEntities({ limit: 10 });
-    allEntities.value = entities;
+    const entitiesResult = await api.getEntities({ limit: 10 });
+    allEntities.value = entitiesResult.items;
     
     console.log('Dashboard loaded:', {
       newsItems: newsData.value.length,
