@@ -38,7 +38,8 @@ class EntityService:
         - entity_type: фильтр по типу сущности
         - search: поиск по названию
         """
-        from sqlalchemy import select, ilike, func
+        from sqlalchemy import select, func
+        from sqlalchemy.sql import ilike
         from src.infrastructure.postgres.models.named_entity import NamedEntity
         
         # Сначала получаем общее количество сущностей
