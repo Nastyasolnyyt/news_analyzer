@@ -485,7 +485,7 @@ export const api = {
         id: e.id,
         name: e.name,
         entity_type: e.entity_type,
-        changePercent: Math.random() * 50 + 10, // временное значение
+        changePercent: e.count, // Используем реальное количество упоминаний
         direction: 'up' as const,
         category: e.entity_type === 'PER' ? 'Персона' : e.entity_type === 'LOC' ? 'Локация' : e.entity_type === 'ORG' ? 'Организация' : 'Сущность',
       }));
@@ -499,12 +499,11 @@ export const api = {
   async getEntities(params?: { limit?: number; page?: number; entity_type?: string }): Promise<{ items: Array<Entity & { recentMentions: number; previousMentions: number; topicCount: number }>; total: number }> {
     const limit = params?.limit || 50;
     const page = params?.page || 1;
-    const offset = (page - 1) * limit;
     
     try {
       const queryParams = new URLSearchParams();
       queryParams.append('limit', String(limit));
-      queryParams.append('offset', String(offset));
+      queryParams.append('page', String(page));
       if (params?.entity_type) queryParams.append('entity_type', params.entity_type);
       
       const url = `${API_BASE}/entities?${queryParams.toString()}`;

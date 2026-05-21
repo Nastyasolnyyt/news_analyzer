@@ -246,7 +246,7 @@ export const api = {
                 id: e.id,
                 name: e.name,
                 entity_type: e.entity_type,
-                changePercent: Math.random() * 50 + 10, // временное значение
+                changePercent: e.count, // Используем реальное количество упоминаний
                 direction: 'up',
                 category: e.entity_type === 'PER' ? 'Персона' : e.entity_type === 'LOC' ? 'Локация' : e.entity_type === 'ORG' ? 'Организация' : 'Сущность',
             }));
@@ -260,11 +260,10 @@ export const api = {
     async getEntities(params) {
         const limit = params?.limit || 50;
         const page = params?.page || 1;
-        const offset = (page - 1) * limit;
         try {
             const queryParams = new URLSearchParams();
             queryParams.append('limit', String(limit));
-            queryParams.append('offset', String(offset));
+            queryParams.append('page', String(page));
             if (params?.entity_type)
                 queryParams.append('entity_type', params.entity_type);
             const url = `${API_BASE}/entities?${queryParams.toString()}`;
@@ -715,11 +714,15 @@ export const api = {
     // Получить список всех организаций
     async getOrganizations(limit = 100) {
         try {
-            const url = `${API_BASE}/entities?entity_type=ORG&limit=${limit}`;
+            const url = `${API_BASE}/entities?entity_type=ORG&limit=${limit}&page=1`;
             const res = await fetch(url);
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
             const data = await res.json();
+            // API теперь возвращает {items, total, ...}
+            if (data.items && Array.isArray(data.items)) {
+                return data.items;
+            }
             return Array.isArray(data) ? data : [];
         }
         catch (error) {
@@ -730,11 +733,15 @@ export const api = {
     // Получить список всех персон
     async getPersons(limit = 100) {
         try {
-            const url = `${API_BASE}/entities?entity_type=PER&limit=${limit}`;
+            const url = `${API_BASE}/entities?entity_type=PER&limit=${limit}&page=1`;
             const res = await fetch(url);
             if (!res.ok)
                 throw new Error(`API error: ${res.status}`);
             const data = await res.json();
+            // API теперь возвращает {items, total, ...}
+            if (data.items && Array.isArray(data.items)) {
+                return data.items;
+            }
             return Array.isArray(data) ? data : [];
         }
         catch (error) {

@@ -47,6 +47,37 @@ const checkAuth = () => {
   return true;
 };
 
+// Загрузить все страницы с пагинацией
+const loadAllPaginated = async (entityType: 'ORG' | 'PER'): Promise<Entity[]> => {
+  const allItems: Entity[] = [];
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    try {
+      const result = await apiClient.getEntities({
+        limit: 100,
+        page,
+        entity_type: entityType,
+      });
+      
+      allItems.push(...result.items);
+      
+      // Если получили меньше чем лимит, это последняя страница
+      if (result.items.length < 100) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    } catch (error) {
+      console.error(`❌ Error loading ${entityType} page ${page}:`, error);
+      hasMore = false;
+    }
+  }
+  
+  return allItems;
+};
+
 // Вычисляемые свойства для фильтрации
 const filteredOrganizations = computed(() => {
   const query = orgSearchQuery.value.toLowerCase();
@@ -68,15 +99,26 @@ onMounted(async () => {
     loading.value = true;
     error.value = null;
 
-    // Загружаем конфиг, организации и персон параллельно (только первые 30 для быстрой загрузки)
-    let [config, orgs, persons_list] = await Promise.all([
-      apiClient.getNotificationConfig(),
-      apiClient.getOrganizations(30),  // Уменьили с 100 на 30
-      apiClient.getPersons(30),        // Уменьили с 100 на 30
+    // Загружаем конфиг параллельно с организациями и персонами
+    const configPromise = apiClient.getNotificationConfig();
+    
+    // Загружаем ВСЕ организации через пагинацию (по 100 на странице)
+    const orgsPromise = loadAllPaginated('ORG');
+    
+    // Загружаем ВСЕ персоны через пагинацию (по 100 на странице)
+    const personsPromise = loadAllPaginated('PER');
+    
+    const [config, orgs, persons_list] = await Promise.all([
+      configPromise,
+      orgsPromise,
+      personsPromise,
     ]);
 
     // Сохраняем организации и персон
     allOrganizations.value = orgs;
+    allPersons.value = persons_list;
+    
+    console.log(`✅ Loaded ${orgs.length} organizations and ${persons_list.length} persons`);
     allPersons.value = persons_list;
 
     // Инициализируем основные настройки, если их нет

@@ -47,52 +47,76 @@ const loadEntities = async () => {
   try {
     loading.value = true;
     error.value = null;
-    console.log('🚀 Loading all entities with pagination...');
+    console.log('🚀 Loading first page of entities...');
     
-    // Загружаем все сущности страница за страницей
-    let page = 1;
-    let hasMore = true;
-    
-    while (hasMore) {
-      try {
-        const result = await api.getEntities({
-          limit: pageSize,
-          page: page,
-        });
+    // ФАЗА 1: Загружаем первую страницу и показываем её немедленно
+    try {
+      const firstPageResult = await api.getEntities({
+        limit: pageSize,
+        page: 1,
+      });
+      
+      console.log(`📄 Loaded page 1: ${firstPageResult.items.length} entities (total: ${firstPageResult.total})`);
+      
+      // Добавляем первую страницу в кэш
+      firstPageResult.items.forEach(entity => {
+        if (entity && entity.id) {
+          allLoadedEntities.value.set(entity.id, entity);
+        }
+      });
+      
+      totalEntities.value = firstPageResult.total;
+      entities.value = Array.from(allLoadedEntities.value.values());
+      
+      // Показываем первую страницу немедленно
+      loading.value = false;
+      
+      // ФАЗА 2: Загружаем остальные страницы в фоне (не блокируя UI)
+      if (firstPageResult.total > pageSize) {
+        console.log('📊 Starting background loading of remaining pages...');
         
-        console.log(`📄 Loaded page ${page}: ${result.items.length} entities (total: ${result.total})`);
+        const totalPages = Math.ceil(firstPageResult.total / pageSize);
         
-        // Добавляем в кэш (дедублицируем по ID)
-        result.items.forEach(entity => {
-          if (entity && entity.id) {
-            allLoadedEntities.value.set(entity.id, entity);
+        // Загружаем оставшиеся страницы асинхронно
+        (async () => {
+          for (let page = 2; page <= totalPages; page++) {
+            try {
+              const result = await api.getEntities({
+                limit: pageSize,
+                page: page,
+              });
+              
+              // Добавляем в кэш
+              result.items.forEach(entity => {
+                if (entity && entity.id) {
+                  allLoadedEntities.value.set(entity.id, entity);
+                }
+              });
+              
+              console.log(`📄 Loaded page ${page}/${totalPages}: ${result.items.length} entities`);
+            } catch (pageError) {
+              console.error(`⚠️ Error loading page ${page}:`, pageError);
+              // Продолжаем со следующей страницы
+            }
           }
-        });
-        
-        totalEntities.value = result.total;
-        
-        // Проверяем, есть ли еще сущности для загрузки
-        if (result.items.length < pageSize || allLoadedEntities.value.size >= result.total) {
-          hasMore = false;
-        } else {
-          page++;
-        }
-      } catch (pageError) {
-        console.error(`❌ Error loading page ${page}:`, pageError);
-        // Продолжаем со следующей страницы или завершаем
-        if (page === 1) {
-          throw pageError;
-        }
-        hasMore = false;
+          
+          // После загрузки всех страниц обновляем список
+          const allLoaded = Array.from(allLoadedEntities.value.values());
+          entities.value = allLoaded;
+          console.log(`✅ Background loading complete: ${allLoaded.length} total entities`);
+        })();
       }
+    } catch (firstPageError) {
+      console.error('❌ Error loading first page:', firstPageError);
+      error.value = firstPageError instanceof Error ? firstPageError.message : 'Ошибка загрузки сущностей';
+      loading.value = false;
+      throw firstPageError;
     }
-    
-    entities.value = Array.from(allLoadedEntities.value.values());
-    console.log(`✅ Total entities loaded: ${entities.value.length} of ${totalEntities.value}`);
   } catch (e: any) {
-    error.value = e.message || 'Ошибка загрузки сущностей';
+    if (!error.value) {
+      error.value = e.message || 'Ошибка загрузки сущностей';
+    }
     console.error('❌ Error:', e);
-  } finally {
     loading.value = false;
   }
 };
