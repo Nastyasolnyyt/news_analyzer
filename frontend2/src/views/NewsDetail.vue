@@ -58,7 +58,7 @@ const toggleMode = () => {
     <!-- LOADING STATE -->
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <p>⏳ Загружаем новость...</p>
+      <p>Загружаем новость...</p>
     </div>
 
     <!-- ERROR STATE -->
@@ -78,9 +78,7 @@ const toggleMode = () => {
         <div class="meta">
           <span class="source">{{ article.source }}</span>
           <span class="date">{{ article.pub_date || article.date }}</span>
-          <span v-if="article.risk_level" :class="['risk-badge', `risk-${article.risk_level}`]">
-            {{ article.risk_level }}
-          </span>
+          
         </div>
         <h1>{{ article.title }}</h1>
         <div v-if="article.tags" class="tags">
