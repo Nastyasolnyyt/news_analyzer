@@ -12,7 +12,6 @@ const error = ref<string | null>(null);
 const saveSuccess = ref(false);
 const isAuthenticated = ref(false);
 
-// Модальное окно для добавления сущности
 const showAddEntityModal = ref(false);
 const addEntityType = ref<'ORG' | 'PER'>('ORG');
 
@@ -26,17 +25,42 @@ const selectedPersons = ref<Set<number>>(new Set());
 const orgSearchQuery = ref('');
 const personSearchQuery = ref('');
 
+// Результаты поиска (только когда есть текст)
+const orgSearchResults = computed(() => {
+  const query = orgSearchQuery.value.toLowerCase().trim();
+  if (!query || query.length < 2) return [];
+  return allOrganizations.value.filter(org => org.name.toLowerCase().includes(query)).slice(0, 15);
+});
+
+const personSearchResults = computed(() => {
+  const query = personSearchQuery.value.toLowerCase().trim();
+  if (!query || query.length < 2) return [];
+  return allPersons.value.filter(person => person.name.toLowerCase().includes(query)).slice(0, 15);
+});
+
+// Получить выбранные сущности объектами
+const selectedOrgsObjects = computed(() => {
+  return Array.from(selectedOrganizations.value)
+    .map(id => allOrganizations.value.find(o => o.id === id))
+    .filter(Boolean) as Entity[];
+});
+
+const selectedPersonsObjects = computed(() => {
+  return Array.from(selectedPersons.value)
+    .map(id => allPersons.value.find(p => p.id === id))
+    .filter(Boolean) as Entity[];
+});
+
 // Настройки уведомлений
 const email = ref('');
-const digestFrequency = ref('instant'); // instant, daily, weekly
+const digestFrequency = ref('instant');
 
-// IDs триггеров и каналов для обновления
+// IDs триггеров и каналов
 const orgTriggersMap = ref<Map<number, number>>(new Map());
 const personTriggersMap = ref<Map<number, number>>(new Map());
 let emailChannelId: number | null = null;
 let notificationSettingsId: number | null = null;
 
-// Проверка аутентификации
 const checkAuth = () => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
@@ -63,7 +87,6 @@ const loadAllPaginated = async (entityType: 'ORG' | 'PER'): Promise<Entity[]> =>
       
       allItems.push(...result.items);
       
-      // Если получили меньше чем лимит, это последняя страница
       if (result.items.length < 100) {
         hasMore = false;
       } else {
@@ -78,18 +101,6 @@ const loadAllPaginated = async (entityType: 'ORG' | 'PER'): Promise<Entity[]> =>
   return allItems;
 };
 
-// Вычисляемые свойства для фильтрации
-const filteredOrganizations = computed(() => {
-  const query = orgSearchQuery.value.toLowerCase();
-  return query ? allOrganizations.value.filter(org => org.name.toLowerCase().includes(query)) : allOrganizations.value;
-});
-
-const filteredPersons = computed(() => {
-  const query = personSearchQuery.value.toLowerCase();
-  return query ? allPersons.value.filter(person => person.name.toLowerCase().includes(query)) : allPersons.value;
-});
-
-// Загрузить данные
 onMounted(async () => {
   if (!checkAuth()) {
     return;
@@ -99,13 +110,8 @@ onMounted(async () => {
     loading.value = true;
     error.value = null;
 
-    // Загружаем конфиг параллельно с организациями и персонами
     const configPromise = apiClient.getNotificationConfig();
-    
-    // Загружаем ВСЕ организации через пагинацию (по 100 на странице)
     const orgsPromise = loadAllPaginated('ORG');
-    
-    // Загружаем ВСЕ персоны через пагинацию (по 100 на странице)
     const personsPromise = loadAllPaginated('PER');
     
     const [config, orgs, persons_list] = await Promise.all([
@@ -114,16 +120,12 @@ onMounted(async () => {
       personsPromise,
     ]);
 
-    // Сохраняем организации и персон
     allOrganizations.value = orgs;
     allPersons.value = persons_list;
     
     console.log(`✅ Loaded ${orgs.length} organizations and ${persons_list.length} persons`);
-    allPersons.value = persons_list;
 
-    // Инициализируем основные настройки, если их нет
     if (!config.settings || !config.settings.id) {
-      console.log('⚠️ Settings not initialized, creating...');
       const newSettings = await apiClient.updateNotificationSettings({
         enabled: true,
         digest_frequency: 'instant',
@@ -134,9 +136,7 @@ onMounted(async () => {
       notificationSettingsId = config.settings.id;
     }
 
-    // Инициализируем email канал, если его нет
     if (!config.channels || config.channels.length === 0) {
-      console.log('⚠️ Email channel not found, creating...');
       try {
         const newChannel = await apiClient.createNotificationChannel({
           channel_type: 'email',
@@ -152,12 +152,10 @@ onMounted(async () => {
       emailChannelId = config.channels[0].id;
     }
 
-    // Загружаем настройки
     const settings = config.settings;
     statusEnabled.value = settings.enabled;
     digestFrequency.value = settings.digest_frequency || 'instant';
 
-    // Восстанавливаем сохраненные триггеры
     const enabledOrgIds = new Set<number>();
     const enabledPersonIds = new Set<number>();
     
@@ -178,7 +176,6 @@ onMounted(async () => {
     selectedOrganizations.value = enabledOrgIds;
     selectedPersons.value = enabledPersonIds;
 
-    // Попытаемся получить email из первого канала (если есть)
     if (config.channels.length > 0 && config.channels[0].channel_type === 'email') {
       email.value = config.channels[0].channel_address || '';
     }
@@ -192,90 +189,58 @@ onMounted(async () => {
   }
 });
 
-const toggleOrganization = (id: number) => {
+const addOrganization = (orgId: number) => {
   const next = new Set(selectedOrganizations.value);
-  if (next.has(id)) {
-    next.delete(id);
-  } else {
-    next.add(id);
-  }
+  next.add(orgId);
+  selectedOrganizations.value = next;
+  orgSearchQuery.value = '';
+};
+
+const removeOrganization = (orgId: number) => {
+  const next = new Set(selectedOrganizations.value);
+  next.delete(orgId);
   selectedOrganizations.value = next;
 };
 
-const togglePerson = (id: number) => {
+const addPerson = (personId: number) => {
   const next = new Set(selectedPersons.value);
-  if (next.has(id)) {
-    next.delete(id);
-  } else {
-    next.add(id);
-  }
+  next.add(personId);
+  selectedPersons.value = next;
+  personSearchQuery.value = '';
+};
+
+const removePerson = (personId: number) => {
+  const next = new Set(selectedPersons.value);
+  next.delete(personId);
   selectedPersons.value = next;
 };
 
 const handleSaveSettings = async () => {
   try {
-    if (!email.value) {
-      error.value = 'Пожалуйста, введите email';
-      return;
-    }
-
     loading.value = true;
     error.value = null;
 
-    // 1. Обновляем основные настройки
-    if (notificationSettingsId) {
-      await apiClient.updateNotificationSettings({
-        enabled: statusEnabled.value,
-        digest_frequency: digestFrequency.value,
-      });
-      console.log('✅ Settings updated');
-    }
-
-    // 2. Обновляем email канал
-    if (emailChannelId) {
-      await apiClient.updateNotificationChannel(emailChannelId, {
-        channel_address: email.value,
-        enabled: true,
-      } as any);
-      console.log('✅ Email channel updated');
-    } else {
-      // Создаем новый канал, если его нет
-      const newChannel = await apiClient.createNotificationChannel({
-        channel_type: 'email',
-        channel_address: email.value,
-        enabled: true,
-      } as any);
-      emailChannelId = newChannel.id;
-      console.log('✅ Email channel created');
-    }
-
-    // 3. Синхронизируем триггеры для организаций
-    // Получаем все текущие триггеры
-    const config = await apiClient.getNotificationConfig();
-    const currentOrgTriggers = new Map<number, number>();
-    const currentPersonTriggers = new Map<number, number>();
-    
-    config.triggers.forEach(trigger => {
-      if (trigger.trigger_type === 'organization') {
-        const orgId = parseInt(trigger.trigger_value);
-        currentOrgTriggers.set(orgId, trigger.id);
-      } else if (trigger.trigger_type === 'person') {
-        const personId = parseInt(trigger.trigger_value);
-        currentPersonTriggers.set(personId, trigger.id);
-      }
+    // Сохраняем основные настройки
+    await apiClient.updateNotificationSettings({
+      enabled: statusEnabled.value,
+      digest_frequency: digestFrequency.value,
     });
 
-    // Обновляем или создаем триггеры для организаций
+    // Сохраняем email
+    if (emailChannelId && email.value) {
+      await apiClient.updateNotificationChannel(emailChannelId, {
+        channel_address: email.value,
+      } as any);
+    }
+
+    // Обновляем триггеры организаций
+    const currentOrgTriggers = new Map(orgTriggersMap.value);
+    
     for (const orgId of selectedOrganizations.value) {
       if (currentOrgTriggers.has(orgId)) {
-        // Обновляем существующий триггер
         const triggerId = currentOrgTriggers.get(orgId)!;
-        await apiClient.updateNotificationTrigger(triggerId, {
-          enabled: true,
-        } as any);
-        console.log(`✅ Org trigger ${orgId} updated`);
+        await apiClient.updateNotificationTrigger(triggerId, { enabled: true } as any);
       } else {
-        // Создаем новый триггер
         const org = allOrganizations.value.find(o => o.id === orgId);
         if (org) {
           await apiClient.createNotificationTrigger({
@@ -284,32 +249,24 @@ const handleSaveSettings = async () => {
             trigger_value: String(orgId),
             enabled: true,
           });
-          console.log(`✅ Org trigger ${orgId} created`);
         }
       }
     }
 
-    // Отключаем триггеры для невыбранных организаций
     for (const [orgId, triggerId] of currentOrgTriggers) {
       if (!selectedOrganizations.value.has(orgId)) {
-        await apiClient.updateNotificationTrigger(triggerId, {
-          enabled: false,
-        } as any);
-        console.log(`✅ Org trigger ${orgId} disabled`);
+        await apiClient.updateNotificationTrigger(triggerId, { enabled: false } as any);
       }
     }
 
-    // Обновляем или создаем триггеры для персон
+    // Обновляем триггеры персон
+    const currentPersonTriggers = new Map(personTriggersMap.value);
+    
     for (const personId of selectedPersons.value) {
       if (currentPersonTriggers.has(personId)) {
-        // Обновляем существующий триггер
         const triggerId = currentPersonTriggers.get(personId)!;
-        await apiClient.updateNotificationTrigger(triggerId, {
-          enabled: true,
-        } as any);
-        console.log(`✅ Person trigger ${personId} updated`);
+        await apiClient.updateNotificationTrigger(triggerId, { enabled: true } as any);
       } else {
-        // Создаем новый триггер
         const person = allPersons.value.find(p => p.id === personId);
         if (person) {
           await apiClient.createNotificationTrigger({
@@ -318,24 +275,18 @@ const handleSaveSettings = async () => {
             trigger_value: String(personId),
             enabled: true,
           });
-          console.log(`✅ Person trigger ${personId} created`);
         }
       }
     }
 
-    // Отключаем триггеры для невыбранных персон
     for (const [personId, triggerId] of currentPersonTriggers) {
       if (!selectedPersons.value.has(personId)) {
-        await apiClient.updateNotificationTrigger(triggerId, {
-          enabled: false,
-        } as any);
-        console.log(`✅ Person trigger ${personId} disabled`);
+        await apiClient.updateNotificationTrigger(triggerId, { enabled: false } as any);
       }
     }
 
     saveSuccess.value = true;
     console.log('✅ All settings saved successfully');
-
     setTimeout(() => {
       saveSuccess.value = false;
     }, 3000);
@@ -353,9 +304,6 @@ const handleOpenAddEntityModal = (type: 'ORG' | 'PER') => {
 };
 
 const handleEntityAdded = async (newEntity: any) => {
-  console.log('✅ New entity added:', newEntity);
-  
-  // Добавляем новую сущность в соответствующий список
   const entity: Entity = {
     id: newEntity.id,
     name: newEntity.name,
@@ -365,14 +313,10 @@ const handleEntityAdded = async (newEntity: any) => {
   };
   
   if (newEntity.entity_type === 'ORG') {
-    // Добавляем в начало списка организаций
     allOrganizations.value.unshift(entity);
-    // Автоматически выбираем новую сущность
     selectedOrganizations.value.add(newEntity.id);
   } else if (newEntity.entity_type === 'PER') {
-    // Добавляем в начало списка персон
     allPersons.value.unshift(entity);
-    // Автоматически выбираем новую сущность
     selectedPersons.value.add(newEntity.id);
   }
   
@@ -403,10 +347,7 @@ const handleSendTestEmail = async () => {
       throw new Error(errorData.detail || 'Failed to send test email');
     }
 
-    const data = await response.json();
     saveSuccess.value = true;
-    console.log('✅ Test email sent successfully:', data);
-
     setTimeout(() => {
       saveSuccess.value = false;
     }, 3000);
@@ -447,7 +388,7 @@ const handleSendTestEmail = async () => {
         <p class="overline">Настройки уведомлений</p>
         <h1>Триггеры и каналы</h1>
         <p class="subtitle">
-          Выбирайте организации и персон для мониторинга с получением уведомлений на email.
+          Используйте поиск для добавления организаций и персон в мониторинг.
         </p>
       </div>
       <label class="status-toggle">
@@ -500,7 +441,7 @@ const handleSendTestEmail = async () => {
         </div>
       </article>
 
-      <!-- Organizations -->
+      <!-- Organizations Search -->
       <article class="card">
         <header>
           <div>
@@ -515,30 +456,46 @@ const handleSendTestEmail = async () => {
             + Добавить
           </button>
         </header>
+
+        <!-- Search Input -->
         <div class="search-box">
           <input
             v-model="orgSearchQuery"
             type="text"
-            placeholder="🔍 Поиск организации..."
+            placeholder="🔍 Поиск организации... (минимум 2 символа)"
             class="search-input"
           />
         </div>
-        <div class="entities-list">
-          <div v-if="filteredOrganizations.length === 0" class="empty-state">
-            {{ orgSearchQuery ? 'Организации не найдены' : 'Организации не загружены' }}
+
+        <!-- Search Results -->
+        <div v-if="orgSearchQuery.length >= 2 && orgSearchResults.length > 0" class="search-results">
+          <div class="results-label">Результаты поиска:</div>
+          <button
+            v-for="org in orgSearchResults"
+            :key="org.id"
+            class="result-item"
+            @click="addOrganization(org.id)"
+          >
+            <span class="result-name">{{ org.name }}</span>
+            <span class="add-icon">+</span>
+          </button>
+        </div>
+
+        <!-- Selected Organizations -->
+        <div v-if="selectedOrgsObjects.length > 0" class="selected-items">
+          <div class="items-label">Выбранные организации:</div>
+          <div v-for="org in selectedOrgsObjects" :key="org.id" class="selected-item">
+            <span class="item-name">{{ org.name }}</span>
+            <button class="remove-btn" @click="removeOrganization(org.id)">✕</button>
           </div>
-          <label v-for="org in filteredOrganizations" :key="org.id" class="entity-checkbox">
-            <input
-              type="checkbox"
-              :checked="selectedOrganizations.has(org.id)"
-              @change="toggleOrganization(org.id)"
-            />
-            <span class="entity-name">{{ org.name }}</span>
-          </label>
+        </div>
+
+        <div v-else-if="orgSearchQuery.length === 0" class="empty-state">
+          Выберите организации через поиск
         </div>
       </article>
 
-      <!-- Persons -->
+      <!-- Persons Search -->
       <article class="card">
         <header>
           <div>
@@ -553,26 +510,42 @@ const handleSendTestEmail = async () => {
             + Добавить
           </button>
         </header>
+
+        <!-- Search Input -->
         <div class="search-box">
           <input
             v-model="personSearchQuery"
             type="text"
-            placeholder="🔍 Поиск персоны..."
+            placeholder="🔍 Поиск персоны... (минимум 2 символа)"
             class="search-input"
           />
         </div>
-        <div class="entities-list">
-          <div v-if="filteredPersons.length === 0" class="empty-state">
-            {{ personSearchQuery ? 'Персоны не найдены' : 'Персоны не загружены' }}
+
+        <!-- Search Results -->
+        <div v-if="personSearchQuery.length >= 2 && personSearchResults.length > 0" class="search-results">
+          <div class="results-label">Результаты поиска:</div>
+          <button
+            v-for="person in personSearchResults"
+            :key="person.id"
+            class="result-item"
+            @click="addPerson(person.id)"
+          >
+            <span class="result-name">{{ person.name }}</span>
+            <span class="add-icon">+</span>
+          </button>
+        </div>
+
+        <!-- Selected Persons -->
+        <div v-if="selectedPersonsObjects.length > 0" class="selected-items">
+          <div class="items-label">Выбранные персоны:</div>
+          <div v-for="person in selectedPersonsObjects" :key="person.id" class="selected-item">
+            <span class="item-name">{{ person.name }}</span>
+            <button class="remove-btn" @click="removePerson(person.id)">✕</button>
           </div>
-          <label v-for="person in filteredPersons" :key="person.id" class="entity-checkbox">
-            <input
-              type="checkbox"
-              :checked="selectedPersons.has(person.id)"
-              @change="togglePerson(person.id)"
-            />
-            <span class="entity-name">{{ person.name }}</span>
-          </label>
+        </div>
+
+        <div v-else-if="personSearchQuery.length === 0" class="empty-state">
+          Выберите персон через поиск
         </div>
       </article>
     </section>
@@ -599,7 +572,6 @@ const handleSendTestEmail = async () => {
       </div>
     </section>
 
-    <!-- Add Entity Modal -->
     <AddEntityModal
       :is-open="showAddEntityModal"
       @close="showAddEntityModal = false"
@@ -798,28 +770,161 @@ const handleSendTestEmail = async () => {
 
 .card {
   background: var(--surface-2);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .card header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 16px;
 }
 
-.card header > div {
+.card header div h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.add-entity-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(79, 138, 255, 0.3);
+  background: rgba(79, 138, 255, 0.1);
+  color: rgba(79, 138, 255, 0.8);
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.add-entity-btn:hover {
+  background: rgba(79, 138, 255, 0.15);
+}
+
+.search-box {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(79, 138, 255, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.search-results {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 12px;
+}
+
+.results-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.result-item:hover {
+  background: rgba(79, 138, 255, 0.1);
+  border-color: rgba(79, 138, 255, 0.3);
+}
+
+.result-name {
+  text-align: left;
   flex: 1;
 }
 
-.card h2 {
-  margin: 4px 0 0;
-  font-size: 1.1rem;
+.add-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: rgba(79, 138, 255, 0.3);
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.selected-items {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 12px;
+}
+
+.items-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.selected-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: rgba(79, 138, 255, 0.1);
+  border: 1px solid rgba(79, 138, 255, 0.2);
+}
+
+.item-name {
+  color: #fff;
+  font-weight: 500;
+}
+
+.remove-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: none;
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-btn:hover {
+  background: rgba(248, 113, 113, 0.3);
+}
+
+.empty-state {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 16px 0;
 }
 
 .form-group {
@@ -829,92 +934,25 @@ const handleSendTestEmail = async () => {
 }
 
 .form-group label {
-  font-size: 0.9rem;
-  color: #d5dae5;
-  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text-dim);
 }
 
 .email-input,
 .select-input {
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  color: #fff;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font-size: 0.9rem;
 }
 
 .email-input:focus,
 .select-input:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(79, 138, 255, 0.1);
-}
-
-.entities-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.entity-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.entity-checkbox:hover {
-  background: rgba(79, 138, 255, 0.1);
-}
-
-.entity-checkbox input {
-  cursor: pointer;
-}
-
-.entity-name {
-  flex: 1;
-  font-size: 0.95rem;
-}
-
-.empty-state {
-  padding: 20px;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 0.9rem;
-}
-
-.search-box {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.search-input {
-  flex: 1;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  color: #fff;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-}
-
-.search-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(79, 138, 255, 0.1);
-  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(79, 138, 255, 0.5);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .summary {
@@ -922,130 +960,64 @@ const handleSendTestEmail = async () => {
 }
 
 .summary h3 {
-  margin: 0 0 16px;
-  font-size: 1.1rem;
+  margin: 0 0 12px;
+  font-size: 1rem;
 }
 
 .summary ul {
   list-style: none;
-  margin: 0 0 20px;
   padding: 0;
+  margin: 0 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.summary li {
-  margin: 0;
-  padding-left: 24px;
-  position: relative;
-  color: #d5dae5;
-  line-height: 1.6;
-  font-size: 0.95rem;
-}
-
-.summary li:before {
-  content: '✓';
-  position: absolute;
-  left: 0;
-  color: var(--positive);
-  font-weight: 600;
-}
-
-.add-entity-btn {
-  padding: 8px 14px;
-  background: rgba(79, 138, 255, 0.15);
-  border: 1px solid rgba(79, 138, 255, 0.3);
-  color: var(--accent);
-  border-radius: 8px;
+  gap: 6px;
   font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.add-entity-btn:hover {
-  background: rgba(79, 138, 255, 0.25);
-  border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(79, 138, 255, 0.2);
-}
-
-.add-entity-btn:active {
-  transform: scale(0.95);
-}
-
-.add-entity-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.primary {
-  padding: 12px 24px;
-  background: rgba(79, 138, 255, 0.1);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  align-self: flex-start;
-}
-
-.primary:hover:not(:disabled) {
-  background: rgba(79, 138, 255, 0.2);
-}
-
-.primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  color: var(--text-dim);
 }
 
 .button-group {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 8px;
 }
 
+.primary,
 .secondary {
-  padding: 12px 24px;
-  background: rgba(168, 85, 247, 0.1);
-  border: 1px solid rgba(168, 85, 247, 0.5);
-  color: #d8b4fe;
-  border-radius: 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
   font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.95rem;
 }
 
-.secondary:hover:not(:disabled) {
-  background: rgba(168, 85, 247, 0.2);
-  border-color: rgba(168, 85, 247, 0.8);
+.primary {
+  background: linear-gradient(120deg, rgba(79, 138, 255, 0.8), rgba(79, 138, 255, 0.6));
+  color: #fff;
 }
 
-.secondary:disabled {
+.primary:hover:not(:disabled) {
+  background: linear-gradient(120deg, rgba(79, 138, 255, 0.9), rgba(79, 138, 255, 0.7));
+}
+
+.primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-@media (max-width: 768px) {
-  .hero {
-    flex-direction: column;
-  }
+.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
 
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
+.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
 
-  .button-group {
-    flex-direction: column;
-  }
-
-  .primary, .secondary {
-    align-self: stretch;
-  }
+.secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
