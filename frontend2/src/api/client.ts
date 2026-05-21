@@ -972,10 +972,14 @@ export const api = {
   // Получить список всех организаций
   async getOrganizations(limit = 100): Promise<Entity[]> {
     try {
-      const url = `${API_BASE}/entities?entity_type=ORG&limit=${limit}`;
+      const url = `${API_BASE}/entities?entity_type=ORG&limit=${limit}&page=1`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
+      // API теперь возвращает {items, total, ...}
+      if (data.items && Array.isArray(data.items)) {
+        return data.items;
+      }
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('❌ Error fetching organizations:', error);
@@ -986,10 +990,14 @@ export const api = {
   // Получить список всех персон
   async getPersons(limit = 100): Promise<Entity[]> {
     try {
-      const url = `${API_BASE}/entities?entity_type=PER&limit=${limit}`;
+      const url = `${API_BASE}/entities?entity_type=PER&limit=${limit}&page=1`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       const data = await res.json();
+      // API теперь возвращает {items, total, ...}
+      if (data.items && Array.isArray(data.items)) {
+        return data.items;
+      }
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('❌ Error fetching persons:', error);
