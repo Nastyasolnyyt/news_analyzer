@@ -39,7 +39,6 @@ class EntityService:
         - search: поиск по названию
         """
         from sqlalchemy import select, func
-        from sqlalchemy.sql import ilike
         from src.infrastructure.postgres.models.named_entity import NamedEntity
         
         # Сначала получаем общее количество сущностей
@@ -47,7 +46,7 @@ class EntityService:
         if entity_type:
             count_query = count_query.where(NamedEntity.entity_type == entity_type)
         if search:
-            count_query = count_query.where(ilike(NamedEntity.name, f"%{search}%"))
+            count_query = count_query.where(NamedEntity.name.ilike(f"%{search}%"))
         
         total_result = await self.ner_gateway.session.execute(count_query)
         total = total_result.scalar() or 0
@@ -61,7 +60,7 @@ class EntityService:
         if entity_type:
             query = query.where(NamedEntity.entity_type == entity_type)
         if search:
-            query = query.where(ilike(NamedEntity.name, f"%{search}%"))
+            query = query.where(NamedEntity.name.ilike(f"%{search}%"))
         query = query.order_by(NamedEntity.created_at.desc()).offset(offset).limit(limit)
         result = await self.ner_gateway.session.execute(query)
         entities = result.scalars().all()
