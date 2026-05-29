@@ -88,7 +88,7 @@ def run_consumer():
         group_id="sentiment-analysis-group",
         auto_offset_reset="earliest",
 
-        # ИСПРАВЛЕНО: Анализ BERT-модели занимает ~5-30 сек на статью.
+        
         # Kafka по умолчанию убивает consumer если он не делает poll() в течение
         # max_poll_interval_ms (по умолчанию 300 сек = 5 мин).
         # При батче из нескольких статей легко превысить.

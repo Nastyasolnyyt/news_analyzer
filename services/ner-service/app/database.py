@@ -16,9 +16,7 @@ class NamedEntity(Base):
 # Таблица связи статья ↔ сущность (составной первичный ключ, без ForeignKey)
 class PostEntity(Base):
     __tablename__ = "post_entities"
-    
-    # ✅ НЕТ ForeignKey — таблицы уже существуют в БД
-    # ✅ Составной первичный ключ, как в реальной БД
+
     post_id = Column(Integer, primary_key=True, index=True)
     entity_id = Column(Integer, primary_key=True, index=True)
 

@@ -23,7 +23,17 @@ app = FastAPI()
 
 scheduler = BackgroundScheduler()
 
-RSS_URLS = ["https://www.vedomosti.ru/rss/news.xml"]
+RSS_URLS = [
+    "https://www.vedomosti.ru/rss/news.xml",       # Ведомости
+    "https://ria.ru/export/rss2/index.xml",         # РИА Новости
+    "https://www.rbc.ru/rss/news",                  # РБК
+    "https://www.gazeta.ru/export/rss/lenta.xml",   # Газета.Ru
+    "https://iz.ru/xml/rss_all.xml",                # Известия
+    "https://www.kommersant.ru/RSS/news.xml",        # Коммерсантъ
+    "https://www.vesti.ru/rss",                     # Вести.Ru
+    "https://life.ru/rss/310",                      # Life.ru
+    "http://www.fontanka.ru/fontanka.rss",           # Фонтанка.ру
+]
 
 
 async def run_parsing_logic(urls: List[str]):
@@ -36,8 +46,12 @@ async def run_parsing_logic(urls: List[str]):
     db = SessionLocal()
     try:
         for url in urls:
-            articles = parse_rss(url.strip())
-            logger.info(f"Получено {len(articles)} статей с {url}")
+            try:
+                articles = parse_rss(url.strip())
+                logger.info(f"Получено {len(articles)} статей с {url}")
+            except Exception as e:
+                logger.error(f"Ошибка парсинга {url}: {e}", exc_info=True)
+                continue
 
             for art_data in articles:
                 stmt = insert(ArticleORM).values(
@@ -99,7 +113,7 @@ async def start_scheduler():
     """
     # Инициализируем БД и добавляем constraint если нужно
     init_db()
-    
+
     scheduler.add_job(
         scheduled_parse_job,
         "interval",
@@ -142,4 +156,6 @@ async def health():
         "status": "ok",
         "scheduler_running": scheduler.running,
         "next_parse": str(next_run),
+        "sources_count": len(RSS_URLS),
+        "sources": RSS_URLS,
     }

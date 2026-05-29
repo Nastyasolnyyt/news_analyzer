@@ -87,7 +87,6 @@ class SyncService:
 
     def article_to_doc(self, article):
         # Собираем данные из связанных таблиц (SQLAlchemy relationship)
-        # Убедись, что в моделях прописаны отношения!
         
         doc = {
             "id": article.id,
@@ -103,7 +102,7 @@ class SyncService:
             "risk_confidence": article.risks[0].confidence if article.risks else None,
         }
         
-        # Если есть сущности (NER)
+        
         # Если есть сущности (NER)
         if hasattr(article, 'entities') and article.entities:
             doc["entities"] = [

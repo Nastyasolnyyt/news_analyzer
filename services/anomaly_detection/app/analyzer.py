@@ -1,10 +1,4 @@
-"""
-anomaly_detection/app/analyzer.py
-ИСПРАВЛЕНО:
-1. В analyze_risks: запрос теперь также смотрит на risk_level (заполняется risklevel-classifier)
-2. Добавлен метод get_stats для диагностики
-3. Понижен min_count с 5 до 2 — чтобы срабатывало на меньшем объёме данных
-"""
+
 import pandas as pd
 from sqlalchemy import text
 from datetime import timedelta
@@ -61,7 +55,7 @@ class AnomalyAnalyzer:
     ):
         """
         Универсальный метод IQR с учётом дней без событий.
-        ИСПРАВЛЕНО: min_count снижен до 2 для работы на небольшом объёме данных.
+        
         """
         if df.empty:
             return []
@@ -134,7 +128,7 @@ class AnomalyAnalyzer:
             logger.warning("Нет данных в articles, пропускаю анализ рисков")
             return []
 
-        # ИСПРАВЛЕНО: смотрим на risk_type (заполняется risk-classifier)
+        
         query = """
             SELECT DATE(created_at) as date, risk_type, COUNT(*) as cnt
             FROM risks

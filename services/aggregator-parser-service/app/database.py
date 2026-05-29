@@ -19,9 +19,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class ArticleORM(Base):
-    """
-    Класс-модель, полностью соответствующий твоей таблице 'articles'.
-    """
+    
     __tablename__ = "articles"
 
     id = Column(Integer, primary_key=True, index=True)

@@ -10,7 +10,6 @@ from src.core.modules.cache import CacheProvider
 from src.core.modules.config import ConfigProvider
 from src.core.modules.db import DBProvider
 from src.core.modules.service import ServiceProvider
-# ИСПРАВЛЕНО: Импортируем настройки вместо прямой переменной
 from src.core.config import env_settings 
 from src.presentation.api.setup import setup_routes
 from starlette.middleware.cors import CORSMiddleware
@@ -28,7 +27,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Работа сервера остановлена...")
 
 
-# ИСПРАВЛЕНО: Используем env_settings.DATABASE_URL для инициализации контейнера
 # Добавляем +asyncpg драйвер для асинхронного SQLAlchemy
 db_url = env_settings.DATABASE_URL
 if not "+asyncpg" in db_url:

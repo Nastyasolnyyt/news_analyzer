@@ -22,7 +22,7 @@ class EntityService:
         post_entity_gateway: PostEntityDBGateWay,
         post_gateway: PostDBGateWay,
     ):
-        # ИСПРАВЛЕНО: Убрали лишнюю упаковку в кортеж
+        
         self.ner_gateway = ner_gateway
         self.post_entity_gateway = post_entity_gateway
         self.post_gateway = post_gateway

@@ -1,9 +1,4 @@
-"""
-anomaly_detection/app/main.py
-ИСПРАВЛЕНО:
-1. Импорты теперь относительные (from analyzer import ...) → работает при запуске через python app/main.py
-2. Добавлен вывод статистики БД при каждом цикле для диагностики
-"""
+
 import time
 import sys
 import os
